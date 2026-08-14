@@ -266,15 +266,22 @@ def create_app(config: LoomConfig) -> "FastAPI":
             )
             return resp.__dict__
 
-        @llm_router.post("/consensus")
-        async def llm_consensus(request: Request):
+        app.include_router(llm_router)
+
+    if config.consensus is not None:
+        consensus_router = APIRouter(
+            prefix="/consensus", tags=["consensus"],
+        )
+
+        @consensus_router.post("/gather")
+        async def consensus_gather(request: Request):
             data = await request.json()
             from loom_ai.models import ChatMessage
             messages = [
                 ChatMessage(role=m["role"], content=m["content"])
                 for m in data["messages"]
             ]
-            responses = await config.llm.consensus(
+            responses, failed = await config.consensus.gather(
                 messages,
                 data["models"],
                 temperature=data.get("temperature", 0.7),
@@ -282,10 +289,32 @@ def create_app(config: LoomConfig) -> "FastAPI":
             return {
                 "responses": [r.__dict__ for r in responses],
                 "count": len(responses),
+                "failed_models": failed,
                 "models_queried": data["models"],
             }
 
-        app.include_router(llm_router)
+        @consensus_router.post("/synthesize")
+        async def consensus_synthesize(request: Request):
+            data = await request.json()
+            result = await config.consensus.synthesize(
+                data["prompt"],
+                data["models"],
+                arbiter_model=data.get("arbiter_model"),
+                tool_name=data.get("tool_name", "design"),
+                temperature=data.get("temperature", 0.7),
+                arbiter_temperature=data.get(
+                    "arbiter_temperature", 0.3
+                ),
+            )
+            return {
+                "synthesis": result.synthesis.__dict__,
+                "worker_responses": [
+                    r.__dict__ for r in result.worker_responses
+                ],
+                "failed_models": result.failed_models,
+            }
+
+        app.include_router(consensus_router)
 
     # ── Graph routes (only if configured) ──────────────────────────
 

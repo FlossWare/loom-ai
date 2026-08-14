@@ -215,10 +215,12 @@ class ConsensusEngine:
     @staticmethod
     def _is_retryable(exc: Exception) -> bool:
         """Determine whether an exception warrants a retry."""
-        if isinstance(exc, asyncio.TimeoutError):
+        if isinstance(exc, (asyncio.TimeoutError, ConnectionError, OSError)):
             return True
         if isinstance(exc, RuntimeError):
-            msg = str(exc)
+            msg = str(exc).lower()
+            if "connection error" in msg:
+                return True
             for code in ("429", "500", "502", "503", "504"):
                 if code in msg:
                     return True

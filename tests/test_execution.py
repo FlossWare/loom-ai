@@ -352,6 +352,17 @@ async def test_single_task():
     assert task.completed_at != ""
 
 
+async def test_execute_task_rejects_non_pending():
+    """execute_task raises ValueError for non-PENDING tasks."""
+    cfg = LoomConfig.from_env()
+    engine = ExecutionEngine(cfg)
+    task = Task(
+        id="done", name="Done", status=TaskStatus.COMPLETED,
+    )
+    with pytest.raises(ValueError, match="Cannot execute task"):
+        await engine.execute_task(task)
+
+
 async def test_task_preserves_order():
     """Returned plan preserves original task ordering."""
     cfg = LoomConfig.from_env()

@@ -109,7 +109,14 @@ class ExecutionEngine:
         Transitions the task through RUNNING and then to either
         COMPLETED or FAILED.  Respects ``task.timeout_seconds``
         when set to a positive value.
+
+        Raises ``ValueError`` if the task is not in PENDING state.
         """
+        if task.status != TaskStatus.PENDING:
+            raise ValueError(
+                f"Cannot execute task {task.id!r} in "
+                f"{task.status.value!r} state"
+            )
         task = self._transition(
             task, task.status, TaskStatus.RUNNING
         )

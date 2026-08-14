@@ -272,6 +272,19 @@ async def test_is_not_retryable_value_error():
     assert not ConsensusEngine._is_retryable(ValueError("bad input"))
 
 
+async def test_is_retryable_connection_error():
+    assert ConsensusEngine._is_retryable(ConnectionError("refused"))
+
+
+async def test_is_retryable_os_error():
+    assert ConsensusEngine._is_retryable(OSError("network unreachable"))
+
+
+async def test_is_retryable_runtime_connection_error():
+    exc = RuntimeError("LLM API connection error to https://x: refused")
+    assert ConsensusEngine._is_retryable(exc)
+
+
 def test_consensus_engine_importable():
     from loom_ai import ConsensusEngine, ConsensusResult
 
