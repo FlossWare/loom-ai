@@ -14,6 +14,7 @@ from __future__ import annotations
 import os
 from dataclasses import dataclass
 
+from loom_ai.consensus import ConsensusEngine
 from loom_ai.protocols import (
     EmbeddingBackend,
     GraphBackend,
@@ -38,6 +39,7 @@ class LoomConfig:
     search:    Full-text, semantic, and hybrid search.
     graph:     Optional knowledge graph (``None`` when disabled).
     llm:       Optional LLM chat completions (``None`` when unconfigured).
+    consensus: Optional multi-model consensus engine wrapping *llm*.
     """
 
     storage: StorageBackend
@@ -47,6 +49,7 @@ class LoomConfig:
     search: SearchBackend
     graph: GraphBackend | None = None
     llm: LLMBackend | None = None
+    consensus: ConsensusEngine | None = None
 
     # ── Factory ──────────────────────────────────────────────────────
 
@@ -68,6 +71,7 @@ class LoomConfig:
             LOOM_SECRETS_FILE   Path to .env file (when LOOM_SECRETS=dotenv)
             LOOM_SECRETS_PREFIX Key prefix for env secret lookup
         """
+        llm = cls._build_llm()
         return cls(
             storage=cls._build_storage(
                 os.environ.get("LOOM_STORAGE", "memory"),
@@ -87,7 +91,10 @@ class LoomConfig:
             graph=cls._build_graph(
                 os.environ.get("LOOM_GRAPH", "disabled"),
             ),
-            llm=cls._build_llm(),
+            llm=llm,
+            consensus=(
+                ConsensusEngine(llm) if llm is not None else None
+            ),
         )
 
     # ── Private builders (lazy imports keep core dependency-free) ─────

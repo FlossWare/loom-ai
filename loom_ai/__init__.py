@@ -23,6 +23,7 @@ Quick start::
 """
 
 from loom_ai.config import LoomConfig
+from loom_ai.consensus import ConsensusEngine, ConsensusResult
 from loom_ai.models import (
     ChatMessage,
     ChatResponse,
@@ -47,6 +48,9 @@ from loom_ai.protocols import (
 __all__ = [
     # Registry
     "LoomConfig",
+    # Consensus
+    "ConsensusEngine",
+    "ConsensusResult",
     # Data models
     "ChatMessage",
     "ChatResponse",

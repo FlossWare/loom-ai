@@ -352,8 +352,10 @@ class GraphBackend(Protocol):
 class LLMBackend(Protocol):
     """Chat completion interface for LLM inference.
 
-    Supports single-model chat, streaming, model listing, and
-    multi-model consensus queries.
+    Supports single-model chat, streaming, and model listing.
+    Multi-model consensus is handled by
+    :class:`~loom_ai.consensus.ConsensusEngine`, which wraps any
+    ``LLMBackend`` instance.
 
     Crush deployment  -> HttpLLMBackend (urllib, any OpenAI-compatible API)
     Claude deployment -> same, or a routing layer
@@ -383,18 +385,4 @@ class LLMBackend(Protocol):
 
     async def list_models(self) -> list[str]:
         """Return sorted model identifiers available through this backend."""
-        ...
-
-    async def consensus(
-        self,
-        messages: list[ChatMessage],
-        models: list[str],
-        *,
-        temperature: float = 0.7,
-    ) -> list[ChatResponse]:
-        """Query multiple models with the same prompt, return all responses.
-
-        Failures for individual models are suppressed so that partial
-        results are still returned.
-        """
         ...
