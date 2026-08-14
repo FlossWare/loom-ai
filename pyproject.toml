@@ -1,0 +1,43 @@
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
+[project]
+name = "loom-ai"
+version = "0.1.0"
+description = "Pluggable AI orchestration framework with backend-agnostic protocols"
+requires-python = ">=3.10"
+license = "Apache-2.0"
+authors = [{ name = "FlossWare" }]
+readme = "README.md"
+classifiers = [
+    "Development Status :: 3 - Alpha",
+    "Intended Audience :: Developers",
+    "Programming Language :: Python :: 3",
+    "Programming Language :: Python :: 3.10",
+    "Programming Language :: Python :: 3.11",
+    "Programming Language :: Python :: 3.12",
+    "Programming Language :: Python :: 3.13",
+    "Typing :: Typed",
+]
+
+[project.optional-dependencies]
+postgresql = ["asyncpg>=0.29", "pgvector>=0.2"]
+redis = ["redis[hiredis]>=5.0"]
+orientdb = ["pyorient>=1.5"]
+openai = ["openai>=1.0"]
+litellm = ["litellm>=1.0"]
+server = ["fastapi>=0.110", "uvicorn[standard]>=0.29"]
+all = ["loom-ai[postgresql,redis,orientdb,openai,litellm,server]"]
+dev = ["pytest>=7.0", "pytest-asyncio>=0.23", "ruff>=0.4"]
+
+[tool.pytest.ini_options]
+asyncio_mode = "auto"
+testpaths = ["tests"]
+
+[tool.ruff]
+target-version = "py310"
+line-length = 88
+
+[tool.ruff.lint]
+select = ["E", "F", "I", "W"]
