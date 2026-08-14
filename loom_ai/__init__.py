@@ -33,16 +33,22 @@ from loom_ai.models import (
     GraphEdge,
     GraphNode,
     QueueItem,
+    ResourceContent,
+    ResourceDefinition,
     SearchResult,
+    ToolDefinition,
+    ToolResult,
 )
 from loom_ai.protocols import (
     EmbeddingBackend,
     GraphBackend,
     LLMBackend,
     QueueBackend,
+    ResourceProvider,
     SearchBackend,
     SecretsBackend,
     StorageBackend,
+    ToolProvider,
 )
 
 __all__ = [
@@ -60,15 +66,21 @@ __all__ = [
     "GraphEdge",
     "GraphNode",
     "QueueItem",
+    "ResourceContent",
+    "ResourceDefinition",
     "SearchResult",
+    "ToolDefinition",
+    "ToolResult",
     # Protocols
     "EmbeddingBackend",
     "GraphBackend",
     "LLMBackend",
     "QueueBackend",
+    "ResourceProvider",
     "SearchBackend",
     "SecretsBackend",
     "StorageBackend",
+    "ToolProvider",
 ]
 
 __version__ = "1.1"

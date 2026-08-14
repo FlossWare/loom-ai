@@ -20,9 +20,11 @@ from loom_ai.protocols import (
     GraphBackend,
     LLMBackend,
     QueueBackend,
+    ResourceProvider,
     SearchBackend,
     SecretsBackend,
     StorageBackend,
+    ToolProvider,
 )
 
 
@@ -40,6 +42,8 @@ class LoomConfig:
     graph:     Optional knowledge graph (``None`` when disabled).
     llm:       Optional LLM chat completions (``None`` when unconfigured).
     consensus: Optional multi-model consensus engine wrapping *llm*.
+    tools:     Optional MCP tool provider (``None`` when unconfigured).
+    resources: Optional MCP resource provider (``None`` when unconfigured).
     """
 
     storage: StorageBackend
@@ -50,6 +54,8 @@ class LoomConfig:
     graph: GraphBackend | None = None
     llm: LLMBackend | None = None
     consensus: ConsensusEngine | None = None
+    tools: ToolProvider | None = None
+    resources: ResourceProvider | None = None
 
     # ── Factory ──────────────────────────────────────────────────────
 
@@ -70,6 +76,8 @@ class LoomConfig:
             LOOM_LLM_MODEL      Default model id for the LLM backend
             LOOM_SECRETS_FILE   Path to .env file (when LOOM_SECRETS=dotenv)
             LOOM_SECRETS_PREFIX Key prefix for env secret lookup
+            LOOM_TOOLS          disabled | memory          (default: disabled)
+            LOOM_RESOURCES      disabled | memory          (default: disabled)
         """
         llm = cls._build_llm()
         return cls(
@@ -94,6 +102,12 @@ class LoomConfig:
             llm=llm,
             consensus=(
                 ConsensusEngine(llm) if llm is not None else None
+            ),
+            tools=cls._build_tools(
+                os.environ.get("LOOM_TOOLS", "disabled"),
+            ),
+            resources=cls._build_resources(
+                os.environ.get("LOOM_RESOURCES", "disabled"),
             ),
         )
 
@@ -268,4 +282,30 @@ class LoomConfig:
             provider_name=os.environ.get(
                 "LOOM_LLM_PROVIDER", "openai-compatible"
             ),
+        )
+
+    @staticmethod
+    def _build_tools(kind: str) -> ToolProvider | None:
+        if kind == "disabled":
+            return None
+        if kind == "memory":
+            from loom_ai.backends.memory_mcp import MemoryToolProvider
+
+            return MemoryToolProvider()
+        raise ValueError(
+            f"Unknown tools backend: {kind!r}.  "
+            f"Valid options: disabled, memory"
+        )
+
+    @staticmethod
+    def _build_resources(kind: str) -> ResourceProvider | None:
+        if kind == "disabled":
+            return None
+        if kind == "memory":
+            from loom_ai.backends.memory_mcp import MemoryResourceProvider
+
+            return MemoryResourceProvider()
+        raise ValueError(
+            f"Unknown resources backend: {kind!r}.  "
+            f"Valid options: disabled, memory"
         )

@@ -103,3 +103,45 @@ class GraphEdge:
     target: str
     label: str
     properties: dict = field(default_factory=dict)
+
+
+# ── MCP (Model Context Protocol) ────────────────────────────────────────
+
+
+@dataclass
+class ToolDefinition:
+    """Schema for a callable tool exposed via MCP."""
+
+    name: str
+    description: str
+    parameters: dict = field(default_factory=dict)
+    required_params: list[str] = field(default_factory=list)
+
+
+@dataclass
+class ToolResult:
+    """Result returned after invoking an MCP tool."""
+
+    tool_name: str
+    output: object = None
+    error: str | None = None
+    duration_ms: float | None = None
+
+
+@dataclass
+class ResourceDefinition:
+    """Descriptor for a readable MCP resource."""
+
+    uri: str
+    name: str
+    description: str = ""
+    mime_type: str | None = None
+
+
+@dataclass
+class ResourceContent:
+    """Content payload returned when reading an MCP resource."""
+
+    uri: str
+    content: str | bytes = ""
+    mime_type: str = "text/plain"

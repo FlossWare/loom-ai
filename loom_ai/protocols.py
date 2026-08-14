@@ -23,7 +23,11 @@ if TYPE_CHECKING:
         GraphEdge,
         GraphNode,
         QueueItem,
+        ResourceContent,
+        ResourceDefinition,
         SearchResult,
+        ToolDefinition,
+        ToolResult,
     )
 
 
@@ -385,4 +389,58 @@ class LLMBackend(Protocol):
 
     async def list_models(self) -> list[str]:
         """Return sorted model identifiers available through this backend."""
+        ...
+
+
+# ── ToolProvider (MCP) ──────────────────────────────────────────────────
+
+
+@runtime_checkable
+class ToolProvider(Protocol):
+    """MCP tool provider: list available tools and invoke them by name.
+
+    Each tool is described by a ``ToolDefinition`` (JSON-Schema-style
+    parameter spec) and returns a ``ToolResult`` on invocation.
+
+    Crush deployment  -> MemoryToolProvider (dict-backed callables)
+    Claude deployment -> an MCP server adapter
+    """
+
+    async def list_tools(self) -> list[ToolDefinition]:
+        """Return definitions for every tool this provider exposes."""
+        ...
+
+    async def call_tool(
+        self, name: str, arguments: dict
+    ) -> ToolResult:
+        """Invoke the tool identified by *name* with the given arguments.
+
+        Implementations must return a ``ToolResult`` with ``error`` set
+        (rather than raising) when the tool itself fails.
+        """
+        ...
+
+
+# ── ResourceProvider (MCP) ──────────────────────────────────────────────
+
+
+@runtime_checkable
+class ResourceProvider(Protocol):
+    """MCP resource provider: list and read data sources.
+
+    Resources are identified by URI and return typed content payloads.
+
+    Crush deployment  -> MemoryResourceProvider (dict-backed)
+    Claude deployment -> an MCP server adapter
+    """
+
+    async def list_resources(self) -> list[ResourceDefinition]:
+        """Return definitions for every resource this provider exposes."""
+        ...
+
+    async def read_resource(self, uri: str) -> ResourceContent:
+        """Read the content of the resource at *uri*.
+
+        Raises ``KeyError`` when the URI is not found.
+        """
         ...
