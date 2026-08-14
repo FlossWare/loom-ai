@@ -1,0 +1,71 @@
+name: CD-CI
+
+on:
+  push:
+    branches: [ main ]
+
+permissions:
+  contents: write
+  id-token: write
+
+jobs:
+  publish:
+    if: github.event.pusher.email != 'version-bump@flossware.org'
+    runs-on: ubuntu-latest
+    environment: release
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+
+      - name: Install build tools
+        run: pip install hatchling build twine
+
+      - name: Install dev dependencies and run tests
+        run: |
+          pip install -e ".[dev,server]"
+          python -m pytest tests/ -v --tb=short
+
+      - name: Lint check
+        run: ruff check loom_ai/
+
+      - name: Setup .gitconfig for version bumps
+        uses: oleksiyrudenko/gha-git-credentials@latest
+        with:
+          global: true
+          name: 'Version Bump'
+          email: 'version-bump@flossware.org'
+          actor: 'VersionBump'
+          token: '${{ secrets.GITHUB_TOKEN }}'
+
+      - name: Bump minor version
+        run: |
+          chmod +x scripts/bump-version.sh
+          scripts/bump-version.sh minor
+
+      - name: Build package
+        run: python -m build
+
+      - name: Verify package
+        run: twine check dist/*
+
+      - name: Publish to PyPI
+        env:
+          TWINE_USERNAME: __token__
+          TWINE_PASSWORD: ${{ secrets.PYPI_TOKEN }}
+        run: twine upload dist/*
+
+      - name: Commit version bump and tag
+        run: |
+          VERSION=$(python -c "import loom_ai; print(loom_ai.__version__)")
+          git add pyproject.toml loom_ai/__init__.py loom_ai/server.py
+          git commit -m "Bump version to ${VERSION} [skip ci]"
+          git tag -a "v${VERSION}" -m "Release ${VERSION}"
+          git push origin main --tags

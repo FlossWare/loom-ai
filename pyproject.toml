@@ -29,7 +29,7 @@ openai = ["openai>=1.0"]
 litellm = ["litellm>=1.0"]
 server = ["fastapi>=0.110", "uvicorn[standard]>=0.29"]
 all = ["loom-ai[postgresql,redis,orientdb,openai,litellm,server]"]
-dev = ["pytest>=7.0", "pytest-asyncio>=0.23", "ruff>=0.4"]
+dev = ["pytest>=7.0", "pytest-asyncio>=0.23", "pytest-cov>=5.0", "ruff>=0.4"]
 
 [tool.pytest.ini_options]
 asyncio_mode = "auto"

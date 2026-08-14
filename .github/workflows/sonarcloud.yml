@@ -1,0 +1,71 @@
+name: SonarCloud Analysis
+
+on:
+  push:
+    branches:
+      - main
+      - develop
+  pull_request:
+    types: [opened, synchronize, reopened]
+
+jobs:
+  sonarcloud:
+    name: SonarCloud Scan
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+
+      - name: Install dependencies
+        run: pip install -e ".[dev,server]"
+
+      - name: Run tests with coverage
+        run: |
+          python -m pytest tests/ \
+            --cov=loom_ai \
+            --cov-report=xml:coverage.xml \
+            -v --tb=short
+
+      - name: Verify CI-based analysis is enabled
+        env:
+          SONAR_TOKEN: ${{ secrets.SONAR_TOKEN }}
+        run: |
+          echo "Checking SonarCloud project settings..."
+
+          PROJECT_SETTINGS=$(curl -s -u "$SONAR_TOKEN:" \
+            "https://sonarcloud.io/api/settings/values?component=FlossWare_loom-ai")
+
+          echo "Project settings retrieved. Proceeding with CI-based analysis..."
+          echo ""
+          echo "NOTE: If this workflow fails with 'Automatic Analysis is enabled',"
+          echo "you must manually disable it in the SonarCloud web UI:"
+          echo "  1. Visit: https://sonarcloud.io/project/administration/analysis_method?id=FlossWare_loom-ai"
+          echo "  2. Select 'CI-based analysis'"
+          echo "  3. Disable 'Automatic Analysis'"
+          echo ""
+
+      - name: SonarCloud Scan
+        uses: SonarSource/sonarcloud-github-action@master
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          SONAR_TOKEN: ${{ secrets.SONAR_TOKEN }}
+        with:
+          args: >
+            -Dsonar.projectKey=FlossWare_loom-ai
+            -Dsonar.organization=flossware
+            -Dsonar.sources=loom_ai
+            -Dsonar.tests=tests
+            -Dsonar.python.version=3.10,3.11,3.12,3.13
+            -Dsonar.python.coverage.reportPaths=coverage.xml
+            -Dsonar.qualitygate.wait=true
+            -Dsonar.scm.disabled=false
+            -Dsonar.sourceEncoding=UTF-8
+            -Dsonar.exclusions=**/__pycache__/**,**/dist/**,**/*.egg-info/**
