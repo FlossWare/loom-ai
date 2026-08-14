@@ -1,9 +1,8 @@
 """loom-ai: Pluggable AI orchestration framework.
 
 Exports ``LoomConfig`` (the central registry), all Protocol interfaces,
-all data-model dataclasses, ``ConsensusEngine`` for multi-model
-fan-out, ``ExecutionEngine`` for DAG-based task scheduling, and
-MCP tool/resource contracts for a clean public API.
+all data-model dataclasses, and the execution engine for a clean public
+API.
 
 Quick start::
 

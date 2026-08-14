@@ -100,7 +100,9 @@ class LoomConfig:
                 os.environ.get("LOOM_GRAPH", "disabled"),
             ),
             llm=llm,
-            consensus=(ConsensusEngine(llm) if llm is not None else None),
+            consensus=(
+                ConsensusEngine(llm) if llm is not None else None
+            ),
             tools=cls._build_tools(
                 os.environ.get("LOOM_TOOLS", "disabled"),
             ),
@@ -129,7 +131,8 @@ class LoomConfig:
                 ) from exc
             return PostgresqlStorageBackend.from_env()  # type: ignore[attr-defined]
         raise ValueError(
-            f"Unknown storage backend: {kind!r}.  Valid options: memory, postgresql"
+            f"Unknown storage backend: {kind!r}.  "
+            f"Valid options: memory, postgresql"
         )
 
     @staticmethod
@@ -150,7 +153,8 @@ class LoomConfig:
                 ) from exc
             return RedisQueueBackend.from_env()  # type: ignore[attr-defined]
         raise ValueError(
-            f"Unknown queue backend: {kind!r}.  Valid options: memory, redis"
+            f"Unknown queue backend: {kind!r}.  "
+            f"Valid options: memory, redis"
         )
 
     @staticmethod
@@ -235,7 +239,8 @@ class LoomConfig:
                 ) from exc
             return PostgresqlSearchBackend.from_env()  # type: ignore[attr-defined]
         raise ValueError(
-            f"Unknown search backend: {kind!r}.  Valid options: memory, postgresql"
+            f"Unknown search backend: {kind!r}.  "
+            f"Valid options: memory, postgresql"
         )
 
     @staticmethod
@@ -274,7 +279,9 @@ class LoomConfig:
             base_url=base_url,
             api_key=os.environ.get("LOOM_LLM_API_KEY", ""),
             default_model=os.environ.get("LOOM_LLM_MODEL", "gpt-4o-mini"),
-            provider_name=os.environ.get("LOOM_LLM_PROVIDER", "openai-compatible"),
+            provider_name=os.environ.get(
+                "LOOM_LLM_PROVIDER", "openai-compatible"
+            ),
         )
 
     @staticmethod
@@ -286,7 +293,8 @@ class LoomConfig:
 
             return MemoryToolProvider()
         raise ValueError(
-            f"Unknown tools backend: {kind!r}.  Valid options: disabled, memory"
+            f"Unknown tools backend: {kind!r}.  "
+            f"Valid options: disabled, memory"
         )
 
     @staticmethod
@@ -298,5 +306,6 @@ class LoomConfig:
 
             return MemoryResourceProvider()
         raise ValueError(
-            f"Unknown resources backend: {kind!r}.  Valid options: disabled, memory"
+            f"Unknown resources backend: {kind!r}.  "
+            f"Valid options: disabled, memory"
         )

@@ -82,7 +82,9 @@ class StorageBackend(Protocol):
 
     # -- Chunks -----------------------------------------------------------
 
-    async def store_chunks(self, document_id: str, chunks: list[Chunk]) -> int:
+    async def store_chunks(
+        self, document_id: str, chunks: list[Chunk]
+    ) -> int:
         """Store chunks for a document and return the count stored."""
         ...
 
@@ -224,7 +226,9 @@ class EmbeddingBackend(Protocol):
         """
         ...
 
-    async def embed_single(self, text: str, *, model: str | None = None) -> list[float]:
+    async def embed_single(
+        self, text: str, *, model: str | None = None
+    ) -> list[float]:
         """Convenience: embed exactly one text and return its vector."""
         ...
 
@@ -267,7 +271,9 @@ class SearchBackend(Protocol):
         """
         ...
 
-    async def text_search(self, query: str, *, limit: int = 10) -> list[SearchResult]:
+    async def text_search(
+        self, query: str, *, limit: int = 10
+    ) -> list[SearchResult]:
         """Return chunks matching *query* via full-text (or substring) search."""
         ...
 
@@ -412,7 +418,9 @@ class ToolProvider(Protocol):
         """Return definitions for every tool this provider exposes."""
         ...
 
-    async def call_tool(self, name: str, arguments: dict) -> ToolResult:
+    async def call_tool(
+        self, name: str, arguments: dict
+    ) -> ToolResult:
         """Invoke the tool identified by *name* with the given arguments.
 
         Implementations must return a ``ToolResult`` with ``error`` set

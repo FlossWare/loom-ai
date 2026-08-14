@@ -91,7 +91,9 @@ class ConsensusEngine:
             max_concurrent or self._max_concurrent,
         )
         deadline = time.monotonic() + (
-            timeout_seconds if timeout_seconds is not None else self._timeout_seconds
+            timeout_seconds
+            if timeout_seconds is not None
+            else self._timeout_seconds
         )
         max_retries = retries if retries is not None else self._retries
 
@@ -169,7 +171,8 @@ class ConsensusEngine:
         """
         worker_msgs_raw = build_worker_messages(tool_name, prompt)
         worker_msgs = [
-            ChatMessage(role=m["role"], content=m["content"]) for m in worker_msgs_raw
+            ChatMessage(role=m["role"], content=m["content"])
+            for m in worker_msgs_raw
         ]
 
         responses, failed = await self.gather(
@@ -187,70 +190,27 @@ class ConsensusEngine:
                 failed_models=failed,
             )
 
-        worker_dicts = [{"model": r.model, "response": r.content} for r in responses]
+        worker_dicts = [
+            {"model": r.model, "response": r.content}
+            for r in responses
+        ]
         arbiter_msgs_raw = build_arbiter_messages(prompt, worker_dicts)
         arbiter_msgs = [
-            ChatMessage(role=m["role"], content=m["content"]) for m in arbiter_msgs_raw
+            ChatMessage(role=m["role"], content=m["content"])
+            for m in arbiter_msgs_raw
         ]
 
-        try:
-            synthesis = await self._call_with_retry(
-                arbiter_msgs,
-                model=arbiter_model,
-                temperature=arbiter_temperature,
-            )
-        except Exception:
-            synthesis = ChatResponse(
-                content="Arbiter synthesis failed; worker responses are available.",
-            )
+        synthesis = await self._backend.chat(
+            arbiter_msgs,
+            model=arbiter_model,
+            temperature=arbiter_temperature,
+        )
 
         return ConsensusResult(
             synthesis=synthesis,
             worker_responses=responses,
             failed_models=failed,
         )
-
-    async def _call_with_retry(
-        self,
-        messages: list[ChatMessage],
-        *,
-        model: str | None = None,
-        temperature: float = 0.7,
-        timeout_seconds: int | None = None,
-        retries: int | None = None,
-    ) -> ChatResponse:
-        """Call backend.chat with deadline timeout and retry."""
-        deadline = time.monotonic() + (
-            timeout_seconds if timeout_seconds is not None else self._timeout_seconds
-        )
-        max_retries = retries if retries is not None else self._retries
-
-        last_exc: Exception | None = None
-        for attempt in range(1 + max_retries):
-            remaining = deadline - time.monotonic()
-            if remaining <= 0:
-                break
-            try:
-                return await asyncio.wait_for(
-                    self._backend.chat(
-                        messages,
-                        model=model,
-                        temperature=temperature,
-                    ),
-                    timeout=remaining,
-                )
-            except Exception as exc:
-                last_exc = exc
-                if not self._is_retryable(exc):
-                    raise
-                delay = min(
-                    (2**attempt) + random.uniform(0, 1),
-                    max(0, deadline - time.monotonic()),
-                )
-                if attempt < max_retries and delay > 0:
-                    await asyncio.sleep(delay)
-
-        raise RuntimeError("Arbiter call failed after retries") from last_exc
 
     @staticmethod
     def _is_retryable(exc: Exception) -> bool:

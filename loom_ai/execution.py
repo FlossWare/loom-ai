@@ -114,9 +114,12 @@ class ExecutionEngine:
         """
         if task.status != TaskStatus.PENDING:
             raise ValueError(
-                f"Cannot execute task {task.id!r} in {task.status.value!r} state"
+                f"Cannot execute task {task.id!r} in "
+                f"{task.status.value!r} state"
             )
-        task = self._transition(task, task.status, TaskStatus.RUNNING)
+        task = self._transition(
+            task, task.status, TaskStatus.RUNNING
+        )
         try:
             if task.timeout_seconds > 0:
                 result = await asyncio.wait_for(
@@ -124,19 +127,36 @@ class ExecutionEngine:
                     timeout=task.timeout_seconds,
                 )
             else:
-                result = await self._runner.run(task, self._config)
-            output = result if isinstance(result, dict) else {"result": result}
+                result = await self._runner.run(
+                    task, self._config
+                )
+            output = (
+                result
+                if isinstance(result, dict)
+                else {"result": result}
+            )
             task = replace(task, output_data=output)
-            return self._transition(task, TaskStatus.RUNNING, TaskStatus.COMPLETED)
+            return self._transition(
+                task, TaskStatus.RUNNING, TaskStatus.COMPLETED
+            )
         except asyncio.TimeoutError:
-            msg = f"Task {task.id!r} timed out after {task.timeout_seconds}s"
+            msg = (
+                f"Task {task.id!r} timed out after "
+                f"{task.timeout_seconds}s"
+            )
             task = replace(task, error=msg)
-            return self._transition(task, TaskStatus.RUNNING, TaskStatus.FAILED)
+            return self._transition(
+                task, TaskStatus.RUNNING, TaskStatus.FAILED
+            )
         except Exception as exc:
             task = replace(task, error=str(exc))
-            return self._transition(task, TaskStatus.RUNNING, TaskStatus.FAILED)
+            return self._transition(
+                task, TaskStatus.RUNNING, TaskStatus.FAILED
+            )
 
-    async def execute_plan(self, plan: ExecutionPlan) -> ExecutionPlan:
+    async def execute_plan(
+        self, plan: ExecutionPlan
+    ) -> ExecutionPlan:
         """Execute all tasks in the plan respecting dependencies.
 
         Tasks whose dependencies are all completed run in parallel.
@@ -165,7 +185,8 @@ class ExecutionEngine:
                 for tid, t in task_map.items()
                 if t.status == TaskStatus.PENDING
                 and all(
-                    task_map[d].status == TaskStatus.COMPLETED for d in t.dependencies
+                    task_map[d].status == TaskStatus.COMPLETED
+                    for d in t.dependencies
                 )
             ]
             if not ready:
@@ -173,17 +194,27 @@ class ExecutionEngine:
 
             ready.sort()
             results = await asyncio.gather(
-                *(self.execute_task(task_map[tid]) for tid in ready)
+                *(
+                    self.execute_task(task_map[tid])
+                    for tid in ready
+                )
             )
             for result in results:
                 task_map[result.id] = result
                 if result.status == TaskStatus.FAILED:
-                    self._cancel_downstream(result.id, task_map, dependents)
+                    self._cancel_downstream(
+                        result.id, task_map, dependents
+                    )
 
-        stuck = [t.id for t in task_map.values() if t.status == TaskStatus.PENDING]
+        stuck = [
+            t.id
+            for t in task_map.values()
+            if t.status == TaskStatus.PENDING
+        ]
         if stuck:
             raise CyclicDependencyError(
-                "Cyclic dependency among tasks: " + ", ".join(sorted(stuck))
+                "Cyclic dependency among tasks: "
+                + ", ".join(sorted(stuck))
             )
 
         return replace(
@@ -191,7 +222,9 @@ class ExecutionEngine:
             tasks=[task_map[t.id] for t in plan.tasks],
         )
 
-    async def retry_failed(self, plan: ExecutionPlan) -> ExecutionPlan:
+    async def retry_failed(
+        self, plan: ExecutionPlan
+    ) -> ExecutionPlan:
         """Retry all failed tasks that have retries remaining.
 
         Resets failed tasks (with ``retries_remaining > 0``) to
@@ -203,11 +236,16 @@ class ExecutionEngine:
         retried_any = False
 
         for task in plan.tasks:
-            if task.status == TaskStatus.FAILED and task.retries_remaining > 0:
+            if (
+                task.status == TaskStatus.FAILED
+                and task.retries_remaining > 0
+            ):
                 task_map[task.id] = replace(
                     task,
                     status=TaskStatus.PENDING,
-                    retries_remaining=(task.retries_remaining - 1),
+                    retries_remaining=(
+                        task.retries_remaining - 1
+                    ),
                     error="",
                     output_data={},
                     started_at="",
@@ -292,5 +330,7 @@ class ExecutionEngine:
                 TaskStatus.RUNNING,
             ):
                 continue
-            task_map[tid] = self._transition(task, task.status, TaskStatus.CANCELLED)
+            task_map[tid] = self._transition(
+                task, task.status, TaskStatus.CANCELLED
+            )
             queue.extend(dependents.get(tid, set()))

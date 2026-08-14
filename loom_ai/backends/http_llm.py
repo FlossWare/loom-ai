@@ -98,7 +98,9 @@ class HttpLLMBackend:
         )
 
     @staticmethod
-    def _parse_response(data: dict, model: str, provider: str) -> ChatResponse:
+    def _parse_response(
+        data: dict, model: str, provider: str
+    ) -> ChatResponse:
         choices = data.get("choices", [])
         content = ""
         if choices:
@@ -131,7 +133,9 @@ class HttpLLMBackend:
     ) -> ChatResponse:
         """Send a chat completion request (run in a thread to stay async)."""
         resolved = self._resolve_model(model)
-        req = self._build_request(messages, resolved, temperature, max_tokens)
+        req = self._build_request(
+            messages, resolved, temperature, max_tokens
+        )
 
         def _do_request() -> ChatResponse:
             try:
@@ -140,18 +144,26 @@ class HttpLLMBackend:
                 ) as resp:
                     body = resp.read().decode("utf-8")
                     data = json.loads(body)
-                    return self._parse_response(data, resolved, self._provider_name)
+                    return self._parse_response(
+                        data, resolved, self._provider_name
+                    )
             except urllib.error.HTTPError as exc:
-                error_body = exc.read().decode("utf-8", errors="replace")[:1000]
+                error_body = exc.read().decode("utf-8", errors="replace")[
+                    :1000
+                ]
                 raise RuntimeError(
-                    f"LLM API error {exc.code} from {self._base_url}: {error_body}"
+                    f"LLM API error {exc.code} from "
+                    f"{self._base_url}: {error_body}"
                 ) from exc
             except urllib.error.URLError as exc:
                 raise RuntimeError(
-                    f"LLM API connection error to {self._base_url}: {exc.reason}"
+                    f"LLM API connection error to "
+                    f"{self._base_url}: {exc.reason}"
                 ) from exc
 
-        return await asyncio.get_running_loop().run_in_executor(None, _do_request)
+        return await asyncio.get_running_loop().run_in_executor(
+            None, _do_request
+        )
 
     async def chat_stream(
         self,
@@ -181,7 +193,9 @@ class HttpLLMBackend:
                     req, timeout=self._timeout, context=self._ssl_ctx
                 ) as resp:
                     for raw_line in resp:
-                        line = raw_line.decode("utf-8", errors="replace").rstrip("\n\r")
+                        line = raw_line.decode(
+                            "utf-8", errors="replace"
+                        ).rstrip("\n\r")
 
                         if not line.startswith("data: "):
                             continue
@@ -202,7 +216,9 @@ class HttpLLMBackend:
                         delta = choices[0].get("delta", {})
                         content = delta.get("content")
                         if content:
-                            loop.call_soon_threadsafe(queue.put_nowait, content)
+                            loop.call_soon_threadsafe(
+                                queue.put_nowait, content
+                            )
             except Exception:
                 # Stream ends; the sentinel below signals the consumer.
                 pass
@@ -220,7 +236,9 @@ class HttpLLMBackend:
     async def list_models(self) -> list[str]:
         """Fetch available models from the ``/models`` endpoint."""
         url = f"{self._base_url}/models"
-        req = urllib.request.Request(url, headers=self._headers(), method="GET")
+        req = urllib.request.Request(
+            url, headers=self._headers(), method="GET"
+        )
 
         def _do_request() -> list[str]:
             try:
@@ -232,7 +250,9 @@ class HttpLLMBackend:
                     models_list = data.get("data", [])
                     return sorted(m["id"] for m in models_list if "id" in m)
             except urllib.error.HTTPError as exc:
-                error_body = exc.read().decode("utf-8", errors="replace")[:500]
+                error_body = exc.read().decode("utf-8", errors="replace")[
+                    :500
+                ]
                 raise RuntimeError(
                     f"Failed to list models from "
                     f"{self._base_url}: {exc.code} {error_body}"
@@ -242,4 +262,6 @@ class HttpLLMBackend:
                     f"Cannot reach {self._base_url}/models: {exc.reason}"
                 ) from exc
 
-        return await asyncio.get_running_loop().run_in_executor(None, _do_request)
+        return await asyncio.get_running_loop().run_in_executor(
+            None, _do_request
+        )
