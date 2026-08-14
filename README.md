@@ -30,10 +30,11 @@ doc_id = await cfg.storage.store_document(Document(
 ))
 
 # Multi-model consensus (requires LOOM_LLM_BASE_URL)
-responses = await cfg.llm.consensus(
-    [ChatMessage(role="user", content="Explain distributed systems")],
+result = await cfg.consensus.synthesize(
+    "Explain distributed systems",
     models=["gemini-3.5-flash", "llama-3.3-70b", "mistral-small"],
 )
+print(result.synthesis.content)
 ```
 
 ### As a REST server
@@ -60,6 +61,9 @@ Routes mount dynamically based on configuration:
 | Search | `/search/*` | Always |
 | Secrets | `/secrets/*` | Always |
 | LLM | `/llm/*` | `LOOM_LLM_BASE_URL` set |
+| Consensus | `/consensus/*` | `LOOM_LLM_BASE_URL` set |
+| Tools | `/tools/*` | `LOOM_TOOLS != disabled` |
+| Resources | `/resources/*` | `LOOM_RESOURCES != disabled` |
 | Graph | `/graph/*` | `LOOM_GRAPH != disabled` |
 | Health | `/health` | Always |
 
@@ -75,6 +79,8 @@ All via environment variables (defaults in parentheses):
 | `LOOM_EMBEDDING` | `noop`, `openai`, `litellm` | `noop` |
 | `LOOM_SEARCH` | `memory`, `postgresql` | `memory` |
 | `LOOM_GRAPH` | `disabled`, `memory`, `orientdb` | `disabled` |
+| `LOOM_TOOLS` | `disabled`, `memory` | `disabled` |
+| `LOOM_RESOURCES` | `disabled`, `memory` | `disabled` |
 | `LOOM_LLM_BASE_URL` | Any OpenAI-compatible URL | *(none)* |
 | `LOOM_LLM_API_KEY` | Bearer token | *(none)* |
 | `LOOM_LLM_MODEL` | Default model id | `gpt-4o-mini` |
@@ -87,18 +93,21 @@ Don't set it? Don't get it. Set nothing at all and you get a pure in-memory orch
 
 ```
 loom_ai/
-  protocols.py          7 Protocol interfaces (async, stdlib-only)
-  models.py             9 dataclasses (Document, Chunk, ChatMessage, etc.)
+  protocols.py          10 Protocol interfaces (async, stdlib-only)
+  models.py             15 dataclasses + 1 enum (Document, Chunk, ChatMessage, Task, etc.)
   config.py             LoomConfig registry with from_env() factory
+  consensus.py          ConsensusEngine (fan-out + arbiter synthesis)
+  execution.py          ExecutionEngine (DAG-based task scheduling)
   prompts.py            Built-in consensus prompt templates
   server.py             Optional FastAPI REST server
   backends/
     memory.py           In-memory implementations (zero deps)
+    memory_mcp.py       In-memory MCP tool/resource providers
     env_secrets.py      Environment variable secrets
     http_llm.py         HTTP LLM backend (urllib, zero deps)
 ```
 
-## 7 Pluggable Protocols
+## 10 Pluggable Protocols
 
 | Protocol | Purpose | Default | Enterprise |
 |----------|---------|---------|------------|
@@ -108,33 +117,37 @@ loom_ai/
 | `EmbeddingBackend` | Text to vectors | Zero vectors | OpenAI / Jina / Voyage |
 | `SearchBackend` | Full-text + semantic | Substring + cosine | tsvector + pgvector ANN |
 | `GraphBackend` | Knowledge graph | Disabled | OrientDB |
-| `LLMBackend` | Chat + consensus | HTTP (any OpenAI-compatible) | Same |
+| `LLMBackend` | Chat completions | HTTP (any OpenAI-compatible) | Same |
+| `ToolProvider` | MCP tool dispatch | In-memory callables | MCP server adapter |
+| `ResourceProvider` | MCP resource access | In-memory static | MCP server adapter |
+| `TaskRunner` | Task execution strategy | Noop (pass-through) | LLM-backed runner |
 
 ## Multi-Model Consensus
 
 Fan out to N models, synthesize with an arbiter:
 
 ```python
-from loom_ai.prompts import build_worker_messages, build_arbiter_messages
+from loom_ai import LoomConfig
 
-# Workers respond independently
-worker_msgs = build_worker_messages("review", "Check this code for bugs")
-responses = await cfg.llm.consensus(
-    [ChatMessage(role=m["role"], content=m["content"]) for m in worker_msgs],
-    models=["gemini-3.5-flash", "llama-3.3-70b", "codestral"],
-    timeout_seconds=60,
-    retries=2,
-)
+cfg = LoomConfig.from_env()
 
-# Arbiter synthesizes
-arbiter_msgs = build_arbiter_messages(
+# High-level: fan-out + arbiter synthesis in one call
+result = await cfg.consensus.synthesize(
     "Check this code for bugs",
-    [{"model": r.model, "response": r.content} for r in responses],
+    models=["gemini-3.5-flash", "llama-3.3-70b", "codestral"],
+    arbiter_model="gemini-3.5-flash",
+    tool_name="review",
+    arbiter_temperature=0.3,
 )
-synthesis = await cfg.llm.chat(
-    [ChatMessage(role=m["role"], content=m["content"]) for m in arbiter_msgs],
-    model="gemini-3.5-flash",
-    temperature=0.3,
+print(result.synthesis.content)
+print(f"Workers: {len(result.worker_responses)}, Failed: {result.failed_models}")
+
+# Low-level: just fan-out (no arbiter)
+from loom_ai import ChatMessage
+
+responses, failed = await cfg.consensus.gather(
+    [ChatMessage(role="user", content="Check this code for bugs")],
+    models=["gemini-3.5-flash", "llama-3.3-70b", "codestral"],
 )
 ```
 

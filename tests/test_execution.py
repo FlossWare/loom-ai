@@ -34,10 +34,7 @@ class RecordingRunner:
     async def run(self, task, config):
         self.attempts[task.id] += 1
         self.calls.append(task.id)
-        if (
-            task.id in self._fail_on_first
-            and self.attempts[task.id] == 1
-        ):
+        if task.id in self._fail_on_first and self.attempts[task.id] == 1:
             raise RuntimeError(f"Simulated failure: {task.id}")
         return {"attempt": self.attempts[task.id]}
 
@@ -77,9 +74,7 @@ async def test_linear_chain():
 
     result = await engine.execute_plan(plan)
 
-    assert all(
-        t.status == TaskStatus.COMPLETED for t in result.tasks
-    )
+    assert all(t.status == TaskStatus.COMPLETED for t in result.tasks)
     assert runner.calls == ["a", "b", "c"]
 
 
@@ -100,9 +95,7 @@ async def test_parallel_independent_tasks():
 
     result = await engine.execute_plan(plan)
 
-    assert all(
-        t.status == TaskStatus.COMPLETED for t in result.tasks
-    )
+    assert all(t.status == TaskStatus.COMPLETED for t in result.tasks)
     assert set(runner.calls) == {"x", "y", "z"}
 
 
@@ -272,9 +265,7 @@ async def test_unknown_dependency_raises():
     plan = ExecutionPlan(
         id="unknown-dep",
         tasks=[
-            Task(
-                id="a", name="A", dependencies=["ghost"]
-            ),
+            Task(id="a", name="A", dependencies=["ghost"]),
         ],
     )
 
@@ -293,9 +284,7 @@ async def test_observer_receives_transitions():
     def on_transition(task, old, new):
         transitions.append((task.id, old, new))
 
-    engine = ExecutionEngine(
-        cfg, runner=NoopTaskRunner(), observer=on_transition
-    )
+    engine = ExecutionEngine(cfg, runner=NoopTaskRunner(), observer=on_transition)
     plan = ExecutionPlan(
         id="observe",
         tasks=[Task(id="t", name="T")],
@@ -357,7 +346,9 @@ async def test_execute_task_rejects_non_pending():
     cfg = LoomConfig.from_env()
     engine = ExecutionEngine(cfg)
     task = Task(
-        id="done", name="Done", status=TaskStatus.COMPLETED,
+        id="done",
+        name="Done",
+        status=TaskStatus.COMPLETED,
     )
     with pytest.raises(ValueError, match="Cannot execute task"):
         await engine.execute_task(task)

@@ -30,9 +30,7 @@ class FakeLLMBackend:
         temperature: float = 0.7,
         max_tokens: int | None = None,
     ) -> ChatResponse:
-        self.calls.append(
-            {"model": model, "temperature": temperature}
-        )
+        self.calls.append({"model": model, "temperature": temperature})
 
         if model in self.slow_models:
             await asyncio.sleep(self.slow_models[model])
@@ -42,9 +40,7 @@ class FakeLLMBackend:
 
         if model in self.retryable_fail_models:
             self.retryable_fail_models.discard(model)
-            raise RuntimeError(
-                "LLM API error 429 from http://fake: rate limited"
-            )
+            raise RuntimeError("LLM API error 429 from http://fake: rate limited")
 
         content = f"Response from {model}"
         return ChatResponse(
@@ -69,9 +65,7 @@ async def test_gather_basic_fanout():
     engine = ConsensusEngine(backend)
     msgs = [ChatMessage(role="user", content="Hello")]
 
-    responses, failed = await engine.gather(
-        msgs, ["model-a", "model-b", "model-c"]
-    )
+    responses, failed = await engine.gather(msgs, ["model-a", "model-b", "model-c"])
 
     assert len(responses) == 3
     assert len(failed) == 0
@@ -88,9 +82,7 @@ async def test_gather_partial_failure():
     engine = ConsensusEngine(backend, retries=0)
     msgs = [ChatMessage(role="user", content="Hello")]
 
-    responses, failed = await engine.gather(
-        msgs, ["model-a", "model-b", "model-c"]
-    )
+    responses, failed = await engine.gather(msgs, ["model-a", "model-b", "model-c"])
 
     assert len(responses) == 2
     assert "model-b" in failed
@@ -103,9 +95,7 @@ async def test_gather_all_fail():
     engine = ConsensusEngine(backend, retries=0)
     msgs = [ChatMessage(role="user", content="Hello")]
 
-    responses, failed = await engine.gather(
-        msgs, ["model-a", "model-b"]
-    )
+    responses, failed = await engine.gather(msgs, ["model-a", "model-b"])
 
     assert len(responses) == 0
     assert set(failed) == {"model-a", "model-b"}
@@ -147,9 +137,7 @@ async def test_gather_respects_concurrency_limit():
     engine = ConsensusEngine(backend, max_concurrent=2)
     msgs = [ChatMessage(role="user", content="Hello")]
 
-    responses, failed = await engine.gather(
-        msgs, ["m1", "m2", "m3", "m4"]
-    )
+    responses, failed = await engine.gather(msgs, ["m1", "m2", "m3", "m4"])
 
     assert len(responses) == 4
     assert len(failed) == 0

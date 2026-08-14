@@ -58,9 +58,7 @@ class MemoryToolProvider:
     async def list_tools(self) -> list[ToolDefinition]:
         return list(self._tools.values())
 
-    async def call_tool(
-        self, name: str, arguments: dict
-    ) -> ToolResult:
+    async def call_tool(self, name: str, arguments: dict) -> ToolResult:
         if name not in self._handlers:
             return ToolResult(
                 tool_name=name,

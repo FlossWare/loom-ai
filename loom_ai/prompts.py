@@ -48,9 +48,7 @@ ARBITER_PROMPT = (
 )
 
 
-def build_worker_messages(
-    tool_name: str, user_prompt: str
-) -> list[dict[str, str]]:
+def build_worker_messages(tool_name: str, user_prompt: str) -> list[dict[str, str]]:
     system = WORKER_PROMPTS.get(tool_name, WORKER_PROMPTS["design"])
     return [
         {"role": "system", "content": system},
@@ -67,10 +65,7 @@ def build_arbiter_messages(
     parts = [f"Original prompt:\n\n{user_prompt}\n"]
     for i, wr in enumerate(worker_responses, 1):
         parts.append(
-            f"\n{'=' * 60}\n"
-            f"MODEL {i}: {wr['model']}\n"
-            f"{'=' * 60}\n"
-            f"{wr['response']}\n"
+            f"\n{'=' * 60}\nMODEL {i}: {wr['model']}\n{'=' * 60}\n{wr['response']}\n"
         )
     parts.append("\nProvide your synthesized consensus response.")
 

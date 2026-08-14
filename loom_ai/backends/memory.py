@@ -108,9 +108,7 @@ class MemoryStorageBackend:
 
             # Remove every embedding that references this chunk
             stale = [
-                eid
-                for eid, emb in self._embeddings.items()
-                if emb.chunk_id == chunk_id
+                eid for eid, emb in self._embeddings.items() if emb.chunk_id == chunk_id
             ]
             for eid in stale:
                 del self._embeddings[eid]
@@ -126,9 +124,7 @@ class MemoryStorageBackend:
 
     # -- Chunks -----------------------------------------------------------
 
-    async def store_chunks(
-        self, document_id: str, chunks: list[Chunk]
-    ) -> int:
+    async def store_chunks(self, document_id: str, chunks: list[Chunk]) -> int:
         stored = 0
         for chunk in chunks:
             self._chunks[chunk.id] = chunk
@@ -158,10 +154,7 @@ class MemoryStorageBackend:
                     past_cursor = True
                 continue
 
-            if (
-                chunk_id not in self._embedded_chunk_ids
-                and chunk_id in self._chunks
-            ):
+            if chunk_id not in self._embedded_chunk_ids and chunk_id in self._chunks:
                 result.append(self._chunks[chunk_id])
                 if len(result) >= limit:
                     break
@@ -179,9 +172,7 @@ class MemoryStorageBackend:
             self._embedded_chunk_ids.discard(chunk_id)
 
             stale = [
-                eid
-                for eid, emb in self._embeddings.items()
-                if emb.chunk_id == chunk_id
+                eid for eid, emb in self._embeddings.items() if emb.chunk_id == chunk_id
             ]
             for eid in stale:
                 del self._embeddings[eid]
@@ -330,9 +321,7 @@ class NoopEmbeddingBackend:
         dims = self._resolve_dims(model)
         return [[0.0] * dims for _ in texts]
 
-    async def embed_single(
-        self, text: str, *, model: str | None = None
-    ) -> list[float]:
+    async def embed_single(self, text: str, *, model: str | None = None) -> list[float]:
         return [0.0] * self._resolve_dims(model)
 
     async def available_models(self) -> list[str]:
@@ -390,9 +379,7 @@ class MemorySearchBackend:
             self._vectors[chunk.id] = vector
         return True
 
-    async def text_search(
-        self, query: str, *, limit: int = 10
-    ) -> list[SearchResult]:
+    async def text_search(self, query: str, *, limit: int = 10) -> list[SearchResult]:
         query_lower = query.lower()
         scored: list[tuple[str, int]] = []
         for chunk_id, chunk in self._chunks.items():
@@ -630,9 +617,7 @@ class MemoryGraphBackend:
         for _ in range(depth):
             next_frontier: set[str] = set()
             for nid in frontier:
-                neighbors = await self.get_neighbors(
-                    nid, edge_label=edge_label
-                )
+                neighbors = await self.get_neighbors(nid, edge_label=edge_label)
                 for neighbor in neighbors:
                     if neighbor.id not in visited:
                         visited.add(neighbor.id)
