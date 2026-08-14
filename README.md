@@ -1,5 +1,7 @@
 # loom-ai
 
+![loom-ai](docs/assets/banner.svg)
+
 Pluggable AI orchestration framework with swappable backends. Zero required dependencies.
 
 ## Install
