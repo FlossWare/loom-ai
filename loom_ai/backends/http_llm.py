@@ -291,7 +291,6 @@ class HttpLLMBackend:
         deadline = time.monotonic() + timeout_seconds
 
         async def _worker(model_id: str) -> ChatResponse | None:
-            last_exc: Exception | None = None
             for attempt in range(1 + retries):
                 remaining = deadline - time.monotonic()
                 if remaining <= 0:
@@ -307,7 +306,6 @@ class HttpLLMBackend:
                             timeout=remaining,
                         )
                 except Exception as exc:
-                    last_exc = exc
                     if not self._is_retryable(exc):
                         break
                     delay = min(

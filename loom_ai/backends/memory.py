@@ -31,7 +31,6 @@ from loom_ai.models import (
     SearchResult,
 )
 
-
 # ── helpers ──────────────────────────────────────────────────────────────
 
 

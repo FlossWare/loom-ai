@@ -22,14 +22,15 @@ import time
 from typing import TYPE_CHECKING
 
 if TYPE_CHECKING:
+    from fastapi import FastAPI
+
     from loom_ai.config import LoomConfig
 
 
 def create_app(config: LoomConfig) -> "FastAPI":
     """Build a FastAPI application wiring only the active backends."""
     try:
-        from fastapi import FastAPI, HTTPException, Request
-        from fastapi.responses import JSONResponse
+        from fastapi import FastAPI, HTTPException, Request  # noqa: F811
     except ImportError as exc:
         raise ImportError(
             "FastAPI server requires 'fastapi' and 'uvicorn'.  "
@@ -39,7 +40,7 @@ def create_app(config: LoomConfig) -> "FastAPI":
     app = FastAPI(
         title="loom-ai",
         description="Pluggable AI orchestration API",
-        version="0.1.0",
+        version="1.0",
     )
     app.state.loom = config
 
@@ -72,7 +73,11 @@ def create_app(config: LoomConfig) -> "FastAPI":
     @storage_router.get("/documents")
     async def list_documents(limit: int = 20, offset: int = 0):
         docs = await config.storage.list_documents(limit=limit, offset=offset)
-        return {"documents": [d.__dict__ for d in docs], "limit": limit, "offset": offset}
+        return {
+            "documents": [d.__dict__ for d in docs],
+            "limit": limit,
+            "offset": offset,
+        }
 
     @storage_router.post("/documents")
     async def store_document(request: Request):
@@ -96,9 +101,11 @@ def create_app(config: LoomConfig) -> "FastAPI":
 
     @storage_router.post("/chunks/store")
     async def store_chunks(request: Request):
-        data = await request.json()
-        from loom_ai.models import Chunk
         import hashlib
+
+        from loom_ai.models import Chunk
+
+        data = await request.json()
         chunks = []
         for i, c in enumerate(data["chunks"]):
             content = c if isinstance(c, str) else c.get("content", "")
@@ -247,7 +254,10 @@ def create_app(config: LoomConfig) -> "FastAPI":
         async def llm_chat(request: Request):
             data = await request.json()
             from loom_ai.models import ChatMessage
-            messages = [ChatMessage(role=m["role"], content=m["content"]) for m in data["messages"]]
+            messages = [
+                ChatMessage(role=m["role"], content=m["content"])
+                for m in data["messages"]
+            ]
             resp = await config.llm.chat(
                 messages,
                 model=data.get("model"),
@@ -260,7 +270,10 @@ def create_app(config: LoomConfig) -> "FastAPI":
         async def llm_consensus(request: Request):
             data = await request.json()
             from loom_ai.models import ChatMessage
-            messages = [ChatMessage(role=m["role"], content=m["content"]) for m in data["messages"]]
+            messages = [
+                ChatMessage(role=m["role"], content=m["content"])
+                for m in data["messages"]
+            ]
             responses = await config.llm.consensus(
                 messages,
                 data["models"],

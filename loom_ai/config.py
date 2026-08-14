@@ -100,7 +100,9 @@ class LoomConfig:
             return MemoryStorageBackend()
         if kind == "postgresql":
             try:
-                from loom_ai.backends.postgresql import PostgresqlStorageBackend  # type: ignore[import-not-found]
+                from loom_ai.backends.postgresql import (
+                    PostgresqlStorageBackend,  # type: ignore[import-not-found]
+                )
             except ImportError as exc:
                 raise ImportError(
                     "PostgreSQL storage requires 'asyncpg'.  "
@@ -120,7 +122,9 @@ class LoomConfig:
             return MemoryQueueBackend()
         if kind == "redis":
             try:
-                from loom_ai.backends.redis import RedisQueueBackend  # type: ignore[import-not-found]
+                from loom_ai.backends.redis import (
+                    RedisQueueBackend,  # type: ignore[import-not-found]
+                )
             except ImportError as exc:
                 raise ImportError(
                     "Redis queue requires the 'redis' package.  "
@@ -149,7 +153,9 @@ class LoomConfig:
             )
         if kind == "postgresql":
             try:
-                from loom_ai.backends.postgresql import PostgresqlSecretsBackend  # type: ignore[import-not-found]
+                from loom_ai.backends.postgresql import (
+                    PostgresqlSecretsBackend,  # type: ignore[import-not-found]
+                )
             except ImportError as exc:
                 raise ImportError(
                     "PostgreSQL secrets requires 'asyncpg'.  "
@@ -169,7 +175,9 @@ class LoomConfig:
             return NoopEmbeddingBackend()
         if kind == "openai":
             try:
-                from loom_ai.backends.openai_embedding import OpenAIEmbeddingBackend  # type: ignore[import-not-found]
+                from loom_ai.backends.openai_embedding import (
+                    OpenAIEmbeddingBackend,  # type: ignore[import-not-found]
+                )
             except ImportError as exc:
                 raise ImportError(
                     "OpenAI embeddings require the 'openai' package.  "
@@ -178,7 +186,9 @@ class LoomConfig:
             return OpenAIEmbeddingBackend.from_env()  # type: ignore[attr-defined]
         if kind == "litellm":
             try:
-                from loom_ai.backends.litellm_embedding import LiteLLMEmbeddingBackend  # type: ignore[import-not-found]
+                from loom_ai.backends.litellm_embedding import (
+                    LiteLLMEmbeddingBackend,  # type: ignore[import-not-found]
+                )
             except ImportError as exc:
                 raise ImportError(
                     "LiteLLM embeddings require the 'litellm' package.  "
@@ -198,7 +208,9 @@ class LoomConfig:
             return MemorySearchBackend()
         if kind == "postgresql":
             try:
-                from loom_ai.backends.postgresql import PostgresqlSearchBackend  # type: ignore[import-not-found]
+                from loom_ai.backends.postgresql import (
+                    PostgresqlSearchBackend,  # type: ignore[import-not-found]
+                )
             except ImportError as exc:
                 raise ImportError(
                     "PostgreSQL search requires 'asyncpg' and 'pgvector'.  "
@@ -220,7 +232,9 @@ class LoomConfig:
             return MemoryGraphBackend()
         if kind == "orientdb":
             try:
-                from loom_ai.backends.orientdb import OrientDBGraphBackend  # type: ignore[import-not-found]
+                from loom_ai.backends.orientdb import (
+                    OrientDBGraphBackend,  # type: ignore[import-not-found]
+                )
             except ImportError as exc:
                 raise ImportError(
                     "OrientDB graph requires 'pyorient'.  "

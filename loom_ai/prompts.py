@@ -8,33 +8,43 @@ from __future__ import annotations
 
 WORKER_PROMPTS: dict[str, str] = {
     "design": (
-        "You are a senior software architect. Analyze the following design question "
-        "and provide a thorough, opinionated recommendation. Be specific about trade-offs, "
-        "suggest concrete patterns, and justify your choices. Focus on practical implementation."
+        "You are a senior software architect. Analyze the "
+        "following design question and provide a thorough, "
+        "opinionated recommendation. Be specific about "
+        "trade-offs, suggest concrete patterns, and justify "
+        "your choices. Focus on practical implementation."
     ),
     "review": (
-        "You are an expert code reviewer. Review the following code or design for bugs, "
-        "security issues, performance problems, and maintainability concerns. Be specific: "
-        "quote line numbers, suggest concrete fixes, and rate severity (CRITICAL/HIGH/MEDIUM/LOW). "
+        "You are an expert code reviewer. Review the "
+        "following code or design for bugs, security issues, "
+        "performance problems, and maintainability concerns. "
+        "Be specific: quote line numbers, suggest concrete "
+        "fixes, and rate severity "
+        "(CRITICAL/HIGH/MEDIUM/LOW). "
         "Don't flag cosmetic issues."
     ),
     "implement": (
-        "You are an expert software engineer. Given the following task, provide a complete, "
-        "production-ready implementation. Include error handling, type hints, and any necessary "
-        "imports. Be pragmatic — write working code, not pseudocode."
+        "You are an expert software engineer. Given the "
+        "following task, provide a complete, production-ready "
+        "implementation. Include error handling, type hints, "
+        "and any necessary imports. Be pragmatic — write "
+        "working code, not pseudocode."
     ),
 }
 
 ARBITER_PROMPT = (
-    "You are an expert Arbiter synthesizing responses from {worker_count} independent AI models. "
+    "You are an expert Arbiter synthesizing responses "
+    "from {worker_count} independent AI models. "
     "Your job:\n"
     "1. Identify points of CONSENSUS (where models agree)\n"
-    "2. Resolve CONFLICTS (pick the better answer, explain why)\n"
-    "3. Catch ERRORS (if a model got something wrong, call it out)\n"
-    "4. Produce a SINGLE definitive response that is better than any individual response\n\n"
-    "Do NOT simply list or summarize each model's response. Synthesize them into one cohesive answer. "
-    "If all models agree on something, state it once with confidence. "
-    "If they disagree, pick the correct answer and briefly note why."
+    "2. Resolve CONFLICTS (pick the better answer, why)\n"
+    "3. Catch ERRORS (if a model got something wrong)\n"
+    "4. Produce a SINGLE definitive response better than "
+    "any individual response\n\n"
+    "Do NOT simply list or summarize each model's response."
+    " Synthesize them into one cohesive answer. "
+    "If all models agree, state it once with confidence. "
+    "If they disagree, pick the correct answer and note why."
 )
 
 
