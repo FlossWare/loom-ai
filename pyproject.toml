@@ -3,7 +3,7 @@ requires = ["hatchling"]
 build-backend = "hatchling.build"
 
 [project]
-name = "loom-ai"
+name = "flossware-loom-ai"
 version = "1.0"
 description = "Pluggable AI orchestration framework with backend-agnostic protocols"
 requires-python = ">=3.10"
@@ -28,7 +28,7 @@ orientdb = ["pyorient>=1.5"]
 openai = ["openai>=1.0"]
 litellm = ["litellm>=1.0"]
 server = ["fastapi>=0.110", "uvicorn[standard]>=0.29"]
-all = ["loom-ai[postgresql,redis,orientdb,openai,litellm,server]"]
+all = ["flossware-loom-ai[postgresql,redis,orientdb,openai,litellm,server]"]
 dev = ["pytest>=7.0", "pytest-asyncio>=0.23", "ruff>=0.4"]
 
 [tool.pytest.ini_options]

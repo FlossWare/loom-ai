@@ -1,7 +1,7 @@
 """Optional FastAPI REST server for loom-ai.
 
 Dynamically mounts routes based on which backends are configured.
-Install with: pip install loom-ai[server]
+Install with: pip install flossware-loom-ai[server]
 
 Usage:
     # Auto-configure from LOOM_* env vars:
@@ -34,7 +34,7 @@ def create_app(config: LoomConfig) -> "FastAPI":
     except ImportError as exc:
         raise ImportError(
             "FastAPI server requires 'fastapi' and 'uvicorn'.  "
-            "Install with: pip install loom-ai[server]"
+            "Install with: pip install flossware-loom-ai[server]"
         ) from exc
 
     app = FastAPI(
@@ -342,7 +342,7 @@ def main() -> None:
     except ImportError as exc:
         raise ImportError(
             "Running the server requires 'uvicorn'.  "
-            "Install with: pip install loom-ai[server]"
+            "Install with: pip install flossware-loom-ai[server]"
         ) from exc
 
     from loom_ai.config import LoomConfig

@@ -7,11 +7,11 @@ Pluggable AI orchestration framework with swappable backends. Zero required depe
 ## Install
 
 ```bash
-pip install loom-ai              # core (stdlib only)
-pip install loom-ai[server]      # + FastAPI REST server
-pip install loom-ai[postgresql]  # + PostgreSQL/pgvector storage
-pip install loom-ai[redis]       # + Redis queues
-pip install loom-ai[all]         # everything
+pip install flossware-loom-ai              # core (stdlib only)
+pip install flossware-loom-ai[server]      # + FastAPI REST server
+pip install flossware-loom-ai[postgresql]  # + PostgreSQL/pgvector storage
+pip install flossware-loom-ai[redis]       # + Redis queues
+pip install flossware-loom-ai[all]         # everything
 ```
 
 ## Quick Start

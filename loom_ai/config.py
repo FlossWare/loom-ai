@@ -106,7 +106,7 @@ class LoomConfig:
             except ImportError as exc:
                 raise ImportError(
                     "PostgreSQL storage requires 'asyncpg'.  "
-                    "Install with: pip install loom-ai[postgresql]"
+                    "Install with: pip install flossware-loom-ai[postgresql]"
                 ) from exc
             return PostgresqlStorageBackend.from_env()  # type: ignore[attr-defined]
         raise ValueError(
@@ -128,7 +128,7 @@ class LoomConfig:
             except ImportError as exc:
                 raise ImportError(
                     "Redis queue requires the 'redis' package.  "
-                    "Install with: pip install loom-ai[redis]"
+                    "Install with: pip install flossware-loom-ai[redis]"
                 ) from exc
             return RedisQueueBackend.from_env()  # type: ignore[attr-defined]
         raise ValueError(
@@ -159,7 +159,7 @@ class LoomConfig:
             except ImportError as exc:
                 raise ImportError(
                     "PostgreSQL secrets requires 'asyncpg'.  "
-                    "Install with: pip install loom-ai[postgresql]"
+                    "Install with: pip install flossware-loom-ai[postgresql]"
                 ) from exc
             return PostgresqlSecretsBackend.from_env()  # type: ignore[attr-defined]
         raise ValueError(
@@ -181,7 +181,7 @@ class LoomConfig:
             except ImportError as exc:
                 raise ImportError(
                     "OpenAI embeddings require the 'openai' package.  "
-                    "Install with: pip install loom-ai[openai]"
+                    "Install with: pip install flossware-loom-ai[openai]"
                 ) from exc
             return OpenAIEmbeddingBackend.from_env()  # type: ignore[attr-defined]
         if kind == "litellm":
@@ -192,7 +192,7 @@ class LoomConfig:
             except ImportError as exc:
                 raise ImportError(
                     "LiteLLM embeddings require the 'litellm' package.  "
-                    "Install with: pip install loom-ai[litellm]"
+                    "Install with: pip install flossware-loom-ai[litellm]"
                 ) from exc
             return LiteLLMEmbeddingBackend.from_env()  # type: ignore[attr-defined]
         raise ValueError(
@@ -214,7 +214,7 @@ class LoomConfig:
             except ImportError as exc:
                 raise ImportError(
                     "PostgreSQL search requires 'asyncpg' and 'pgvector'.  "
-                    "Install with: pip install loom-ai[postgresql]"
+                    "Install with: pip install flossware-loom-ai[postgresql]"
                 ) from exc
             return PostgresqlSearchBackend.from_env()  # type: ignore[attr-defined]
         raise ValueError(
@@ -238,7 +238,7 @@ class LoomConfig:
             except ImportError as exc:
                 raise ImportError(
                     "OrientDB graph requires 'pyorient'.  "
-                    "Install with: pip install loom-ai[orientdb]"
+                    "Install with: pip install flossware-loom-ai[orientdb]"
                 ) from exc
             return OrientDBGraphBackend.from_env()  # type: ignore[attr-defined]
         raise ValueError(
