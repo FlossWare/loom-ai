@@ -31,6 +31,9 @@ server = ["fastapi>=0.110", "uvicorn[standard]>=0.29"]
 all = ["flossware-loom-ai[postgresql,redis,orientdb,openai,litellm,server]"]
 dev = ["pytest>=7.0", "pytest-asyncio>=0.23", "ruff>=0.4"]
 
+[tool.hatch.build.targets.wheel]
+packages = ["loom_ai"]
+
 [tool.pytest.ini_options]
 asyncio_mode = "auto"
 testpaths = ["tests"]
