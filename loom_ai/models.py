@@ -7,6 +7,7 @@ signatures.
 
 from __future__ import annotations
 
+import enum
 from dataclasses import dataclass, field
 
 
@@ -145,3 +146,44 @@ class ResourceContent:
     uri: str
     content: str | bytes = ""
     mime_type: str = "text/plain"
+
+
+# ── Execution Engine ────────────────────────────────────────────────────
+
+
+class TaskStatus(enum.Enum):
+    """Lifecycle states for a task in an execution plan."""
+
+    PENDING = "pending"
+    RUNNING = "running"
+    COMPLETED = "completed"
+    FAILED = "failed"
+    CANCELLED = "cancelled"
+
+
+@dataclass
+class Task:
+    """A unit of work within an execution plan."""
+
+    id: str
+    name: str
+    description: str = ""
+    status: TaskStatus = TaskStatus.PENDING
+    dependencies: list[str] = field(default_factory=list)
+    input_data: dict = field(default_factory=dict)
+    output_data: dict = field(default_factory=dict)
+    error: str = ""
+    retries_remaining: int = 0
+    timeout_seconds: float = 0.0
+    created_at: str = ""
+    started_at: str = ""
+    completed_at: str = ""
+
+
+@dataclass
+class ExecutionPlan:
+    """An ordered collection of tasks with dependency relationships."""
+
+    id: str
+    tasks: list[Task] = field(default_factory=list)
+    created_at: str = ""

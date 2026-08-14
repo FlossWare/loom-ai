@@ -11,9 +11,16 @@ dependencies beyond ``typing``.
 
 from __future__ import annotations
 
-from typing import TYPE_CHECKING, AsyncIterator, Protocol, runtime_checkable
+from typing import (
+    TYPE_CHECKING,
+    Any,
+    AsyncIterator,
+    Protocol,
+    runtime_checkable,
+)
 
 if TYPE_CHECKING:
+    from loom_ai.config import LoomConfig
     from loom_ai.models import (
         ChatMessage,
         ChatResponse,
@@ -26,6 +33,7 @@ if TYPE_CHECKING:
         ResourceContent,
         ResourceDefinition,
         SearchResult,
+        Task,
         ToolDefinition,
         ToolResult,
     )
@@ -442,5 +450,27 @@ class ResourceProvider(Protocol):
         """Read the content of the resource at *uri*.
 
         Raises ``KeyError`` when the URI is not found.
+        """
+        ...
+
+
+# -- TaskRunner ──────────────────────────────────────────────────────────
+
+
+@runtime_checkable
+class TaskRunner(Protocol):
+    """Executes a single task within the orchestration engine.
+
+    Implementations define *how* a task runs (LLM call, tool
+    invocation, pass-through, etc.).  The execution engine calls
+    ``run`` and maps the return value into ``task.output_data``.
+    """
+
+    async def run(self, task: Task, config: LoomConfig) -> Any:
+        """Execute *task* and return an arbitrary result.
+
+        The engine stores ``dict`` results directly as
+        ``output_data``; non-dict results are wrapped in
+        ``{"result": value}``.
         """
         ...

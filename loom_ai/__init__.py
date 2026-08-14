@@ -1,7 +1,8 @@
 """loom-ai: Pluggable AI orchestration framework.
 
 Exports ``LoomConfig`` (the central registry), all Protocol interfaces,
-and all data-model dataclasses for a clean public API.
+all data-model dataclasses, and the execution engine for a clean public
+API.
 
 Quick start::
 
@@ -24,18 +25,27 @@ Quick start::
 
 from loom_ai.config import LoomConfig
 from loom_ai.consensus import ConsensusEngine, ConsensusResult
+from loom_ai.execution import (
+    CyclicDependencyError,
+    ExecutionEngine,
+    LLMTaskRunner,
+    NoopTaskRunner,
+)
 from loom_ai.models import (
     ChatMessage,
     ChatResponse,
     Chunk,
     Document,
     Embedding,
+    ExecutionPlan,
     GraphEdge,
     GraphNode,
     QueueItem,
     ResourceContent,
     ResourceDefinition,
     SearchResult,
+    Task,
+    TaskStatus,
     ToolDefinition,
     ToolResult,
 )
@@ -48,6 +58,7 @@ from loom_ai.protocols import (
     SearchBackend,
     SecretsBackend,
     StorageBackend,
+    TaskRunner,
     ToolProvider,
 )
 
@@ -63,14 +74,22 @@ __all__ = [
     "Chunk",
     "Document",
     "Embedding",
+    "ExecutionPlan",
     "GraphEdge",
     "GraphNode",
     "QueueItem",
     "ResourceContent",
     "ResourceDefinition",
     "SearchResult",
+    "Task",
+    "TaskStatus",
     "ToolDefinition",
     "ToolResult",
+    # Execution
+    "CyclicDependencyError",
+    "ExecutionEngine",
+    "LLMTaskRunner",
+    "NoopTaskRunner",
     # Protocols
     "EmbeddingBackend",
     "GraphBackend",
@@ -80,6 +99,7 @@ __all__ = [
     "SearchBackend",
     "SecretsBackend",
     "StorageBackend",
+    "TaskRunner",
     "ToolProvider",
 ]
 
