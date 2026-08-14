@@ -40,7 +40,7 @@ def create_app(config: LoomConfig) -> "FastAPI":
     app = FastAPI(
         title="loom-ai",
         description="Pluggable AI orchestration API",
-        version="1.2",
+        version="1.3",
     )
     app.state.loom = config
 
