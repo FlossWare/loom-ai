@@ -64,12 +64,9 @@ from loom_ai.protocols import (
 )
 
 __all__ = [
-    # Registry
     "LoomConfig",
-    # Consensus
     "ConsensusEngine",
     "ConsensusResult",
-    # Data models
     "ChatMessage",
     "ChatResponse",
     "Chunk",
@@ -86,12 +83,10 @@ __all__ = [
     "TaskStatus",
     "ToolDefinition",
     "ToolResult",
-    # Execution
     "CyclicDependencyError",
     "ExecutionEngine",
     "LLMTaskRunner",
     "NoopTaskRunner",
-    # Protocols
     "EmbeddingBackend",
     "GraphBackend",
     "LLMBackend",
@@ -104,4 +99,4 @@ __all__ = [
     "ToolProvider",
 ]
 
-__version__ = "1.1"
+__version__ = "1.2"
