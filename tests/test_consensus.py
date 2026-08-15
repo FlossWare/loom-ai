@@ -2,19 +2,14 @@
 
 import asyncio
 
+import pytest
+
 from loom_ai.consensus import ConsensusEngine, ConsensusResult
 from loom_ai.models import ChatMessage, ChatResponse
 
-# ── Fake LLM backend for testing ────────────────────────────────────────
-
 
 class FakeLLMBackend:
-    """Minimal LLMBackend that records calls and returns canned responses.
-
-    Set ``fail_models`` to a set of model ids that should raise
-    RuntimeError.  Set ``slow_models`` to a dict of model id -> delay
-    in seconds to simulate latency.
-    """
+    """Minimal LLMBackend that records calls and returns canned responses."""
 
     def __init__(self) -> None:
         self.calls: list[dict] = []
@@ -30,9 +25,7 @@ class FakeLLMBackend:
         temperature: float = 0.7,
         max_tokens: int | None = None,
     ) -> ChatResponse:
-        self.calls.append(
-            {"model": model, "temperature": temperature}
-        )
+        self.calls.append({"model": model, "temperature": temperature})
 
         if model in self.slow_models:
             await asyncio.sleep(self.slow_models[model])
@@ -42,9 +35,7 @@ class FakeLLMBackend:
 
         if model in self.retryable_fail_models:
             self.retryable_fail_models.discard(model)
-            raise RuntimeError(
-                "LLM API error 429 from http://fake: rate limited"
-            )
+            raise RuntimeError("LLM API error 429 from http://fake: rate limited")
 
         content = f"Response from {model}"
         return ChatResponse(
@@ -61,25 +52,17 @@ class FakeLLMBackend:
         return ["model-a", "model-b", "model-c"]
 
 
-# ── Tests ────────────────────────────────────────────────────────────────
-
-
 async def test_gather_basic_fanout():
     backend = FakeLLMBackend()
     engine = ConsensusEngine(backend)
     msgs = [ChatMessage(role="user", content="Hello")]
-
     responses, failed = await engine.gather(
-        msgs, ["model-a", "model-b", "model-c"]
+        msgs,
+        ["model-a", "model-b", "model-c"],
     )
-
     assert len(responses) == 3
     assert len(failed) == 0
-    assert {r.model for r in responses} == {
-        "model-a",
-        "model-b",
-        "model-c",
-    }
+    assert {r.model for r in responses} == {"model-a", "model-b", "model-c"}
 
 
 async def test_gather_partial_failure():
@@ -87,11 +70,10 @@ async def test_gather_partial_failure():
     backend.fail_models = {"model-b"}
     engine = ConsensusEngine(backend, retries=0)
     msgs = [ChatMessage(role="user", content="Hello")]
-
     responses, failed = await engine.gather(
-        msgs, ["model-a", "model-b", "model-c"]
+        msgs,
+        ["model-a", "model-b", "model-c"],
     )
-
     assert len(responses) == 2
     assert "model-b" in failed
     assert {r.model for r in responses} == {"model-a", "model-c"}
@@ -102,11 +84,7 @@ async def test_gather_all_fail():
     backend.fail_models = {"model-a", "model-b"}
     engine = ConsensusEngine(backend, retries=0)
     msgs = [ChatMessage(role="user", content="Hello")]
-
-    responses, failed = await engine.gather(
-        msgs, ["model-a", "model-b"]
-    )
-
+    responses, failed = await engine.gather(msgs, ["model-a", "model-b"])
     assert len(responses) == 0
     assert set(failed) == {"model-a", "model-b"}
 
@@ -116,13 +94,11 @@ async def test_gather_timeout():
     backend.slow_models = {"model-slow": 10.0}
     engine = ConsensusEngine(backend, retries=0)
     msgs = [ChatMessage(role="user", content="Hello")]
-
     responses, failed = await engine.gather(
         msgs,
         ["model-a", "model-slow"],
         timeout_seconds=1,
     )
-
     assert len(responses) == 1
     assert responses[0].model == "model-a"
     assert "model-slow" in failed
@@ -133,9 +109,7 @@ async def test_gather_retries_on_429():
     backend.retryable_fail_models = {"model-a"}
     engine = ConsensusEngine(backend, retries=2)
     msgs = [ChatMessage(role="user", content="Hello")]
-
     responses, failed = await engine.gather(msgs, ["model-a"])
-
     assert len(responses) == 1
     assert responses[0].model == "model-a"
     assert len(failed) == 0
@@ -146,11 +120,7 @@ async def test_gather_respects_concurrency_limit():
     backend = FakeLLMBackend()
     engine = ConsensusEngine(backend, max_concurrent=2)
     msgs = [ChatMessage(role="user", content="Hello")]
-
-    responses, failed = await engine.gather(
-        msgs, ["m1", "m2", "m3", "m4"]
-    )
-
+    responses, failed = await engine.gather(msgs, ["m1", "m2", "m3", "m4"])
     assert len(responses) == 4
     assert len(failed) == 0
 
@@ -164,7 +134,6 @@ async def test_gather_override_params():
         retries=2,
     )
     msgs = [ChatMessage(role="user", content="Hello")]
-
     responses, failed = await engine.gather(
         msgs,
         ["model-a"],
@@ -172,19 +141,16 @@ async def test_gather_override_params():
         timeout_seconds=30,
         retries=0,
     )
-
     assert len(responses) == 1
 
 
 async def test_synthesize_basic():
     backend = FakeLLMBackend()
     engine = ConsensusEngine(backend)
-
     result = await engine.synthesize(
         "What is Python?",
         ["model-a", "model-b"],
     )
-
     assert isinstance(result, ConsensusResult)
     assert len(result.worker_responses) == 2
     assert len(result.failed_models) == 0
@@ -195,12 +161,10 @@ async def test_synthesize_with_all_failures():
     backend = FakeLLMBackend()
     backend.fail_models = {"model-a", "model-b"}
     engine = ConsensusEngine(backend, retries=0)
-
     result = await engine.synthesize(
         "What is Python?",
         ["model-a", "model-b"],
     )
-
     assert result.synthesis.content == "All models failed to respond."
     assert len(result.worker_responses) == 0
     assert set(result.failed_models) == {"model-a", "model-b"}
@@ -210,12 +174,10 @@ async def test_synthesize_partial_failure():
     backend = FakeLLMBackend()
     backend.fail_models = {"model-b"}
     engine = ConsensusEngine(backend, retries=0)
-
     result = await engine.synthesize(
         "What is Python?",
         ["model-a", "model-b", "model-c"],
     )
-
     assert len(result.worker_responses) == 2
     assert "model-b" in result.failed_models
     assert result.synthesis.content != ""
@@ -224,13 +186,11 @@ async def test_synthesize_partial_failure():
 async def test_synthesize_uses_tool_name():
     backend = FakeLLMBackend()
     engine = ConsensusEngine(backend)
-
     result = await engine.synthesize(
         "Review this code",
         ["model-a"],
         tool_name="review",
     )
-
     assert len(result.worker_responses) == 1
     assert len(backend.calls) == 2
 
@@ -238,15 +198,28 @@ async def test_synthesize_uses_tool_name():
 async def test_synthesize_arbiter_model():
     backend = FakeLLMBackend()
     engine = ConsensusEngine(backend)
-
     await engine.synthesize(
         "Design a system",
         ["model-a"],
         arbiter_model="arbiter-special",
     )
-
     arbiter_call = backend.calls[-1]
     assert arbiter_call["model"] == "arbiter-special"
+
+
+async def test_arbiter_timeout_returns_worker_responses():
+    backend = FakeLLMBackend()
+    backend.slow_models = {"arbiter": 0.1}
+    engine = ConsensusEngine(backend, retries=0)
+    messages = [ChatMessage(role="user", content="Synthesize")]
+
+    with pytest.raises(RuntimeError, match="Arbiter call failed"):
+        await engine._call_with_retry(
+            messages,
+            model="arbiter",
+            timeout_seconds=0.01,
+            retries=0,
+        )
 
 
 async def test_is_retryable_timeout():

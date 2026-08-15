@@ -16,89 +16,22 @@ pip install flossware-loom-ai[all]         # everything
 
 ## Quick Start
 
-### As a Python library
-
 ```python
-from loom_ai import LoomConfig, Document, ChatMessage
+from loom_ai import LoomConfig, Document
 
-# Zero-config: all in-memory / no-op backends
 cfg = LoomConfig.from_env()
+await cfg.storage.store_document(
+    Document(id="doc-1", title="Example", content="Hello world")
+)
 
-# Store a document
-doc_id = await cfg.storage.store_document(Document(
-    id="doc-1", title="Example", content="Hello world"
-))
-
-# Multi-model consensus (requires LOOM_LLM_BASE_URL)
-responses = await cfg.llm.consensus(
-    [ChatMessage(role="user", content="Explain distributed systems")],
+result = await cfg.consensus.synthesize(
+    "Explain distributed systems",
     models=["gemini-3.5-flash", "llama-3.3-70b", "mistral-small"],
 )
+print(result.synthesis.content)
 ```
 
-### As a REST server
-
-```bash
-# Minimal — just LLM routing
-export LOOM_LLM_BASE_URL=http://localhost:4000/v1
-python -m loom_ai
-
-# Full stack
-export LOOM_STORAGE=postgresql
-export LOOM_QUEUE=redis
-export LOOM_GRAPH=memory
-export LOOM_LLM_BASE_URL=http://localhost:4000/v1
-python -m loom_ai
-```
-
-Routes mount dynamically based on configuration:
-
-| Backend | Routes | When |
-|---------|--------|------|
-| Storage | `/knowledge/*` | Always |
-| Queue | `/pipeline/*` | Always |
-| Search | `/search/*` | Always |
-| Secrets | `/secrets/*` | Always |
-| LLM | `/llm/*` | `LOOM_LLM_BASE_URL` set |
-| Graph | `/graph/*` | `LOOM_GRAPH != disabled` |
-| Health | `/health` | Always |
-
-## Configuration
-
-All via environment variables (defaults in parentheses):
-
-| Variable | Options | Default |
-|----------|---------|---------|
-| `LOOM_STORAGE` | `memory`, `postgresql` | `memory` |
-| `LOOM_QUEUE` | `memory`, `redis` | `memory` |
-| `LOOM_SECRETS` | `env`, `dotenv`, `postgresql` | `env` |
-| `LOOM_EMBEDDING` | `noop`, `openai`, `litellm` | `noop` |
-| `LOOM_SEARCH` | `memory`, `postgresql` | `memory` |
-| `LOOM_GRAPH` | `disabled`, `memory`, `orientdb` | `disabled` |
-| `LOOM_LLM_BASE_URL` | Any OpenAI-compatible URL | *(none)* |
-| `LOOM_LLM_API_KEY` | Bearer token | *(none)* |
-| `LOOM_LLM_MODEL` | Default model id | `gpt-4o-mini` |
-| `LOOM_HOST` | Server bind address | `0.0.0.0` |
-| `LOOM_PORT` | Server port | `5000` |
-
-Don't set it? Don't get it. Set nothing at all and you get a pure in-memory orchestrator.
-
-## Architecture
-
-```
-loom_ai/
-  protocols.py          7 Protocol interfaces (async, stdlib-only)
-  models.py             9 dataclasses (Document, Chunk, ChatMessage, etc.)
-  config.py             LoomConfig registry with from_env() factory
-  prompts.py            Built-in consensus prompt templates
-  server.py             Optional FastAPI REST server
-  backends/
-    memory.py           In-memory implementations (zero deps)
-    env_secrets.py      Environment variable secrets
-    http_llm.py         HTTP LLM backend (urllib, zero deps)
-```
-
-## 7 Pluggable Protocols
+## 10 Pluggable Protocols
 
 | Protocol | Purpose | Default | Enterprise |
 |----------|---------|---------|------------|
@@ -108,39 +41,38 @@ loom_ai/
 | `EmbeddingBackend` | Text to vectors | Zero vectors | OpenAI / Jina / Voyage |
 | `SearchBackend` | Full-text + semantic | Substring + cosine | tsvector + pgvector ANN |
 | `GraphBackend` | Knowledge graph | Disabled | OrientDB |
-| `LLMBackend` | Chat + consensus | HTTP (any OpenAI-compatible) | Same |
+| `LLMBackend` | Chat completions | HTTP (any OpenAI-compatible) | Same |
+| `ToolProvider` | MCP-shaped tool contract | In-memory callables | MCP transport adapter |
+| `ResourceProvider` | MCP-shaped resource contract | In-memory static | MCP transport adapter |
+| `TaskRunner` | Task execution strategy | Noop (pass-through) | LLM-backed runner |
+
+The MCP-related protocols define **Loom contracts** for tools and resources. They are transport-neutral. An MCP SDK, server, or transport adapter can be added without making MCP transport a dependency of Loom core.
+
+`LLMTaskRunner` is a minimal reference implementation of `TaskRunner`. Richer agent behavior such as planning, tool loops, verification, and application-specific interaction belongs above this execution layer.
 
 ## Multi-Model Consensus
 
-Fan out to N models, synthesize with an arbiter:
-
 ```python
-from loom_ai.prompts import build_worker_messages, build_arbiter_messages
+from loom_ai import ChatMessage, LoomConfig
 
-# Workers respond independently
-worker_msgs = build_worker_messages("review", "Check this code for bugs")
-responses = await cfg.llm.consensus(
-    [ChatMessage(role=m["role"], content=m["content"]) for m in worker_msgs],
-    models=["gemini-3.5-flash", "llama-3.3-70b", "codestral"],
-    timeout_seconds=60,
-    retries=2,
-)
+cfg = LoomConfig.from_env()
 
-# Arbiter synthesizes
-arbiter_msgs = build_arbiter_messages(
+result = await cfg.consensus.synthesize(
     "Check this code for bugs",
-    [{"model": r.model, "response": r.content} for r in responses],
+    models=["gemini-3.5-flash", "llama-3.3-70b", "codestral"],
+    arbiter_model="gemini-3.5-flash",
+    tool_name="review",
+    arbiter_temperature=0.3,
 )
-synthesis = await cfg.llm.chat(
-    [ChatMessage(role=m["role"], content=m["content"]) for m in arbiter_msgs],
-    model="gemini-3.5-flash",
-    temperature=0.3,
+print(result.synthesis.content)
+
+responses, failed = await cfg.consensus.gather(
+    [ChatMessage(role="user", content="Check this code for bugs")],
+    models=["gemini-3.5-flash", "llama-3.3-70b", "codestral"],
 )
 ```
 
-## Free AI Providers
-
-See [docs/free-ai-providers.md](docs/free-ai-providers.md) for 20+ free model providers with signup links, compatible with the `HttpLLMBackend` via [LiteLLM](https://github.com/BerriAI/litellm) proxy.
+The arbiter uses the same configured deadline/retry policy as worker calls and returns successful worker responses when synthesis cannot be completed.
 
 ## License
 

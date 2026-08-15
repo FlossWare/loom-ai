@@ -1,12 +1,8 @@
-"""In-memory MCP tool and resource providers for loom-ai.
+"""In-memory implementations of Loom's MCP-shaped contracts.
 
-Zero external dependencies.  Suitable for testing, local development,
-and the 'crush' deployment profile.
-
-Classes
--------
-MemoryToolProvider      -- register async callables, dispatch by name
-MemoryResourceProvider  -- register static resources, serve by URI
+These providers are intentionally transport-neutral.  They implement the
+Loom ``ToolProvider`` and ``ResourceProvider`` contracts without depending
+on an MCP SDK or providing an MCP server/transport themselves.
 """
 
 from __future__ import annotations
@@ -26,20 +22,8 @@ from loom_ai.models import (
 class MemoryToolProvider:
     """In-memory tool registry that dispatches to async callables.
 
-    Satisfies :class:`~loom_ai.protocols.ToolProvider` via structural
-    subtyping.
-
-    Usage::
-
-        provider = MemoryToolProvider()
-        provider.register(
-            ToolDefinition(name="add", description="Add two numbers",
-                           parameters={"a": {"type": "number"},
-                                       "b": {"type": "number"}},
-                           required_params=["a", "b"]),
-            handler=my_add_handler,
-        )
-        result = await provider.call_tool("add", {"a": 1, "b": 2})
+    Tool arguments are checked against the tool's JSON-Schema-shaped
+    ``input_schema`` before the handler is invoked.
     """
 
     def __init__(self) -> None:
@@ -58,14 +42,17 @@ class MemoryToolProvider:
     async def list_tools(self) -> list[ToolDefinition]:
         return list(self._tools.values())
 
-    async def call_tool(
-        self, name: str, arguments: dict
-    ) -> ToolResult:
+    async def call_tool(self, name: str, arguments: dict) -> ToolResult:
         if name not in self._handlers:
             return ToolResult(
                 tool_name=name,
                 error=f"Tool not found: {name!r}",
             )
+
+        definition = self._tools[name]
+        validation_error = self._validate_arguments(definition, arguments)
+        if validation_error is not None:
+            return ToolResult(tool_name=name, error=validation_error)
 
         handler = self._handlers[name]
         start = time.monotonic()
@@ -85,23 +72,40 @@ class MemoryToolProvider:
                 duration_ms=elapsed,
             )
 
+    @staticmethod
+    def _validate_arguments(
+        definition: ToolDefinition,
+        arguments: dict,
+    ) -> str | None:
+        """Validate required and unknown top-level object properties."""
+        schema = definition.input_schema or {}
+        properties = schema.get("properties", {})
+        required = schema.get("required", [])
+
+        if not isinstance(properties, dict):
+            return (
+                f"Invalid input schema for tool {definition.name!r}: "
+                "properties must be an object"
+            )
+        if not isinstance(required, list):
+            return (
+                f"Invalid input schema for tool {definition.name!r}: "
+                "required must be an array"
+            )
+
+        missing = [name for name in required if name not in arguments]
+        if missing:
+            return "Missing required arguments: " + ", ".join(sorted(missing))
+
+        unknown = sorted(set(arguments) - set(properties))
+        if unknown:
+            return "Unknown arguments: " + ", ".join(unknown)
+
+        return None
+
 
 class MemoryResourceProvider:
-    """In-memory resource registry serving static content by URI.
-
-    Satisfies :class:`~loom_ai.protocols.ResourceProvider` via structural
-    subtyping.
-
-    Usage::
-
-        provider = MemoryResourceProvider()
-        provider.register(
-            ResourceDefinition(uri="file:///readme", name="README",
-                               description="Project readme"),
-            content="# Hello",
-        )
-        result = await provider.read_resource("file:///readme")
-    """
+    """In-memory resource registry serving static content by URI."""
 
     def __init__(self) -> None:
         self._definitions: dict[str, ResourceDefinition] = {}

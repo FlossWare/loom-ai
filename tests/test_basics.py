@@ -129,14 +129,21 @@ def test_dataclass_construction():
     assert edge.source == "a"
 
     emb = Embedding(
-        id="e", chunk_id="c", vector=[0.1],
-        model="m", provider="p", dimensions=1,
+        id="e",
+        chunk_id="c",
+        vector=[0.1],
+        model="m",
+        provider="p",
+        dimensions=1,
     )
     assert emb.dimensions == 1
 
     sr = SearchResult(
-        chunk_id="c", content="C", score=0.9,
-        document_title="T", source="s",
+        chunk_id="c",
+        content="C",
+        score=0.9,
+        document_title="T",
+        source="s",
     )
     assert sr.score == 0.9
 

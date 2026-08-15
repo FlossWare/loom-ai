@@ -77,11 +77,7 @@ class EnvSecretsBackend:
                 key = key.strip()
                 value = value.strip()
                 # Strip matching surrounding quotes
-                if (
-                    len(value) >= 2
-                    and value[0] == value[-1]
-                    and value[0] in ("'", '"')
-                ):
+                if len(value) >= 2 and value[0] == value[-1] and value[0] in ("'", '"'):
                     value = value[1:-1]
                 self._dotenv[key] = value
 
