@@ -39,6 +39,7 @@ def create_app(config: LoomConfig) -> "FastAPI":
         ) from exc
 
     api_key = os.environ.get("LOOM_API_KEY")
+    auth_deps: list = []
 
     if api_key:
         from fastapi import Depends, Security  # noqa: F811
@@ -52,18 +53,13 @@ def create_app(config: LoomConfig) -> "FastAPI":
             if credentials.credentials != api_key:
                 raise HTTPException(status_code=401, detail="Invalid API key")
 
-        app = FastAPI(
-            title="loom-ai",
-            description="Pluggable AI orchestration API",
-            version="1.1",
-            dependencies=[Depends(verify_api_key)],
-        )
-    else:
-        app = FastAPI(
-            title="loom-ai",
-            description="Pluggable AI orchestration API",
-            version="1.1",
-        )
+        auth_deps = [Depends(verify_api_key)]
+
+    app = FastAPI(
+        title="loom-ai",
+        description="Pluggable AI orchestration API",
+        version="1.1",
+    )
 
     app.state.loom = config
 
@@ -89,7 +85,9 @@ def create_app(config: LoomConfig) -> "FastAPI":
 
     from fastapi import APIRouter
 
-    storage_router = APIRouter(prefix="/knowledge", tags=["knowledge"])
+    storage_router = APIRouter(
+        prefix="/knowledge", tags=["knowledge"], dependencies=auth_deps
+    )
 
     @storage_router.get("/stats")
     async def knowledge_stats():
@@ -173,7 +171,9 @@ def create_app(config: LoomConfig) -> "FastAPI":
 
     app.include_router(storage_router)
 
-    queue_router = APIRouter(prefix="/pipeline", tags=["pipeline"])
+    queue_router = APIRouter(
+        prefix="/pipeline", tags=["pipeline"], dependencies=auth_deps
+    )
 
     @queue_router.get("/queues/{queue_name}/status")
     async def queue_status(queue_name: str):
@@ -224,7 +224,7 @@ def create_app(config: LoomConfig) -> "FastAPI":
 
     app.include_router(queue_router)
 
-    search_router = APIRouter(prefix="/search", tags=["search"])
+    search_router = APIRouter(prefix="/search", tags=["search"], dependencies=auth_deps)
 
     @search_router.get("/text")
     async def text_search(q: str, limit: int = 10):
@@ -252,7 +252,9 @@ def create_app(config: LoomConfig) -> "FastAPI":
 
     app.include_router(search_router)
 
-    secrets_router = APIRouter(prefix="/secrets", tags=["secrets"])
+    secrets_router = APIRouter(
+        prefix="/secrets", tags=["secrets"], dependencies=auth_deps
+    )
 
     @secrets_router.get("/")
     async def list_secrets():
@@ -269,7 +271,7 @@ def create_app(config: LoomConfig) -> "FastAPI":
     app.include_router(secrets_router)
 
     if config.llm is not None:
-        llm_router = APIRouter(prefix="/llm", tags=["llm"])
+        llm_router = APIRouter(prefix="/llm", tags=["llm"], dependencies=auth_deps)
 
         @llm_router.get("/models")
         async def llm_models():
@@ -296,7 +298,9 @@ def create_app(config: LoomConfig) -> "FastAPI":
         app.include_router(llm_router)
 
     if config.consensus is not None:
-        consensus_router = APIRouter(prefix="/consensus", tags=["consensus"])
+        consensus_router = APIRouter(
+            prefix="/consensus", tags=["consensus"], dependencies=auth_deps
+        )
 
         @consensus_router.post("/gather")
         async def consensus_gather(request: Request):
@@ -339,7 +343,9 @@ def create_app(config: LoomConfig) -> "FastAPI":
         app.include_router(consensus_router)
 
     if config.tools is not None:
-        tools_router = APIRouter(prefix="/tools", tags=["tools"])
+        tools_router = APIRouter(
+            prefix="/tools", tags=["tools"], dependencies=auth_deps
+        )
 
         @tools_router.get("/")
         async def list_tools():
@@ -357,7 +363,9 @@ def create_app(config: LoomConfig) -> "FastAPI":
         app.include_router(tools_router)
 
     if config.resources is not None:
-        resources_router = APIRouter(prefix="/resources", tags=["resources"])
+        resources_router = APIRouter(
+            prefix="/resources", tags=["resources"], dependencies=auth_deps
+        )
 
         @resources_router.get("/")
         async def list_resources():
@@ -393,7 +401,9 @@ def create_app(config: LoomConfig) -> "FastAPI":
         app.include_router(resources_router)
 
     if config.graph is not None:
-        graph_router = APIRouter(prefix="/graph", tags=["graph"])
+        graph_router = APIRouter(
+            prefix="/graph", tags=["graph"], dependencies=auth_deps
+        )
 
         @graph_router.post("/nodes")
         async def add_node(request: Request):
