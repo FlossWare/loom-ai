@@ -106,17 +106,24 @@ class GraphEdge:
     properties: dict = field(default_factory=dict)
 
 
-# ── MCP (Model Context Protocol) ────────────────────────────────────────
+# ── MCP contract models ─────────────────────────────────────────────────
 
 
 @dataclass
 class ToolDefinition:
-    """Schema for a callable tool exposed via MCP."""
+    """JSON-Schema-shaped contract for a callable MCP tool.
+
+    ``input_schema`` is an object schema whose ``properties`` and
+    ``required`` members describe the arguments accepted by the tool.
+    Loom intentionally models the contract without implementing an MCP
+    transport or server.
+    """
 
     name: str
     description: str
-    parameters: dict = field(default_factory=dict)
-    required_params: list[str] = field(default_factory=list)
+    input_schema: dict = field(
+        default_factory=lambda: {"type": "object", "properties": {}}
+    )
 
 
 @dataclass

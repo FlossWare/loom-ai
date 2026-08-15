@@ -2,7 +2,7 @@
 
 Runs tasks in dependency order using topological waves.
 Independent tasks execute concurrently via ``asyncio.gather``.
-Failed tasks cancel their transitive dependents but do not
+Failed tasks cancel pending transitive dependents but do not
 block independent branches of the DAG.
 """
 
@@ -15,12 +15,7 @@ from datetime import datetime, timezone
 from typing import Any, Callable
 
 from loom_ai.config import LoomConfig
-from loom_ai.models import (
-    ChatMessage,
-    ExecutionPlan,
-    Task,
-    TaskStatus,
-)
+from loom_ai.models import ChatMessage, ExecutionPlan, Task, TaskStatus
 from loom_ai.protocols import TaskRunner
 
 TaskObserver = Callable[[Task, TaskStatus, TaskStatus], None]
@@ -30,14 +25,11 @@ class CyclicDependencyError(Exception):
     """The task dependency graph contains a cycle."""
 
 
-# ── Built-in runners ────────────────────────────────────────────────────
-
-
 class NoopTaskRunner:
     """Passes ``input_data`` through as ``output_data`` unchanged.
 
     Satisfies :class:`~loom_ai.protocols.TaskRunner` via structural
-    subtyping.  Useful for testing and pipeline scaffolding.
+    subtyping. Useful for testing and pipeline scaffolding.
     """
 
     async def run(self, task: Task, config: LoomConfig) -> Any:
@@ -45,10 +37,11 @@ class NoopTaskRunner:
 
 
 class LLMTaskRunner:
-    """Sends the task description to the configured LLM backend.
+    """Minimal reference runner that sends a task to the configured LLM.
 
-    Satisfies :class:`~loom_ai.protocols.TaskRunner` via structural
-    subtyping.  Requires ``config.llm`` to be set.
+    This runner intentionally provides only the basic TaskRunner contract.
+    Planning, tool use, agent loops, verification, and other richer runtime
+    behavior belong in orchestration layers above this class.
     """
 
     async def run(self, task: Task, config: LoomConfig) -> Any:
@@ -58,17 +51,9 @@ class LLMTaskRunner:
                 "Set LOOM_LLM_BASE_URL or inject llm= "
                 "into LoomConfig."
             )
-        messages = [
-            ChatMessage(role="user", content=task.description),
-        ]
+        messages = [ChatMessage(role="user", content=task.description)]
         response = await config.llm.chat(messages)
-        return {
-            "response": response.content,
-            "model": response.model,
-        }
-
-
-# ── Execution engine ────────────────────────────────────────────────────
+        return {"response": response.content, "model": response.model}
 
 
 class ExecutionEngine:
@@ -76,19 +61,8 @@ class ExecutionEngine:
 
     Runs an :class:`ExecutionPlan` by repeatedly scheduling waves
     of ready tasks (all dependencies satisfied) in parallel.
-    Failed tasks propagate cancellations to downstream dependents
+    Failed tasks propagate cancellation to pending downstream dependents
     without blocking independent branches.
-
-    Parameters
-    ----------
-    config:
-        Backend registry providing LLM access and other services.
-    runner:
-        Strategy for executing individual tasks.  Defaults to
-        :class:`NoopTaskRunner` when ``None``.
-    observer:
-        Optional callback ``(task, old_status, new_status)``
-        invoked on every task status transition.
     """
 
     def __init__(
@@ -101,25 +75,13 @@ class ExecutionEngine:
         self._runner: TaskRunner = runner or NoopTaskRunner()
         self._observer = observer
 
-    # ── Public API ──────────────────────────────────────────────────
-
     async def execute_task(self, task: Task) -> Task:
-        """Run a single task through the configured runner.
-
-        Transitions the task through RUNNING and then to either
-        COMPLETED or FAILED.  Respects ``task.timeout_seconds``
-        when set to a positive value.
-
-        Raises ``ValueError`` if the task is not in PENDING state.
-        """
+        """Run a single task through the configured runner."""
         if task.status != TaskStatus.PENDING:
             raise ValueError(
-                f"Cannot execute task {task.id!r} in "
-                f"{task.status.value!r} state"
+                f"Cannot execute task {task.id!r} in {task.status.value!r} state"
             )
-        task = self._transition(
-            task, task.status, TaskStatus.RUNNING
-        )
+        task = self._transition(task, task.status, TaskStatus.RUNNING)
         try:
             if task.timeout_seconds > 0:
                 result = await asyncio.wait_for(
@@ -127,41 +89,24 @@ class ExecutionEngine:
                     timeout=task.timeout_seconds,
                 )
             else:
-                result = await self._runner.run(
-                    task, self._config
-                )
-            output = (
-                result
-                if isinstance(result, dict)
-                else {"result": result}
-            )
+                result = await self._runner.run(task, self._config)
+            output = result if isinstance(result, dict) else {"result": result}
             task = replace(task, output_data=output)
-            return self._transition(
-                task, TaskStatus.RUNNING, TaskStatus.COMPLETED
-            )
+            return self._transition(task, TaskStatus.RUNNING, TaskStatus.COMPLETED)
         except asyncio.TimeoutError:
-            msg = (
-                f"Task {task.id!r} timed out after "
-                f"{task.timeout_seconds}s"
-            )
+            msg = f"Task {task.id!r} timed out after {task.timeout_seconds}s"
             task = replace(task, error=msg)
-            return self._transition(
-                task, TaskStatus.RUNNING, TaskStatus.FAILED
-            )
+            return self._transition(task, TaskStatus.RUNNING, TaskStatus.FAILED)
         except Exception as exc:
             task = replace(task, error=str(exc))
-            return self._transition(
-                task, TaskStatus.RUNNING, TaskStatus.FAILED
-            )
+            return self._transition(task, TaskStatus.RUNNING, TaskStatus.FAILED)
 
-    async def execute_plan(
-        self, plan: ExecutionPlan
-    ) -> ExecutionPlan:
+    async def execute_plan(self, plan: ExecutionPlan) -> ExecutionPlan:
         """Execute all tasks in the plan respecting dependencies.
 
         Tasks whose dependencies are all completed run in parallel.
-        A failed task cancels its transitive dependents.  Raises
-        :class:`CyclicDependencyError` if unresolvable tasks remain.
+        A failed task cancels its pending transitive dependents. Raises
+        :class:`CyclicDependencyError` if unresolvable pending tasks remain.
         """
         task_map = {t.id: t for t in plan.tasks}
         all_ids = set(task_map)
@@ -185,8 +130,7 @@ class ExecutionEngine:
                 for tid, t in task_map.items()
                 if t.status == TaskStatus.PENDING
                 and all(
-                    task_map[d].status == TaskStatus.COMPLETED
-                    for d in t.dependencies
+                    task_map[d].status == TaskStatus.COMPLETED for d in t.dependencies
                 )
             ]
             if not ready:
@@ -194,58 +138,37 @@ class ExecutionEngine:
 
             ready.sort()
             results = await asyncio.gather(
-                *(
-                    self.execute_task(task_map[tid])
-                    for tid in ready
-                )
+                *(self.execute_task(task_map[tid]) for tid in ready)
             )
             for result in results:
                 task_map[result.id] = result
                 if result.status == TaskStatus.FAILED:
-                    self._cancel_downstream(
-                        result.id, task_map, dependents
-                    )
+                    self._cancel_downstream(result.id, task_map, dependents)
 
-        stuck = [
-            t.id
-            for t in task_map.values()
-            if t.status == TaskStatus.PENDING
-        ]
+        stuck = [t.id for t in task_map.values() if t.status == TaskStatus.PENDING]
         if stuck:
             raise CyclicDependencyError(
-                "Cyclic dependency among tasks: "
-                + ", ".join(sorted(stuck))
+                "Cyclic dependency among tasks: " + ", ".join(sorted(stuck))
             )
 
-        return replace(
-            plan,
-            tasks=[task_map[t.id] for t in plan.tasks],
-        )
+        return replace(plan, tasks=[task_map[t.id] for t in plan.tasks])
 
-    async def retry_failed(
-        self, plan: ExecutionPlan
-    ) -> ExecutionPlan:
-        """Retry all failed tasks that have retries remaining.
+    async def retry_failed(self, plan: ExecutionPlan) -> ExecutionPlan:
+        """Retry failed tasks and progressively release their dependents.
 
-        Resets failed tasks (with ``retries_remaining > 0``) to
-        PENDING, un-cancels downstream tasks whose dependencies
-        are now satisfiable, then re-executes the updated plan.
-        Returns the plan unchanged when nothing is retryable.
+        Failed tasks with retries remaining are reset to ``PENDING`` and
+        executed first. A cancelled dependent is only restored after *all*
+        of its dependencies are actually ``COMPLETED``.
         """
         task_map = {t.id: t for t in plan.tasks}
         retried_any = False
 
         for task in plan.tasks:
-            if (
-                task.status == TaskStatus.FAILED
-                and task.retries_remaining > 0
-            ):
+            if task.status == TaskStatus.FAILED and task.retries_remaining > 0:
                 task_map[task.id] = replace(
                     task,
                     status=TaskStatus.PENDING,
-                    retries_remaining=(
-                        task.retries_remaining - 1
-                    ),
+                    retries_remaining=task.retries_remaining - 1,
                     error="",
                     output_data={},
                     started_at="",
@@ -256,21 +179,21 @@ class ExecutionEngine:
         if not retried_any:
             return plan
 
-        changed = True
-        while changed:
-            changed = False
+        updated = replace(plan, tasks=[task_map[t.id] for t in plan.tasks])
+
+        while True:
+            updated = await self.execute_plan(updated)
+            task_map = {t.id: t for t in updated.tasks}
+
+            released = False
             for task in list(task_map.values()):
                 if task.status != TaskStatus.CANCELLED:
                     continue
-                deps_ok = all(
-                    task_map[d].status
-                    in (
-                        TaskStatus.COMPLETED,
-                        TaskStatus.PENDING,
-                    )
+                deps_completed = all(
+                    task_map[d].status == TaskStatus.COMPLETED
                     for d in task.dependencies
                 )
-                if deps_ok:
+                if deps_completed:
                     task_map[task.id] = replace(
                         task,
                         status=TaskStatus.PENDING,
@@ -279,15 +202,18 @@ class ExecutionEngine:
                         started_at="",
                         completed_at="",
                     )
-                    changed = True
+                    released = True
 
-        updated = replace(
-            plan,
-            tasks=[task_map[t.id] for t in plan.tasks],
-        )
-        return await self.execute_plan(updated)
+            if not released:
+                return replace(
+                    updated,
+                    tasks=[task_map[t.id] for t in updated.tasks],
+                )
 
-    # ── Internal helpers ────────────────────────────────────────────
+            updated = replace(
+                updated,
+                tasks=[task_map[t.id] for t in updated.tasks],
+            )
 
     @staticmethod
     def _now() -> str:
@@ -320,17 +246,18 @@ class ExecutionEngine:
         task_map: dict[str, Task],
         dependents: dict[str, set[str]],
     ) -> None:
-        """Cancel all tasks transitively dependent on *failed_id*."""
+        """Cancel pending tasks transitively dependent on *failed_id*.
+
+        The execution engine processes whole waves before propagating
+        failures, so downstream tasks should not be RUNNING here. Keeping
+        cancellation limited to PENDING makes the state machine honest:
+        a running coroutine is never marked CANCELLED without being cancelled.
+        """
         queue = list(dependents.get(failed_id, set()))
         while queue:
             tid = queue.pop(0)
             task = task_map[tid]
-            if task.status not in (
-                TaskStatus.PENDING,
-                TaskStatus.RUNNING,
-            ):
+            if task.status != TaskStatus.PENDING:
                 continue
-            task_map[tid] = self._transition(
-                task, task.status, TaskStatus.CANCELLED
-            )
+            task_map[tid] = self._transition(task, task.status, TaskStatus.CANCELLED)
             queue.extend(dependents.get(tid, set()))

@@ -1,4 +1,4 @@
-"""Tests for MCP tool and resource provider contracts."""
+"""Tests for Loom's MCP-shaped tool and resource contracts."""
 
 import pytest
 
@@ -11,8 +11,6 @@ from loom_ai import (
     ToolResult,
 )
 from loom_ai.backends.memory_mcp import MemoryResourceProvider, MemoryToolProvider
-
-# ── helpers ─────────────────────────────────────────────────────────────
 
 
 async def _add(a: int, b: int) -> int:
@@ -29,11 +27,14 @@ def _make_tool_provider() -> MemoryToolProvider:
         ToolDefinition(
             name="add",
             description="Add two numbers",
-            parameters={
-                "a": {"type": "integer"},
-                "b": {"type": "integer"},
+            input_schema={
+                "type": "object",
+                "properties": {
+                    "a": {"type": "integer"},
+                    "b": {"type": "integer"},
+                },
+                "required": ["a", "b"],
             },
-            required_params=["a", "b"],
         ),
         handler=_add,
     )
@@ -70,9 +71,6 @@ def _make_resource_provider() -> MemoryResourceProvider:
     return provider
 
 
-# ── ToolProvider tests ──────────────────────────────────────────────────
-
-
 async def test_tool_provider_protocol_conformance():
     provider = MemoryToolProvider()
     assert isinstance(provider, ToolProvider)
@@ -95,6 +93,37 @@ async def test_call_tool_success():
     assert result.error is None
     assert result.duration_ms is not None
     assert result.duration_ms >= 0
+
+
+async def test_call_tool_missing_required_argument():
+    provider = _make_tool_provider()
+    result = await provider.call_tool("add", {"a": 3})
+    assert result.error is not None
+    assert "missing required" in result.error.lower()
+    assert "b" in result.error
+
+
+async def test_call_tool_unknown_argument():
+    provider = _make_tool_provider()
+    result = await provider.call_tool("add", {"a": 3, "b": 4, "c": 5})
+    assert result.error is not None
+    assert "unknown arguments" in result.error.lower()
+    assert "c" in result.error
+
+
+async def test_call_tool_invalid_schema():
+    provider = MemoryToolProvider()
+    provider.register(
+        ToolDefinition(
+            name="bad",
+            description="Invalid schema",
+            input_schema={"type": "object", "properties": []},
+        ),
+        handler=_add,
+    )
+    result = await provider.call_tool("bad", {})
+    assert result.error is not None
+    assert "properties" in result.error
 
 
 async def test_call_tool_error():
@@ -122,9 +151,6 @@ async def test_list_tools_empty():
     provider = MemoryToolProvider()
     tools = await provider.list_tools()
     assert tools == []
-
-
-# ── ResourceProvider tests ──────────────────────────────────────────────
 
 
 async def test_resource_provider_protocol_conformance():
@@ -168,9 +194,6 @@ async def test_list_resources_empty():
     provider = MemoryResourceProvider()
     resources = await provider.list_resources()
     assert resources == []
-
-
-# ── LoomConfig integration ──────────────────────────────────────────────
 
 
 def test_loom_config_defaults_mcp_none():
