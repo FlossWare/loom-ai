@@ -38,11 +38,33 @@ def create_app(config: LoomConfig) -> "FastAPI":
             "Install with: pip install flossware-loom-ai[server]"
         ) from exc
 
-    app = FastAPI(
-        title="loom-ai",
-        description="Pluggable AI orchestration API",
-        version="1.1",
-    )
+    api_key = os.environ.get("LOOM_API_KEY")
+
+    if api_key:
+        from fastapi import Depends, Security  # noqa: F811
+        from fastapi.security import HTTPAuthorizationCredentials, HTTPBearer
+
+        security = HTTPBearer()
+
+        async def verify_api_key(
+            credentials: HTTPAuthorizationCredentials = Security(security),
+        ) -> None:
+            if credentials.credentials != api_key:
+                raise HTTPException(status_code=401, detail="Invalid API key")
+
+        app = FastAPI(
+            title="loom-ai",
+            description="Pluggable AI orchestration API",
+            version="1.1",
+            dependencies=[Depends(verify_api_key)],
+        )
+    else:
+        app = FastAPI(
+            title="loom-ai",
+            description="Pluggable AI orchestration API",
+            version="1.1",
+        )
+
     app.state.loom = config
 
     @app.get("/health")
@@ -432,6 +454,6 @@ def main() -> None:
 
     config = LoomConfig.from_env()
     app = create_app(config)
-    host = os.environ.get("LOOM_HOST", "0.0.0.0")
+    host = os.environ.get("LOOM_HOST", "127.0.0.1")
     port = int(os.environ.get("LOOM_PORT", "5000"))
     uvicorn.run(app, host=host, port=port)
