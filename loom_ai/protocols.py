@@ -156,9 +156,7 @@ class EmbeddingBackend(Protocol):
         """Return one embedding vector per input text."""
         ...
 
-    async def embed_single(
-        self, text: str, *, model: str | None = None
-    ) -> list[float]:
+    async def embed_single(self, text: str, *, model: str | None = None) -> list[float]:
         """Embed exactly one text."""
         ...
 
@@ -186,9 +184,7 @@ class SearchBackend(Protocol):
         """Index a chunk."""
         ...
 
-    async def text_search(
-        self, query: str, *, limit: int = 10
-    ) -> list[SearchResult]:
+    async def text_search(self, query: str, *, limit: int = 10) -> list[SearchResult]:
         """Return text-search matches."""
         ...
 
