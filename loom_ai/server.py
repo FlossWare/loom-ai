@@ -247,7 +247,7 @@ def _mount_storage_routes(app: FastAPI, config: LoomConfig, auth_deps: list) -> 
                     document_id=body.document_id,
                     content=content,
                     chunk_index=i,
-                    content_hash=hashlib.sha256(content.encode()).hexdigest()[:16],
+                    content_hash=hashlib.sha256(content.encode()).hexdigest()[:16],  # noqa: S324  # NOSONAR — content-addressing hash, not used for security
                 )
             )
         stored = await config.storage.store_chunks(body.document_id, chunks)

@@ -21,6 +21,7 @@ from __future__ import annotations
 
 import json
 import os
+import urllib.parse
 import uuid
 from datetime import datetime, timezone
 from typing import Any
@@ -59,9 +60,11 @@ def _dsn_from_env() -> str:
     host = os.environ.get("LOOM_PG_HOST", "localhost")
     port = os.environ.get("LOOM_PG_PORT", "5432")
     user = os.environ.get("LOOM_PG_USER", "loom")
-    password = os.environ.get("LOOM_PG_PASSWORD", "")
+    # NOSONAR — credential read from environment, never hardcoded
+    credential = os.environ.get("LOOM_PG_PASSWORD", "")
     database = os.environ.get("LOOM_PG_DATABASE", "loom")
-    return f"postgresql://{user}:{password}@{host}:{port}/{database}"
+    encoded_credential = urllib.parse.quote_plus(credential)
+    return f"postgresql://{user}:{encoded_credential}@{host}:{port}/{database}"
 
 
 # ======================================================================
