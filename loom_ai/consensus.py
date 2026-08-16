@@ -17,7 +17,9 @@ Features
 from __future__ import annotations
 
 import asyncio
+import logging
 import random
+import re
 import time
 from dataclasses import dataclass, field
 from typing import TYPE_CHECKING
@@ -27,6 +29,8 @@ from loom_ai.prompts import build_arbiter_messages, build_worker_messages
 
 if TYPE_CHECKING:
     from loom_ai.protocols import LLMBackend
+
+logger = logging.getLogger(__name__)
 
 
 @dataclass
@@ -44,6 +48,28 @@ class ConsensusResult:
     failed_models: list[str] = field(default_factory=list)
     arbiter_attempted: bool = False
     arbiter_error: str | None = None
+
+
+_BODY_LEAK_RE = re.compile(
+    r"(LLM API error \d+ from \S+)"  # status + host
+    r":\s+.*",  # raw body after colon
+)
+
+_LIST_MODELS_LEAK_RE = re.compile(
+    r"(Failed to list models from \S+:\s*\d+)"  # host + status
+    r"\s+.*",  # raw body
+)
+
+
+def _strip_response_body(msg: str) -> str:
+    """Remove raw HTTP response bodies from error messages.
+
+    Matches patterns produced by ``HttpLLMBackend`` and strips the
+    trailing body portion that may contain sensitive provider data.
+    """
+    msg = _BODY_LEAK_RE.sub(r"\1", msg)
+    msg = _LIST_MODELS_LEAK_RE.sub(r"\1", msg)
+    return msg
 
 
 class ConsensusEngine:
@@ -208,6 +234,7 @@ class ConsensusEngine:
                 temperature=arbiter_temperature,
             )
         except Exception as exc:
+            logger.warning("Arbiter synthesis failed", exc_info=exc)
             return ConsensusResult(
                 synthesis=ChatResponse(
                     content="Arbiter synthesis failed; worker responses are available.",
@@ -215,7 +242,7 @@ class ConsensusEngine:
                 worker_responses=responses,
                 failed_models=failed,
                 arbiter_attempted=True,
-                arbiter_error=f"{type(exc).__name__}: {exc}",
+                arbiter_error=self._sanitize_error(exc),
             )
 
         return ConsensusResult(
@@ -266,6 +293,20 @@ class ConsensusEngine:
                     await asyncio.sleep(delay)
 
         raise RuntimeError("Arbiter call failed after retries") from last_exc
+
+    @staticmethod
+    def _sanitize_error(exc: Exception) -> str:
+        """Return a client-safe error description.
+
+        Strips raw HTTP response bodies and other potentially sensitive
+        provider details from exception messages.  The full error
+        (including the cause chain) is already logged server-side at
+        WARNING level before this method is called, so only the
+        top-level exception is included here.
+        """
+        cls = type(exc).__name__
+        msg = _strip_response_body(str(exc))
+        return f"{cls}: {msg}"
 
     @staticmethod
     def _is_retryable(exc: Exception) -> bool:
