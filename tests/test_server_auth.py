@@ -63,3 +63,12 @@ def test_secrets_accessible_with_valid_key(monkeypatch):
     client = TestClient(app)
     resp = client.get("/secrets/", headers={"Authorization": "Bearer test-secret"})
     assert resp.status_code == 200
+
+
+def test_health_always_unauthenticated(monkeypatch):
+    """Health endpoint must be reachable without auth even when API key is set."""
+    app = _make_app(monkeypatch, api_key="test-secret")
+    client = TestClient(app)
+    resp = client.get("/health")
+    assert resp.status_code == 200
+    assert resp.json()["status"] == "healthy"

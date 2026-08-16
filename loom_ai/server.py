@@ -3,6 +3,19 @@
 Dynamically mounts routes based on which backends are configured.
 Install with: pip install flossware-loom-ai[server]
 
+Security model:
+    - Default bind: 127.0.0.1 (localhost only). Override with LOOM_HOST.
+    - When LOOM_API_KEY is unset, the server is intentionally unauthenticated.
+      This is safe only when bound to localhost or behind a reverse proxy /
+      network policy. Do not bind to 0.0.0.0 without setting LOOM_API_KEY.
+    - When LOOM_API_KEY is set, all routes except /health require a valid
+      Bearer token. /health is always unauthenticated for probe compatibility.
+    - Missing Authorization header: 403 (from HTTPBearer).
+      Invalid Bearer token: 401 (from verify_api_key).
+    - /secrets/{name} returns plaintext secret values by design. When auth is
+      enabled, only callers with the API key can access them. When auth is
+      disabled, localhost binding is the sole access control.
+
 Usage:
     # Auto-configure from LOOM_* env vars:
     python -m loom_ai.server
@@ -18,6 +31,8 @@ Usage:
 from __future__ import annotations
 
 import base64
+import hmac
+import logging
 import os
 import time
 from typing import TYPE_CHECKING
@@ -38,6 +53,7 @@ def create_app(config: LoomConfig) -> "FastAPI":
             "Install with: pip install flossware-loom-ai[server]"
         ) from exc
 
+    logger = logging.getLogger("loom_ai.server")
     api_key = os.environ.get("LOOM_API_KEY")
     auth_deps: list = []
 
@@ -50,7 +66,8 @@ def create_app(config: LoomConfig) -> "FastAPI":
         async def verify_api_key(
             credentials: HTTPAuthorizationCredentials = Security(security),
         ) -> None:
-            if credentials.credentials != api_key:
+            if not hmac.compare_digest(credentials.credentials, api_key):
+                logger.warning("Invalid API key attempt")
                 raise HTTPException(status_code=401, detail="Invalid API key")
 
         auth_deps = [Depends(verify_api_key)]
