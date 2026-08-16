@@ -181,7 +181,7 @@ class HttpLLMBackend:
             messages, resolved, temperature, max_tokens, stream=True
         )
 
-        queue: asyncio.Queue[str | None] = asyncio.Queue()
+        queue: asyncio.Queue[str | None | BaseException] = asyncio.Queue()
         loop = asyncio.get_running_loop()
 
         def _stream_reader() -> None:
@@ -212,9 +212,29 @@ class HttpLLMBackend:
                         content = delta.get("content")
                         if content:
                             loop.call_soon_threadsafe(queue.put_nowait, content)
-            except Exception:
-                # Stream ends; the sentinel below signals the consumer.
-                pass
+            except urllib.error.HTTPError as exc:
+                error_body = exc.read().decode("utf-8", errors="replace")[:1000]
+                logger.warning(
+                    "LLM streaming error %d from %s: %s",
+                    exc.code,
+                    self._base_url,
+                    error_body,
+                )
+                error = RuntimeError(
+                    f"LLM streaming error {exc.code} from {self._base_url}"
+                )
+                error.__cause__ = exc
+                loop.call_soon_threadsafe(queue.put_nowait, error)
+            except urllib.error.URLError as exc:
+                error = RuntimeError(
+                    f"LLM streaming connection error to {self._base_url}: {exc.reason}"
+                )
+                error.__cause__ = exc
+                loop.call_soon_threadsafe(queue.put_nowait, error)
+            except Exception as exc:
+                error = RuntimeError(f"LLM streaming error: {exc}")
+                error.__cause__ = exc
+                loop.call_soon_threadsafe(queue.put_nowait, error)
             finally:
                 loop.call_soon_threadsafe(queue.put_nowait, None)
 
@@ -224,6 +244,8 @@ class HttpLLMBackend:
             item = await queue.get()
             if item is None:
                 break
+            if isinstance(item, BaseException):
+                raise item
             yield item
 
     async def list_models(self) -> list[str]:
