@@ -39,15 +39,6 @@ Loom is an orchestration substrate built around provider-neutral contracts. The 
 
 External projects are **interoperability targets and implementations**, not architectural dependencies. Loom should define the contract first and validate it against multiple implementations.
 
-### Current contract work
-
-- **#81** — Context engineering and reversible compression
-- **#82** — Prompt-cache awareness and optimization
-- **#83** — Pluggable agent runtime contract
-- **#84** — Pluggable context engine contract
-- **#85** — Pluggable capability and tool backend contract
-- **#86** — Pluggable evaluation engine contract
-
 This distinction is intentional: Loom can **use** an external project without incorporating it, and can **assimilate** an architectural idea without making the source project a dependency.
 
 ## Install
@@ -77,24 +68,59 @@ result = await cfg.consensus.synthesize(
 print(result.synthesis.content)
 ```
 
-## 10 Pluggable Protocols
+## Protocol Contracts
 
-| Protocol | Purpose | Default | Enterprise |
-|----------|---------|---------|------------|
-| `StorageBackend` | Documents, chunks, embeddings | In-memory dicts | PostgreSQL + pgvector |
-| `QueueBackend` | Named task queues | In-memory deque | Redis |
-| `SecretsBackend` | API keys and config | `os.environ` | PostgreSQL encrypted |
-| `EmbeddingBackend` | Text to vectors | Zero vectors | OpenAI / Jina / Voyage |
-| `SearchBackend` | Full-text + semantic | Substring + cosine | tsvector + pgvector ANN |
-| `GraphBackend` | Knowledge graph | Disabled | OrientDB |
-| `LLMBackend` | Chat completions | HTTP (any OpenAI-compatible) | Same |
-| `ToolProvider` | MCP-shaped tool contract | In-memory callables | MCP transport adapter |
-| `ResourceProvider` | MCP-shaped resource contract | In-memory static | MCP transport adapter |
-| `TaskRunner` | Task execution strategy | Noop (pass-through) | LLM-backed runner |
+Loom defines **53 `@runtime_checkable` Protocol contracts** across 10 phases, all using structural subtyping (no ABC inheritance required).
 
-The MCP-related protocols define **Loom contracts** for tools and resources. They are transport-neutral. An MCP SDK, server, or transport adapter can be added without making MCP transport a dependency of Loom core.
+### Core Protocols (`protocols.py`)
 
-`LLMTaskRunner` is a minimal reference implementation of `TaskRunner`. Richer agent behavior such as planning, tool loops, verification, and application-specific interaction belongs above this execution layer.
+| Protocol | Purpose | Default Backend |
+|----------|---------|-----------------|
+| `StorageBackend` | Documents, chunks, embeddings | In-memory dicts |
+| `QueueBackend` | Named task queues | In-memory deque |
+| `SecretsBackend` | API keys and config | `os.environ` |
+| `EmbeddingBackend` | Text to vectors | Zero vectors |
+| `SearchBackend` | Full-text + semantic | Substring + cosine |
+| `GraphBackend` | Knowledge graph | In-memory adjacency |
+| `LLMBackend` | Chat completions | HTTP (OpenAI-compatible) |
+| `ToolProvider` | MCP-shaped tool contract | In-memory callables |
+| `ResourceProvider` | MCP-shaped resource contract | In-memory static |
+| `TaskRunner` | Task execution strategy | Noop (pass-through) |
+| `IdempotentStore` | Upsert semantics marker | All storage backends |
+
+### Phase 1–3: Orchestration Contracts
+
+Structured output, conversation, memory, model routing, consensus patterns, knowledge/RAG, streaming, workflow, learning, strategy selection, budget tracking, transcripts, resilience (circuit breaker), observability, session management, worker registry, caching, evaluation, feedback loops, and human-in-the-loop.
+
+### Phase 4–9: Advanced Contracts
+
+Knowledge graphs, temporal stores, belief management, evaluation suites, telemetry, inference routing, agent lifecycle, agent memory, output validation, security gates, program optimization, agent loops, recipe execution, ACP interoperability, context assembly, trajectory stores, agent environments, provider/capability/policy registries, catalog synchronization, tournament runners, consensus strategies, model evaluation, context compression, prompt cache optimization, pluggable runtimes, health checks, and request validation.
+
+### REST API Contracts (`contracts_api.py`)
+
+Request lifecycle, error handling, and middleware protocols.
+
+## Backend Implementations
+
+36 pluggable backend modules in `loom_ai/backends/`:
+
+| Backend | Purpose |
+|---------|---------|
+| `adaptive_router` | Thompson Sampling model routing |
+| `adversarial` | Independent model panel verification |
+| `consensus_strategies` | Majority vote, weighted, quality threshold |
+| `fleet` | Worker pool + 3 load-balancing strategies |
+| `genetic_optimizer` | GA-based strategy parameter optimization |
+| `graph` | In-memory knowledge graph with BFS/DFS |
+| `postgresql` | PostgreSQL + pgvector storage/search |
+| `provider_health` | Health tracking, rate limiting, circuit breaker |
+| `rag` | Document ingestion, embeddings, hybrid search |
+| `redis_queue` | Durable queue with priorities, leases, DLQ |
+| `security` | Config validation, secret masking, audit logging |
+| `task_classifier` | Rule-based task classification + blueprints |
+| `telemetry` | Execution telemetry, cost tracking, model feedback |
+
+See `examples/demo.py` for a runnable walkthrough using in-memory backends.
 
 ## Multi-Model Consensus
 
