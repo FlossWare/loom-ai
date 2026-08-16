@@ -79,6 +79,10 @@ class ConfigValidator:
         for key, expected_type in self._schema.items():
             if key not in config:
                 errors.append(f"missing required key: {key}")
+            elif expected_type in (int, float) and isinstance(config[key], bool):
+                errors.append(
+                    f"key '{key}' expected {expected_type.__name__}, got bool"
+                )
             elif not isinstance(config[key], expected_type):
                 actual = type(config[key]).__name__
                 errors.append(
