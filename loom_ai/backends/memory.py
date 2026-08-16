@@ -6,20 +6,23 @@ profile.  All data is lost on process exit.
 
 Classes
 -------
-MemoryStorageBackend   -- dict-backed document / chunk / embedding store
-MemoryQueueBackend     -- deque-backed named task queues (thread-safe)
-NoopEmbeddingBackend   -- zero-vector embedding generator
-MemorySearchBackend    -- substring text search + brute-force cosine similarity
-MemoryGraphBackend     -- dict-backed knowledge graph with BFS traversal
-DisabledGraphBackend   -- raises NotImplementedError for every operation
+MemoryStorageBackend          -- dict-backed document / chunk / embedding store
+MemoryQueueBackend            -- deque-backed named task queues (thread-safe)
+NoopEmbeddingBackend          -- zero-vector embedding generator
+MemorySearchBackend           -- substring text search + brute-force cosine similarity
+MemoryGraphBackend            -- dict-backed knowledge graph with BFS traversal
+DisabledGraphBackend          -- raises NotImplementedError for every operation
+InMemoryPersistentMemory      -- dict-backed persistent memory store (#91)
 """
 
 from __future__ import annotations
 
 import math
 import threading
+import uuid
 from collections import deque
 from dataclasses import replace
+from datetime import datetime
 
 from loom_ai.models import (
     Chunk,
@@ -30,6 +33,7 @@ from loom_ai.models import (
     QueueItem,
     SearchResult,
 )
+from loom_ai.models_phase1 import MemoryRecord
 
 # ── helpers ──────────────────────────────────────────────────────────────
 
@@ -647,3 +651,102 @@ class MemoryGraphBackend:
         self._adjacency.get(edge.source, set()).discard(edge_id)
         self._adjacency.get(edge.target, set()).discard(edge_id)
         return True
+
+
+# ══════════════════════════════════════════════════════════════════════════
+# PersistentMemoryBackend (#91)
+# ══════════════════════════════════════════════════════════════════════════
+
+
+class InMemoryPersistentMemory:
+    """Dict-backed persistent memory store.
+
+    Satisfies :class:`~loom_ai.contracts_phase1.PersistentMemoryBackend`
+    via structural subtyping.  All data is lost on process exit.
+    """
+
+    def __init__(self) -> None:
+        self._records: dict[str, MemoryRecord] = {}
+
+    async def store(
+        self,
+        name: str,
+        content: str,
+        *,
+        memory_type: str,
+        metadata: dict | None = None,
+    ) -> str:
+        """Store content under *name* and return the record id."""
+        now = datetime.utcnow().isoformat()
+        record = MemoryRecord(
+            id=str(uuid.uuid4()),
+            name=name,
+            content=content,
+            memory_type=memory_type,
+            metadata=metadata or {},
+            created_at=now,
+            updated_at=now,
+        )
+        self._records[name] = record
+        return record.id
+
+    async def recall(self, name: str) -> MemoryRecord | None:
+        """Recall a memory by name, or ``None`` if not found."""
+        return self._records.get(name)
+
+    async def search(
+        self,
+        query: str,
+        *,
+        limit: int = 10,
+        memory_type: str | None = None,
+    ) -> list[MemoryRecord]:
+        """Search memories by substring matching on name and content."""
+        query_lower = query.lower()
+        results: list[MemoryRecord] = []
+        for record in self._records.values():
+            if memory_type is not None and record.memory_type != memory_type:
+                continue
+            if (
+                query_lower in record.name.lower()
+                or query_lower in record.content.lower()
+            ):
+                results.append(record)
+            if len(results) >= limit:
+                break
+        return results
+
+    async def update(
+        self,
+        name: str,
+        content: str,
+        *,
+        memory_type: str | None = None,
+        metadata: dict | None = None,
+    ) -> None:
+        """Overwrite the content of an existing memory."""
+        record = self._records.get(name)
+        if record is None:
+            msg = f"No memory with name '{name}'"
+            raise KeyError(msg)
+        record.content = content
+        record.updated_at = datetime.utcnow().isoformat()
+        if memory_type is not None:
+            record.memory_type = memory_type
+        if metadata is not None:
+            record.metadata = metadata
+
+    async def forget(self, name: str) -> bool:
+        """Remove a memory by name.  Return ``True`` if it existed."""
+        if name in self._records:
+            del self._records[name]
+            return True
+        return False
+
+    async def list_memories(
+        self, *, memory_type: str | None = None
+    ) -> list[MemoryRecord]:
+        """Return stored memories, optionally filtered by type."""
+        if memory_type is None:
+            return list(self._records.values())
+        return [r for r in self._records.values() if r.memory_type == memory_type]
