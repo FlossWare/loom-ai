@@ -22,6 +22,7 @@ if TYPE_CHECKING:
         FeedbackLoopReport,
         SessionBriefing,
         WorkerInfo,
+        WorkerStatus,
     )
 
 
@@ -50,7 +51,7 @@ class WorkerRegistry(Protocol):
         """Remove a worker from the registry."""
         ...
 
-    async def health_check(self) -> dict:
+    async def health_check(self) -> dict[str, WorkerStatus]:
         """Return the health status of all registered workers."""
         ...
 
@@ -63,7 +64,7 @@ class WorkerRegistry(Protocol):
 class CachePolicy(Protocol):
     """Prompt-caching strategy for provider-specific cache hints."""
 
-    def apply_cache_hints(self, messages: list, *, provider: str) -> list:
+    def apply_cache_hints(self, messages: list[dict], *, provider: str) -> list[dict]:
         """Annotate *messages* with cache-control hints for *provider*.
 
         Returns a new list of messages with provider-specific caching
