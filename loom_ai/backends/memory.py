@@ -71,6 +71,10 @@ class MemoryStorageBackend:
     instance across threads must add their own synchronisation.
     """
 
+    @property
+    def is_idempotent(self) -> bool:
+        return True
+
     def __init__(self) -> None:
         # Primary stores (keyed by entity id)
         self._documents: dict[str, Document] = {}
@@ -362,6 +366,10 @@ class MemorySearchBackend:
     subtyping.
     """
 
+    @property
+    def is_idempotent(self) -> bool:
+        return True
+
     def __init__(self) -> None:
         # chunk_id -> Chunk
         self._chunks: dict[str, Chunk] = {}
@@ -577,6 +585,10 @@ class MemoryGraphBackend:
     subtyping.
     """
 
+    @property
+    def is_idempotent(self) -> bool:
+        return True
+
     def __init__(self) -> None:
         self._nodes: dict[str, GraphNode] = {}
         self._edges: dict[str, GraphEdge] = {}
@@ -686,6 +698,10 @@ class InMemoryPersistentMemory:
     Satisfies :class:`~loom_ai.contracts_phase1.PersistentMemoryBackend`
     via structural subtyping.  All data is lost on process exit.
     """
+
+    @property
+    def is_idempotent(self) -> bool:
+        return True
 
     def __init__(self) -> None:
         self._records: dict[str, MemoryRecord] = {}

@@ -61,7 +61,8 @@ class IdempotentStore(Protocol):
     appends duplicates).
     """
 
-    ...
+    @property
+    def is_idempotent(self) -> bool: ...
 
 
 @runtime_checkable
