@@ -223,88 +223,71 @@ async def test_arbiter_timeout_returns_worker_responses():
         )
 
 
-async def test_is_retryable_timeout():
-    assert ConsensusEngine._is_retryable(asyncio.TimeoutError())
-
-
-async def test_is_retryable_429():
-    exc = RuntimeError("LLM API error 429 from http://example.com")
+@pytest.mark.parametrize(
+    "exc",
+    [
+        pytest.param(asyncio.TimeoutError(), id="timeout"),
+        pytest.param(
+            RuntimeError("LLM API error 429 from http://example.com"), id="429"
+        ),
+        pytest.param(
+            RuntimeError("LLM API error 503 from http://example.com"), id="503"
+        ),
+        pytest.param(ConnectionError("refused"), id="connection_error"),
+        pytest.param(OSError("network unreachable"), id="os_error"),
+        pytest.param(
+            RuntimeError("LLM API connection error to https://x: refused"),
+            id="runtime_connection_error",
+        ),
+        pytest.param(
+            RuntimeError("llm api error 500 from http://api:8080/v1: internal error"),
+            id="500_with_port",
+        ),
+        pytest.param(
+            RuntimeError("llm api error 429 from http://api:5000/v1: rate limited"),
+            id="429_with_port_5000",
+        ),
+    ],
+)
+async def test_is_retryable(exc):
     assert ConsensusEngine._is_retryable(exc)
 
 
-async def test_is_retryable_503():
-    exc = RuntimeError("LLM API error 503 from http://example.com")
-    assert ConsensusEngine._is_retryable(exc)
-
-
-async def test_is_not_retryable_400():
-    exc = RuntimeError("LLM API error 400 from http://example.com")
+@pytest.mark.parametrize(
+    "exc",
+    [
+        pytest.param(
+            RuntimeError("LLM API error 400 from http://example.com"), id="400"
+        ),
+        pytest.param(ValueError("bad input"), id="value_error"),
+        pytest.param(
+            RuntimeError("llm api error 400 from http://api:5000/v1: bad request"),
+            id="port_5000_not_500",
+        ),
+        pytest.param(
+            RuntimeError("llm api error 400 from http://api:5003/v1: bad request"),
+            id="port_5003_not_500",
+        ),
+        pytest.param(
+            RuntimeError("llm api error 400 from http://api:5029/v1: bad request"),
+            id="port_5029_not_502",
+        ),
+        pytest.param(
+            RuntimeError("llm api error 400 from http://api:5039/v1: bad request"),
+            id="port_5039_not_503",
+        ),
+        pytest.param(
+            RuntimeError("llm api error 400 from http://api:5049/v1: bad request"),
+            id="port_5049_not_504",
+        ),
+        pytest.param(
+            RuntimeError("llm api error 400 from http://api:4290/v1: bad request"),
+            id="port_4290_not_429",
+        ),
+    ],
+)
+async def test_is_not_retryable(exc):
     assert not ConsensusEngine._is_retryable(exc)
-
-
-async def test_is_not_retryable_value_error():
-    assert not ConsensusEngine._is_retryable(ValueError("bad input"))
-
-
-async def test_is_retryable_connection_error():
-    assert ConsensusEngine._is_retryable(ConnectionError("refused"))
-
-
-async def test_is_retryable_os_error():
-    assert ConsensusEngine._is_retryable(OSError("network unreachable"))
-
-
-async def test_is_retryable_runtime_connection_error():
-    exc = RuntimeError("LLM API connection error to https://x: refused")
-    assert ConsensusEngine._is_retryable(exc)
-
-
-async def test_is_not_retryable_port_5000():
-    """Port 5000 in URL must not match '500' status code."""
-    exc = RuntimeError("llm api error 400 from http://api:5000/v1: bad request")
-    assert not ConsensusEngine._is_retryable(exc)
-
-
-async def test_is_not_retryable_port_5003():
-    """Port 5003 in URL must not match '500' status code."""
-    exc = RuntimeError("llm api error 400 from http://api:5003/v1: bad request")
-    assert not ConsensusEngine._is_retryable(exc)
-
-
-async def test_is_not_retryable_port_5029():
-    """Port 5029 in URL must not match '502' status code."""
-    exc = RuntimeError("llm api error 400 from http://api:5029/v1: bad request")
-    assert not ConsensusEngine._is_retryable(exc)
-
-
-async def test_is_not_retryable_port_5039():
-    """Port 5039 in URL must not match '503' status code."""
-    exc = RuntimeError("llm api error 400 from http://api:5039/v1: bad request")
-    assert not ConsensusEngine._is_retryable(exc)
-
-
-async def test_is_not_retryable_port_5049():
-    """Port 5049 in URL must not match '504' status code."""
-    exc = RuntimeError("llm api error 400 from http://api:5049/v1: bad request")
-    assert not ConsensusEngine._is_retryable(exc)
-
-
-async def test_is_not_retryable_port_4290():
-    """Port 4290 in URL must not match '429' status code."""
-    exc = RuntimeError("llm api error 400 from http://api:4290/v1: bad request")
-    assert not ConsensusEngine._is_retryable(exc)
-
-
-async def test_is_retryable_500_with_port():
-    """Real 500 error from a URL with port must still be retryable."""
-    exc = RuntimeError("llm api error 500 from http://api:8080/v1: internal error")
-    assert ConsensusEngine._is_retryable(exc)
-
-
-async def test_is_retryable_429_with_port_5000():
-    """Real 429 error from port 5000 must still be retryable."""
-    exc = RuntimeError("llm api error 429 from http://api:5000/v1: rate limited")
-    assert ConsensusEngine._is_retryable(exc)
 
 
 def test_consensus_engine_importable():
