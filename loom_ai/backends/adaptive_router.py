@@ -94,6 +94,7 @@ class AdaptiveModelRouter:
     """
 
     def __init__(self) -> None:
+        self._rng = random.Random()  # noqa: S311
         # (model, task_type) -> bandit arm
         self._arms: dict[tuple[str, str], _ModelArm] = {}
         # model -> capability profile
@@ -293,7 +294,7 @@ class AdaptiveModelRouter:
 
         for model in candidates:
             arm = self._get_arm(model, task_type)
-            sample = random.betavariate(arm.alpha, arm.beta)
+            sample = self._rng.betavariate(arm.alpha, arm.beta)
             if sample > best_sample:
                 best_sample = sample
                 best_model = model

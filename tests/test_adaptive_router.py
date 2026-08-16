@@ -232,12 +232,12 @@ class TestThompsonSampling:
         router = AdaptiveModelRouter()
         await router.register_provider("p", MockBackend("p"), models=["a", "b"])
 
-        random.seed(42)
+        router._rng = random.Random(42)
         first = await router.select("code", candidates=["a", "b"])
 
         router2 = AdaptiveModelRouter()
         await router2.register_provider("p", MockBackend("p"), models=["a", "b"])
-        random.seed(42)
+        router2._rng = random.Random(42)
         second = await router2.select("code", candidates=["a", "b"])
 
         assert first == second

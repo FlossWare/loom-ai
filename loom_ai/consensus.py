@@ -104,6 +104,7 @@ class ConsensusEngine:
         self._max_concurrent = max_concurrent
         self._timeout_seconds = timeout_seconds
         self._retries = retries
+        self._rng = random.Random()  # noqa: S311
 
     async def gather(
         self,
@@ -154,7 +155,7 @@ class ConsensusEngine:
                     if not self._is_retryable(exc):
                         break
                     delay = min(
-                        (2**attempt) + random.uniform(0, 1),
+                        (2**attempt) + self._rng.uniform(0, 1),
                         max(0, deadline - time.monotonic()),
                     )
                     if attempt < max_retries and delay > 0:
@@ -289,7 +290,7 @@ class ConsensusEngine:
                 if not self._is_retryable(exc):
                     break
                 delay = min(
-                    (2**attempt) + random.uniform(0, 1),
+                    (2**attempt) + self._rng.uniform(0, 1),
                     max(0, deadline - time.monotonic()),
                 )
                 if attempt < max_retries and delay > 0:

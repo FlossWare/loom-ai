@@ -67,11 +67,11 @@ async def test_select_favors_rewarded_strategy():
 async def test_select_deterministic_with_seed():
     """With a fixed random seed, select is reproducible."""
     selector = ThompsonSamplingSelector()
-    random.seed(42)
+    selector._rng = random.Random(42)
     first = await selector.select("code", candidates=["a", "b", "c"])
 
     selector2 = ThompsonSamplingSelector()
-    random.seed(42)
+    selector2._rng = random.Random(42)
     second = await selector2.select("code", candidates=["a", "b", "c"])
 
     assert first == second
