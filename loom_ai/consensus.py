@@ -257,7 +257,7 @@ class ConsensusEngine:
             except Exception as exc:
                 last_exc = exc
                 if not self._is_retryable(exc):
-                    raise
+                    break
                 delay = min(
                     (2**attempt) + random.uniform(0, 1),
                     max(0, deadline - time.monotonic()),

@@ -1,7 +1,5 @@
 """Regression tests for explicit consensus failure reporting."""
 
-import asyncio
-
 from loom_ai.consensus import ConsensusEngine
 from loom_ai.models import ChatMessage, ChatResponse
 
