@@ -112,6 +112,9 @@ class ConsensusEngine:
                     break
                 try:
                     async with sem:
+                        remaining = deadline - time.monotonic()
+                        if remaining <= 0:
+                            break
                         resp = await asyncio.wait_for(
                             self._backend.chat(
                                 messages,

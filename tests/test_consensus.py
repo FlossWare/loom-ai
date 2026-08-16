@@ -1,6 +1,7 @@
 """Tests for loom_ai.consensus.ConsensusEngine."""
 
 import asyncio
+import time
 
 import pytest
 
@@ -270,3 +271,40 @@ def test_consensus_result_defaults():
     result = ConsensusResult(synthesis=resp)
     assert result.worker_responses == []
     assert result.failed_models == []
+
+
+async def test_gather_recomputes_deadline_after_semaphore(monkeypatch):
+    """Deadline must be recomputed after semaphore acquisition (issue #40).
+
+    With ``max_concurrent=1``, model-slow holds the semaphore for 0.6 s.
+    The overall deadline is 0.8 s, so model-b acquires the semaphore at
+    ~0.6 s with only ~0.2 s remaining.  Before the fix, the stale
+    ``remaining`` was computed *before* waiting for the semaphore, so
+    model-b's ``wait_for`` would have used the full ~0.8 s budget,
+    violating the deadline.  After the fix the total wall-clock time must
+    stay within a small margin of the 0.8 s deadline.
+    """
+    backend = FakeLLMBackend()
+    # model-slow takes 0.6 s, model-b is instant
+    backend.slow_models = {"model-slow": 0.6}
+    engine = ConsensusEngine(backend, max_concurrent=1, retries=0)
+    msgs = [ChatMessage(role="user", content="Hello")]
+
+    start = time.monotonic()
+    responses, failed = await engine.gather(
+        msgs,
+        ["model-slow", "model-b"],
+        timeout_seconds=0.8,
+    )
+    elapsed = time.monotonic() - start
+
+    # Both should succeed (model-slow takes 0.6 s, model-b starts at
+    # ~0.6 s with ~0.2 s remaining and finishes instantly).
+    assert len(responses) == 2
+    assert len(failed) == 0
+
+    # Critical: total time must be close to 0.8 s, not 0.8 + 0.8 = 1.6 s
+    # which would happen with the stale deadline bug.
+    assert elapsed < 1.2, (
+        f"gather took {elapsed:.2f}s, suggesting stale deadline after semaphore wait"
+    )
