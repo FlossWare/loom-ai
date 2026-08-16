@@ -37,6 +37,8 @@ import os
 import time
 from typing import TYPE_CHECKING
 
+from loom_ai import __version__
+
 if TYPE_CHECKING:
     from fastapi import FastAPI
 
@@ -160,7 +162,7 @@ def create_app(config: LoomConfig) -> FastAPI:
     app = FastAPI(
         title="loom-ai",
         description="Pluggable AI orchestration API",
-        version="1.1",
+        version=__version__,
     )
 
     app.state.loom = config
