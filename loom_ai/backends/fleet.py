@@ -187,7 +187,8 @@ class LoadBalancer:
         if not healthy:
             return None
         self._rebuild_cycle(healthy)
-        assert self._rr_cycle is not None
+        if self._rr_cycle is None:
+            return None
         return next(self._rr_cycle)
 
     def _select_least_connections(self) -> WorkerInfo | None:

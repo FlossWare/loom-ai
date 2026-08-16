@@ -227,8 +227,8 @@ class PolicyOverride:
         override = self._overrides.get(policy)
         if override is None:
             return None
-        now = datetime.now(timezone.utc).isoformat()
-        if override.expires_at <= now:
+        now = datetime.now(timezone.utc)
+        if datetime.fromisoformat(override.expires_at) <= now:
             return None
         return override.value
 
@@ -238,5 +238,9 @@ class PolicyOverride:
 
     def active_overrides(self) -> list[Override]:
         """Return all non-expired overrides."""
-        now = datetime.now(timezone.utc).isoformat()
-        return [o for o in self._overrides.values() if o.expires_at > now]
+        now = datetime.now(timezone.utc)
+        return [
+            o
+            for o in self._overrides.values()
+            if datetime.fromisoformat(o.expires_at) > now
+        ]
