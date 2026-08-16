@@ -24,10 +24,6 @@ from loom_ai.models_phase2 import (
     WorkflowStatus,
 )
 
-# ══════════════════════════════════════════════════════════════════════════
-# WorkflowStorageBackend
-# ══════════════════════════════════════════════════════════════════════════
-
 
 class InMemoryWorkflowStorage:
     """Fully async, dict-backed workflow storage backend.
@@ -76,11 +72,6 @@ class InMemoryWorkflowStorage:
     async def get_worker_results(self, exec_id: str) -> list[WorkerResult]:
         """Return all worker results attached to *exec_id*."""
         return list(self._worker_results.get(exec_id, []))
-
-
-# ══════════════════════════════════════════════════════════════════════════
-# WorkflowEngine
-# ══════════════════════════════════════════════════════════════════════════
 
 
 class SimpleWorkflowEngine:
@@ -178,12 +169,17 @@ class SimpleWorkflowEngine:
         elapsed_ms = (time.monotonic() - start_time) * 1000.0
 
         # Mark final status
+        if status_str == "completed":
+            final_progress = 1.0
+        elif total_phases:
+            final_progress = len(phases_completed) / total_phases
+        else:
+            final_progress = 0.0
+
         self._statuses[run_id] = WorkflowStatus(
             run_id=run_id,
             phase=phases_completed[-1] if phases_completed else "",
-            progress=1.0
-            if status_str == "completed"
-            else (len(phases_completed) / total_phases if total_phases else 0.0),
+            progress=final_progress,
             started_at=started_at,
         )
 
