@@ -131,7 +131,14 @@ class PersistentMemoryBackend(Protocol):
         """Search memories by query text with optional type filter."""
         ...
 
-    async def update(self, name: str, content: str) -> None:
+    async def update(
+        self,
+        name: str,
+        content: str,
+        *,
+        memory_type: str | None = None,
+        metadata: dict | None = None,
+    ) -> None:
         """Overwrite the content of an existing memory."""
         ...
 
