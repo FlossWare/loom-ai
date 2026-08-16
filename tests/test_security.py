@@ -59,6 +59,39 @@ def test_validator_empty_schema():
     assert result.valid is True
 
 
+def test_validator_rejects_bool_for_int():
+    """bool is a subclass of int; validator must reject it."""
+    v = ConfigValidator({"count": int})
+    for val in (True, False):
+        result = v.validate({"count": val})
+        assert result.valid is False, f"should reject {val!r} for int"
+        assert any("expected int, got bool" in e for e in result.errors)
+
+
+def test_validator_accepts_int_for_int():
+    """Regular integers must still pass an int schema."""
+    v = ConfigValidator({"count": int})
+    for val in (0, 1, 42, -1):
+        result = v.validate({"count": val})
+        assert result.valid is True, f"should accept {val!r} for int"
+
+
+def test_validator_accepts_bool_for_bool():
+    """When the schema expects bool, True/False must still pass."""
+    v = ConfigValidator({"flag": bool})
+    for val in (True, False):
+        result = v.validate({"flag": val})
+        assert result.valid is True, f"should accept {val!r} for bool"
+
+
+def test_validator_rejects_bool_for_float():
+    """bool is also a subclass of float via int; validator must reject it."""
+    v = ConfigValidator({"rate": float})
+    result = v.validate({"rate": True})
+    assert result.valid is False
+    assert any("expected float, got bool" in e for e in result.errors)
+
+
 # ── SecretsMask ───────────────────────────────────────────────────────────
 
 
