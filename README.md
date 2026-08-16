@@ -6,6 +6,8 @@ Pluggable AI orchestration framework with swappable backends. Zero required depe
 
 ## Architecture
 
+See [docs/architecture.md](docs/architecture.md) for detailed architecture documentation, including the extension model, request lifecycle, and implementation boundaries.
+
 Loom is an orchestration substrate built around provider-neutral contracts. The core defines stable interfaces; external projects and services may implement those contracts without becoming Loom dependencies.
 
 ```text
