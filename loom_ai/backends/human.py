@@ -99,12 +99,13 @@ class AutoApproveHumanInTheLoop:
 
     async def request_input(
         self,
-        _prompt: str,
+        prompt: str,
         *,
         options: list[str] | None = None,
-        _timeout: float | None = None,
+        timeout: float | None = None,
     ) -> str:
         """Return the first option or ``"approved"``."""
+        _ = prompt, timeout
         if options:
             return options[0]
         return "approved"
