@@ -105,6 +105,7 @@ class AutoApproveHumanInTheLoop:
         timeout: float | None = None,
     ) -> str:
         """Return the first option or ``"approved"``."""
+        _ = prompt, timeout
         if options:
             return options[0]
         return "approved"
