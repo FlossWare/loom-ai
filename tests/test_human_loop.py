@@ -189,7 +189,7 @@ async def test_auto_approve_returns_approved_for_empty_options():
 async def test_auto_approve_ignores_timeout():
     """Timeout parameter is accepted but has no effect."""
     hitl = AutoApproveHumanInTheLoop()
-    result = await hitl.request_input("Approve?", options=["go"], timeout=0.001)
+    result = await hitl.request_input("Approve?", options=["go"], _timeout=0.001)
 
     assert result == "go"
 
