@@ -22,6 +22,13 @@ Quick start::
         graph=my_orientdb_graph,
         llm=my_http_llm,
     )
+
+For the full set of 78 protocol contracts, use the consolidated
+facade::
+
+    from loom_ai.contracts import StorageBackend, WorkflowEngine, ...
+
+See ``docs/contracts.md`` for the canonical contract inventory.
 """
 
 from loom_ai.config import LoomConfig
@@ -30,6 +37,21 @@ from loom_ai.contracts_execution import (
     ExecutionObserver,
     ExecutionPipeline,
     ExecutionStep,
+)
+from loom_ai.contracts_phase1 import (
+    ConversationManager,
+    ModelRouter,
+    PersistentMemoryBackend,
+    StructuredOutputMixin,
+)
+from loom_ai.contracts_phase2 import (
+    ObservabilityBackend,
+    WorkflowEngine,
+)
+from loom_ai.contracts_phase3 import (
+    EvaluationHarness,
+    SessionInitializer,
+    WorkerRegistry,
 )
 from loom_ai.execution import (
     CyclicDependencyError,
@@ -119,6 +141,16 @@ __all__ = [
     "StorageBackend",
     "TaskRunner",
     "ToolProvider",
+    # Most-used advanced contracts
+    "ConversationManager",
+    "EvaluationHarness",
+    "ModelRouter",
+    "ObservabilityBackend",
+    "PersistentMemoryBackend",
+    "SessionInitializer",
+    "StructuredOutputMixin",
+    "WorkerRegistry",
+    "WorkflowEngine",
 ]
 
 __version__ = "1.2"
