@@ -12,9 +12,9 @@ from typing import Any
 
 from loom_ai.contracts_phase6 import (
     ACPAdapter,
+    AgentCapabilityRegistry,
     AgentEnvironment,
     AgentLoop,
-    CapabilityRegistry,
     ContextAssembler,
     RecipeExecutor,
     TrajectoryStore,
@@ -23,17 +23,17 @@ from loom_ai.models_phase6 import (
     ACPEvent,
     ACPMessage,
     ACPSession,
+    AgentCapabilityProfile,
     AgentCheckpoint,
+    AgentEnvironmentObservation,
     AgentOperation,
     AgentState,
     AgentTurn,
+    AssemblyContextBudget,
     Capability,
-    CapabilityProfile,
     CapabilityRequirement,
-    ContextBudget,
     ContextSnapshot,
     ContextSource,
-    EnvironmentObservation,
     EnvironmentSnapshot,
     EnvironmentSpec,
     RecipeDefinition,
@@ -198,8 +198,8 @@ class StubAgentEnvironment:
     async def restore(self, snapshot: EnvironmentSnapshot) -> None:
         pass
 
-    async def observe(self, env_id: str) -> EnvironmentObservation:
-        return EnvironmentObservation(
+    async def observe(self, env_id: str) -> AgentEnvironmentObservation:
+        return AgentEnvironmentObservation(
             env_id=env_id, observation_type="state", content=""
         )
 
@@ -207,8 +207,8 @@ class StubAgentEnvironment:
         return True
 
 
-class StubCapabilityRegistry:
-    """Minimal stub satisfying the CapabilityRegistry protocol."""
+class StubAgentCapabilityRegistry:
+    """Minimal stub satisfying the AgentCapabilityRegistry protocol."""
 
     async def register_capability(self, capability: Capability) -> None:
         pass
@@ -221,15 +221,15 @@ class StubCapabilityRegistry:
     ) -> list[Capability]:
         return []
 
-    async def register_profile(self, profile: CapabilityProfile) -> None:
+    async def register_profile(self, profile: AgentCapabilityProfile) -> None:
         pass
 
     async def match(
         self, requirements: list[CapabilityRequirement]
-    ) -> list[CapabilityProfile]:
+    ) -> list[AgentCapabilityProfile]:
         return []
 
-    async def get_profile(self, agent_or_model: str) -> CapabilityProfile | None:
+    async def get_profile(self, agent_or_model: str) -> AgentCapabilityProfile | None:
         return None
 
 
@@ -267,8 +267,8 @@ def test_agent_environment_conformance():
 
 
 def test_capability_registry_conformance():
-    """StubCapabilityRegistry satisfies the CapabilityRegistry protocol."""
-    assert isinstance(StubCapabilityRegistry(), CapabilityRegistry)
+    """StubAgentCapabilityRegistry satisfies the AgentCapabilityRegistry protocol."""
+    assert isinstance(StubAgentCapabilityRegistry(), AgentCapabilityRegistry)
 
 
 # ── Non-conformance tests (negative) ─────────────────────────────────────
@@ -305,7 +305,7 @@ def test_empty_does_not_satisfy_agent_environment():
 
 
 def test_empty_does_not_satisfy_capability_registry():
-    assert not isinstance(_Empty(), CapabilityRegistry)
+    assert not isinstance(_Empty(), AgentCapabilityRegistry)
 
 
 # ── Async method exercise tests ──────────────────────────────────────────
@@ -529,29 +529,29 @@ async def test_agent_environment_observe():
     """AgentEnvironment.observe returns an observation."""
     env = StubAgentEnvironment()
     obs = await env.observe("env-1")
-    assert isinstance(obs, EnvironmentObservation)
+    assert isinstance(obs, AgentEnvironmentObservation)
     assert obs.env_id == "env-1"
 
 
 async def test_capability_registry_register_and_get():
-    """CapabilityRegistry register/get capability round-trip."""
-    registry = StubCapabilityRegistry()
+    """AgentCapabilityRegistry register/get capability round-trip."""
+    registry = StubAgentCapabilityRegistry()
     cap = Capability(capability_id="cap-1", name="code-generation", category="coding")
     await registry.register_capability(cap)
     assert await registry.get_capability("cap-1") is None  # stub returns None
 
 
 async def test_capability_registry_list():
-    """CapabilityRegistry.list_capabilities accepts category filter."""
-    registry = StubCapabilityRegistry()
+    """AgentCapabilityRegistry.list_capabilities accepts category filter."""
+    registry = StubAgentCapabilityRegistry()
     caps = await registry.list_capabilities(category="coding")
     assert isinstance(caps, list)
 
 
 async def test_capability_registry_profile_and_match():
-    """CapabilityRegistry profile registration and matching."""
-    registry = StubCapabilityRegistry()
-    profile = CapabilityProfile(
+    """AgentCapabilityRegistry profile registration and matching."""
+    registry = StubAgentCapabilityRegistry()
+    profile = AgentCapabilityProfile(
         profile_id="p-1",
         agent_or_model="opus",
         capabilities=["cap-1", "cap-2"],
@@ -567,8 +567,8 @@ async def test_capability_registry_profile_and_match():
 
 
 async def test_capability_registry_get_profile():
-    """CapabilityRegistry.get_profile returns None for unknown model."""
-    registry = StubCapabilityRegistry()
+    """AgentCapabilityRegistry.get_profile returns None for unknown model."""
+    registry = StubAgentCapabilityRegistry()
     assert await registry.get_profile("unknown-model") is None
 
 
@@ -615,8 +615,8 @@ def test_context_source_defaults():
 
 
 def test_context_budget_fields():
-    """ContextBudget stores token allocation."""
-    b = ContextBudget(total_tokens=4096, used=1000, remaining=3096)
+    """AssemblyContextBudget stores token allocation."""
+    b = AssemblyContextBudget(total_tokens=4096, used=1000, remaining=3096)
     assert b.total_tokens == 4096
     assert b.remaining == 3096
 
@@ -659,8 +659,10 @@ def test_environment_snapshot_defaults():
 
 
 def test_environment_observation_defaults():
-    """EnvironmentObservation defaults to not verifiable."""
-    o = EnvironmentObservation(env_id="e-1", observation_type="state", content="ok")
+    """AgentEnvironmentObservation defaults to not verifiable."""
+    o = AgentEnvironmentObservation(
+        env_id="e-1", observation_type="state", content="ok"
+    )
     assert o.verifiable is False
 
 
@@ -679,7 +681,7 @@ def test_capability_requirement_defaults():
 
 
 def test_capability_profile_defaults():
-    """CapabilityProfile has empty capabilities and scores."""
-    p = CapabilityProfile(profile_id="p-1", agent_or_model="opus")
+    """AgentCapabilityProfile has empty capabilities and scores."""
+    p = AgentCapabilityProfile(profile_id="p-1", agent_or_model="opus")
     assert p.capabilities == []
     assert p.scores == {}

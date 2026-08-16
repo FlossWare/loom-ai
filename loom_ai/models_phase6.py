@@ -164,7 +164,7 @@ class ContextSource:
 
 
 @dataclass
-class ContextBudget:
+class AssemblyContextBudget:
     """Token-budget allocation for context assembly."""
 
     total_tokens: int
@@ -178,7 +178,7 @@ class ContextSnapshot:
     """Assembled context ready for model submission."""
 
     sources: list[ContextSource] = field(default_factory=list)
-    budget: ContextBudget | None = None
+    budget: AssemblyContextBudget | None = None
     total_tokens: int = 0
     compacted: bool = False
     metadata: dict = field(default_factory=dict)
@@ -252,7 +252,7 @@ class EnvironmentSnapshot:
 
 
 @dataclass
-class EnvironmentObservation:
+class AgentEnvironmentObservation:
     """An observation captured from the environment during execution."""
 
     env_id: str
@@ -289,7 +289,7 @@ class CapabilityRequirement:
 
 
 @dataclass
-class CapabilityProfile:
+class AgentCapabilityProfile:
     """A profile listing capabilities possessed by a model or agent."""
 
     profile_id: str

@@ -17,7 +17,7 @@ Phase 6 covers seven Agent Architecture contract areas:
 - **ContextAssembler** -- context construction, budgeting, and compaction (#62)
 - **TrajectoryStore** -- trajectory capture, replay, and curation (#63)
 - **AgentEnvironment** -- executable environment lifecycle and observation (#64)
-- **CapabilityRegistry** -- agent/model capability taxonomy and matching (#65)
+- **AgentCapabilityRegistry** -- agent/model capability taxonomy and matching (#65)
 """
 
 from __future__ import annotations
@@ -29,16 +29,16 @@ if TYPE_CHECKING:
         ACPEvent,
         ACPMessage,
         ACPSession,
+        AgentCapabilityProfile,
         AgentCheckpoint,
+        AgentEnvironmentObservation,
         AgentOperation,
         AgentState,
         AgentTurn,
         Capability,
-        CapabilityProfile,
         CapabilityRequirement,
         ContextSnapshot,
         ContextSource,
-        EnvironmentObservation,
         EnvironmentSnapshot,
         EnvironmentSpec,
         RecipeDefinition,
@@ -274,7 +274,7 @@ class AgentEnvironment(Protocol):
         """Restore the environment to a previous snapshot."""
         ...
 
-    async def observe(self, env_id: str) -> EnvironmentObservation:
+    async def observe(self, env_id: str) -> AgentEnvironmentObservation:
         """Capture the current observation from the environment."""
         ...
 
@@ -287,7 +287,7 @@ class AgentEnvironment(Protocol):
 
 
 @runtime_checkable
-class CapabilityRegistry(Protocol):
+class AgentCapabilityRegistry(Protocol):
     """Capability-oriented taxonomy for agent and model selection.
 
     Separates desired capabilities from implementation substrate,
@@ -309,16 +309,16 @@ class CapabilityRegistry(Protocol):
         """Return capabilities, optionally filtered by category."""
         ...
 
-    async def register_profile(self, profile: CapabilityProfile) -> None:
+    async def register_profile(self, profile: AgentCapabilityProfile) -> None:
         """Register a capability profile for a model or agent."""
         ...
 
     async def match(
         self, requirements: list[CapabilityRequirement]
-    ) -> list[CapabilityProfile]:
+    ) -> list[AgentCapabilityProfile]:
         """Return profiles satisfying all *requirements*."""
         ...
 
-    async def get_profile(self, agent_or_model: str) -> CapabilityProfile | None:
+    async def get_profile(self, agent_or_model: str) -> AgentCapabilityProfile | None:
         """Return the capability profile for a model or agent."""
         ...
