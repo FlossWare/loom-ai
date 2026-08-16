@@ -3,6 +3,19 @@
 Dynamically mounts routes based on which backends are configured.
 Install with: pip install flossware-loom-ai[server]
 
+Security model:
+    - Default bind: 127.0.0.1 (localhost only). Override with LOOM_HOST.
+    - When LOOM_API_KEY is unset, the server is intentionally unauthenticated.
+      This is safe only when bound to localhost or behind a reverse proxy /
+      network policy. Do not bind to 0.0.0.0 without setting LOOM_API_KEY.
+    - When LOOM_API_KEY is set, all routes except /health require a valid
+      Bearer token. /health is always unauthenticated for probe compatibility.
+    - Missing Authorization header: 403 (from HTTPBearer).
+      Invalid Bearer token: 401 (from verify_api_key).
+    - /secrets/{name} returns plaintext secret values by design. When auth is
+      enabled, only callers with the API key can access them. When auth is
+      disabled, localhost binding is the sole access control.
+
 Usage:
     # Auto-configure from LOOM_* env vars:
     python -m loom_ai.server
@@ -18,6 +31,8 @@ Usage:
 from __future__ import annotations
 
 import base64
+import hmac
+import logging
 import os
 import time
 from typing import TYPE_CHECKING
@@ -38,11 +53,31 @@ def create_app(config: LoomConfig) -> "FastAPI":
             "Install with: pip install flossware-loom-ai[server]"
         ) from exc
 
+    logger = logging.getLogger("loom_ai.server")
+    api_key = os.environ.get("LOOM_API_KEY")
+    auth_deps: list = []
+
+    if api_key:
+        from fastapi import Depends, Security  # noqa: F811
+        from fastapi.security import HTTPAuthorizationCredentials, HTTPBearer
+
+        security = HTTPBearer()
+
+        async def verify_api_key(
+            credentials: HTTPAuthorizationCredentials = Security(security),
+        ) -> None:
+            if not hmac.compare_digest(credentials.credentials, api_key):
+                logger.warning("Invalid API key attempt")
+                raise HTTPException(status_code=401, detail="Invalid API key")
+
+        auth_deps = [Depends(verify_api_key)]
+
     app = FastAPI(
         title="loom-ai",
         description="Pluggable AI orchestration API",
         version="1.1",
     )
+
     app.state.loom = config
 
     @app.get("/health")
@@ -67,7 +102,9 @@ def create_app(config: LoomConfig) -> "FastAPI":
 
     from fastapi import APIRouter
 
-    storage_router = APIRouter(prefix="/knowledge", tags=["knowledge"])
+    storage_router = APIRouter(
+        prefix="/knowledge", tags=["knowledge"], dependencies=auth_deps
+    )
 
     @storage_router.get("/stats")
     async def knowledge_stats():
@@ -151,7 +188,9 @@ def create_app(config: LoomConfig) -> "FastAPI":
 
     app.include_router(storage_router)
 
-    queue_router = APIRouter(prefix="/pipeline", tags=["pipeline"])
+    queue_router = APIRouter(
+        prefix="/pipeline", tags=["pipeline"], dependencies=auth_deps
+    )
 
     @queue_router.get("/queues/{queue_name}/status")
     async def queue_status(queue_name: str):
@@ -202,7 +241,7 @@ def create_app(config: LoomConfig) -> "FastAPI":
 
     app.include_router(queue_router)
 
-    search_router = APIRouter(prefix="/search", tags=["search"])
+    search_router = APIRouter(prefix="/search", tags=["search"], dependencies=auth_deps)
 
     @search_router.get("/text")
     async def text_search(q: str, limit: int = 10):
@@ -230,7 +269,9 @@ def create_app(config: LoomConfig) -> "FastAPI":
 
     app.include_router(search_router)
 
-    secrets_router = APIRouter(prefix="/secrets", tags=["secrets"])
+    secrets_router = APIRouter(
+        prefix="/secrets", tags=["secrets"], dependencies=auth_deps
+    )
 
     @secrets_router.get("/")
     async def list_secrets():
@@ -247,7 +288,7 @@ def create_app(config: LoomConfig) -> "FastAPI":
     app.include_router(secrets_router)
 
     if config.llm is not None:
-        llm_router = APIRouter(prefix="/llm", tags=["llm"])
+        llm_router = APIRouter(prefix="/llm", tags=["llm"], dependencies=auth_deps)
 
         @llm_router.get("/models")
         async def llm_models():
@@ -274,7 +315,9 @@ def create_app(config: LoomConfig) -> "FastAPI":
         app.include_router(llm_router)
 
     if config.consensus is not None:
-        consensus_router = APIRouter(prefix="/consensus", tags=["consensus"])
+        consensus_router = APIRouter(
+            prefix="/consensus", tags=["consensus"], dependencies=auth_deps
+        )
 
         @consensus_router.post("/gather")
         async def consensus_gather(request: Request):
@@ -317,7 +360,9 @@ def create_app(config: LoomConfig) -> "FastAPI":
         app.include_router(consensus_router)
 
     if config.tools is not None:
-        tools_router = APIRouter(prefix="/tools", tags=["tools"])
+        tools_router = APIRouter(
+            prefix="/tools", tags=["tools"], dependencies=auth_deps
+        )
 
         @tools_router.get("/")
         async def list_tools():
@@ -335,7 +380,9 @@ def create_app(config: LoomConfig) -> "FastAPI":
         app.include_router(tools_router)
 
     if config.resources is not None:
-        resources_router = APIRouter(prefix="/resources", tags=["resources"])
+        resources_router = APIRouter(
+            prefix="/resources", tags=["resources"], dependencies=auth_deps
+        )
 
         @resources_router.get("/")
         async def list_resources():
@@ -371,7 +418,9 @@ def create_app(config: LoomConfig) -> "FastAPI":
         app.include_router(resources_router)
 
     if config.graph is not None:
-        graph_router = APIRouter(prefix="/graph", tags=["graph"])
+        graph_router = APIRouter(
+            prefix="/graph", tags=["graph"], dependencies=auth_deps
+        )
 
         @graph_router.post("/nodes")
         async def add_node(request: Request):
@@ -432,6 +481,6 @@ def main() -> None:
 
     config = LoomConfig.from_env()
     app = create_app(config)
-    host = os.environ.get("LOOM_HOST", "0.0.0.0")
+    host = os.environ.get("LOOM_HOST", "127.0.0.1")
     port = int(os.environ.get("LOOM_PORT", "5000"))
     uvicorn.run(app, host=host, port=port)
