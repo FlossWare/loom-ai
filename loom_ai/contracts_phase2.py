@@ -67,9 +67,9 @@ class WorkflowStorageBackend(Protocol):
         ...
 
     async def find_similar(
-        self, task: str, *, limit: int = 10
+        self, task_description: str, *, limit: int = 10
     ) -> list[WorkflowExecution]:
-        """Return executions whose task description is similar to *task*."""
+        """Return executions whose task description is similar to *task_description*."""
         ...
 
     async def get_execution(self, exec_id: str) -> WorkflowExecution | None:
