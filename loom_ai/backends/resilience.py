@@ -30,6 +30,7 @@ class _ProviderState:
     failure_count: int = 0
     last_failure_at: float = 0.0
     opened_at: float = 0.0
+    half_open_probe_sent: bool = False
 
 
 class CircuitBreakerPolicy:
@@ -75,11 +76,15 @@ class CircuitBreakerPolicy:
             elapsed = time.time() - ps.opened_at
             if elapsed >= self._recovery_timeout:
                 ps.state = "half_open"
+                ps.half_open_probe_sent = True
                 return True
             return False
 
-        # half_open -- allow a single probe
-        return True
+        # half_open -- allow only one probe at a time
+        if not ps.half_open_probe_sent:
+            ps.half_open_probe_sent = True
+            return True
+        return False
 
     async def record_outcome(
         self, provider: str, *, success: bool, latency_ms: float
@@ -99,6 +104,7 @@ class CircuitBreakerPolicy:
                     ps.opened_at = now
 
         elif ps.state == "half_open":
+            ps.half_open_probe_sent = False
             if success:
                 ps.state = "closed"
                 ps.failure_count = 0

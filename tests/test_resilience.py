@@ -121,6 +121,14 @@ async def test_half_open_success_closes_circuit():
     assert state.failure_count == 0
 
 
+async def test_half_open_blocks_second_probe():
+    policy = CircuitBreakerPolicy(failure_threshold=2, recovery_timeout=0.0)
+    await _fail_n(policy, "openai", 2)
+
+    assert await policy.should_allow("openai") is True
+    assert await policy.should_allow("openai") is False
+
+
 async def test_half_open_failure_reopens_circuit():
     policy = CircuitBreakerPolicy(failure_threshold=2, recovery_timeout=0.0)
     await _fail_n(policy, "openai", 2)
