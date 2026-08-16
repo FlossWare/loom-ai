@@ -37,7 +37,7 @@ async def test_arbiter_failure_is_explicit():
     )
 
     assert result.arbiter_attempted is True
-    assert result.arbiter_error == "RuntimeError: arbiter unavailable"
+    assert result.arbiter_error == "RuntimeError: Arbiter call failed after retries"
     assert len(result.worker_responses) == 1
     assert result.synthesis.content.startswith("Arbiter synthesis failed")
 
