@@ -81,6 +81,8 @@ class StubLLMBackend:
         max_tokens: int | None = None,
     ) -> ChatResponse:
         """Return a canned response based on the model id."""
+        _ = temperature
+        _ = max_tokens
         model = model or "model-alpha"
         content = self._RESPONSES.get(
             model,
@@ -97,6 +99,7 @@ class StubLLMBackend:
         max_tokens: int | None = None,
     ) -> AsyncIterator[str]:
         """Yield the response word by word."""
+        _ = max_tokens
         resp = await self.chat(messages, model=model, temperature=temperature)
         for word in resp.content.split():
             yield word + " "

@@ -333,22 +333,12 @@ class InMemoryKnowledgeGraph:
             if depth >= max_depth:
                 continue
             for rid in sorted(self._outgoing.get(node, set())):
-                rel = self._relationships.get(rid)
-                if rel is None:
-                    continue
-                neighbor = rel.target_id
-                if neighbor in seen:
+                neighbor = self._neighbor_from_edge(rid)
+                if neighbor is None or neighbor in seen:
                     continue
                 parent[neighbor] = node
                 if neighbor == target_id:
-                    # Reconstruct path.
-                    path = [target_id]
-                    cur = target_id
-                    while cur != source_id:
-                        cur = parent[cur]
-                        path.append(cur)
-                    path.reverse()
-                    return path
+                    return self._reconstruct_path(parent, source_id, target_id)
                 seen.add(neighbor)
                 queue.append((neighbor, depth + 1))
 
@@ -374,6 +364,22 @@ class InMemoryKnowledgeGraph:
             entities=entities,
             relationships=relationships,
         )
+
+    def _neighbor_from_edge(self, rid: str) -> str | None:
+        rel = self._relationships.get(rid)
+        return rel.target_id if rel is not None else None
+
+    @staticmethod
+    def _reconstruct_path(
+        parent: dict[str, str], source_id: str, target_id: str
+    ) -> list[str]:
+        path = [target_id]
+        cur = target_id
+        while cur != source_id:
+            cur = parent[cur]
+            path.append(cur)
+        path.reverse()
+        return path
 
     # -- Utility -----------------------------------------------------------
 

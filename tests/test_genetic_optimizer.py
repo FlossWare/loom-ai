@@ -197,12 +197,10 @@ def test_diversity_different_population():
 def test_deterministic_with_seed():
     params = [ParamBounds("x", 0.0, 10.0)]
 
-    random.seed(99)
-    opt1 = GeneticOptimizer(params=params, population_size=10)
+    opt1 = GeneticOptimizer(params=params, population_size=10, seed=99)
     best1 = opt1.evolve(lambda i: -abs(i.genes["x"] - 3.0), generations=10)
 
-    random.seed(99)
-    opt2 = GeneticOptimizer(params=params, population_size=10)
+    opt2 = GeneticOptimizer(params=params, population_size=10, seed=99)
     best2 = opt2.evolve(lambda i: -abs(i.genes["x"] - 3.0), generations=10)
 
     assert best1.genes["x"] == best2.genes["x"]

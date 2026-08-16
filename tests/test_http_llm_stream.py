@@ -60,8 +60,8 @@ async def test_chat_stream_propagates_http_error():
     )
 
     with patch("urllib.request.urlopen", side_effect=exc):
+        chunks = []
         with pytest.raises(RuntimeError, match="LLM streaming error 500"):
-            chunks = []
             async for chunk in backend.chat_stream(msgs):
                 chunks.append(chunk)
 
@@ -113,8 +113,9 @@ async def test_chat_stream_yields_content_before_error():
 
     with patch("urllib.request.urlopen", return_value=_FailingResponse()):
         collected: list[str] = []
+        stream = backend.chat_stream(msgs)
         with pytest.raises(RuntimeError, match="LLM streaming error"):
-            async for chunk in backend.chat_stream(msgs):
+            async for chunk in stream:
                 collected.append(chunk)
 
         assert collected == ["partial"]
