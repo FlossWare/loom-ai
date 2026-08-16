@@ -10,12 +10,15 @@ from __future__ import annotations
 
 import asyncio
 import json
+import logging
 import ssl
 import urllib.error
 import urllib.request
 from typing import AsyncIterator
 
 from loom_ai.models import ChatMessage, ChatResponse
+
+logger = logging.getLogger(__name__)
 
 
 class HttpLLMBackend:
@@ -143,8 +146,14 @@ class HttpLLMBackend:
                     return self._parse_response(data, resolved, self._provider_name)
             except urllib.error.HTTPError as exc:
                 error_body = exc.read().decode("utf-8", errors="replace")[:1000]
+                logger.warning(
+                    "LLM API error %d from %s: %s",
+                    exc.code,
+                    self._base_url,
+                    error_body,
+                )
                 raise RuntimeError(
-                    f"LLM API error {exc.code} from {self._base_url}: {error_body}"
+                    f"LLM API error {exc.code} from {self._base_url}"
                 ) from exc
             except urllib.error.URLError as exc:
                 raise RuntimeError(
@@ -233,9 +242,14 @@ class HttpLLMBackend:
                     return sorted(m["id"] for m in models_list if "id" in m)
             except urllib.error.HTTPError as exc:
                 error_body = exc.read().decode("utf-8", errors="replace")[:500]
+                logger.warning(
+                    "Failed to list models from %s: %d %s",
+                    self._base_url,
+                    exc.code,
+                    error_body,
+                )
                 raise RuntimeError(
-                    f"Failed to list models from "
-                    f"{self._base_url}: {exc.code} {error_body}"
+                    f"Failed to list models from {self._base_url}: {exc.code}"
                 ) from exc
             except urllib.error.URLError as exc:
                 raise RuntimeError(
