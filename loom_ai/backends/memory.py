@@ -22,7 +22,7 @@ import threading
 import uuid
 from collections import deque
 from dataclasses import replace
-from datetime import datetime
+from datetime import datetime, timezone
 
 from loom_ai.models import (
     Chunk,
@@ -677,7 +677,7 @@ class InMemoryPersistentMemory:
         metadata: dict | None = None,
     ) -> str:
         """Store content under *name* and return the record id."""
-        now = datetime.utcnow().isoformat()
+        now = datetime.now(timezone.utc).isoformat()
         record = MemoryRecord(
             id=str(uuid.uuid4()),
             name=name,
@@ -730,7 +730,7 @@ class InMemoryPersistentMemory:
             msg = f"No memory with name '{name}'"
             raise KeyError(msg)
         record.content = content
-        record.updated_at = datetime.utcnow().isoformat()
+        record.updated_at = datetime.now(timezone.utc).isoformat()
         if memory_type is not None:
             record.memory_type = memory_type
         if metadata is not None:
