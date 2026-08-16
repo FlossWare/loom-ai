@@ -26,6 +26,11 @@ Quick start::
 
 from loom_ai.config import LoomConfig
 from loom_ai.consensus import ConsensusEngine, ConsensusResult
+from loom_ai.contracts_execution import (
+    ExecutionObserver,
+    ExecutionPipeline,
+    ExecutionStep,
+)
 from loom_ai.execution import (
     CyclicDependencyError,
     ExecutionEngine,
@@ -49,6 +54,13 @@ from loom_ai.models import (
     TaskStatus,
     ToolDefinition,
     ToolResult,
+)
+from loom_ai.models_execution import (
+    ExecutionContext,
+    ExecutionResult,
+    ExecutionStatus,
+    StepResult,
+    StepStatus,
 )
 from loom_ai.protocols import (
     EmbeddingBackend,
@@ -88,6 +100,14 @@ __all__ = [
     "ExecutionEngine",
     "LLMTaskRunner",
     "NoopTaskRunner",
+    "ExecutionContext",
+    "ExecutionObserver",
+    "ExecutionPipeline",
+    "ExecutionResult",
+    "ExecutionStatus",
+    "ExecutionStep",
+    "StepResult",
+    "StepStatus",
     "EmbeddingBackend",
     "GraphBackend",
     "IdempotentStore",
