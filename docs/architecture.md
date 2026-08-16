@@ -36,9 +36,10 @@ synthesis), `ExecutionEngine` (DAG-based task scheduling), and higher-level
 coordination such as adaptive routing and fleet management.  These components
 depend on the contract layer but never on a specific backend.
 
-**Contract layer** -- 89 `@runtime_checkable` Protocol classes across
+**Contract layer** -- 78 `@runtime_checkable` Protocol classes across
 `protocols.py` and `contracts_phase1.py` through `contracts_phase9.py` plus
-`contracts_api.py`.  Every method is `async`.  The only imports are from the
+`contracts_api.py`.  Nearly all methods are `async` (exceptions include
+`IdempotentStore.is_idempotent`).  The only imports are from the
 standard library (`typing`, `dataclasses`).
 
 **Backend layer** -- 36 pluggable modules in `loom_ai/backends/` that satisfy
@@ -406,7 +407,7 @@ intentionally does not -- `enqueue` appends duplicates by design.
 
 ## Contract Phases
 
-The 89 protocol contracts are organized into phases reflecting the order they
+The 78 protocol contracts are organized into phases reflecting the order they
 were designed:
 
 | Phase | File | Count | Focus |
