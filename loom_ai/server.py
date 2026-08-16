@@ -202,13 +202,14 @@ def create_app(config: LoomConfig) -> "FastAPI":
         from loom_ai.models import QueueItem
 
         items_data = data.get("items", [data])
+        ts = int(time.time() * 1000)
         items = [
             QueueItem(
-                id=item.get("id", f"q-{int(time.time() * 1000)}"),
+                id=item.get("id", f"q-{ts}-{i}"),
                 payload=item,
                 enqueued_at=time.time(),
             )
-            for item in items_data
+            for i, item in enumerate(items_data)
         ]
         count = await config.queue.enqueue(queue_name, items)
         return {"enqueued": count}

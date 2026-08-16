@@ -149,3 +149,31 @@ def test_dataclass_construction():
 
     qi = QueueItem(id="q", payload={})
     assert qi.worker_id is None
+
+
+async def test_batch_enqueue_unique_ids():
+    """Batch-enqueued items must have unique IDs so no data is lost on fetch."""
+    cfg = LoomConfig.from_env()
+    items = [QueueItem(id=f"batch-{i}", payload={"index": i}) for i in range(5)]
+    count = await cfg.queue.enqueue("batch-queue", items)
+    assert count == 5
+
+    fetched = await cfg.queue.fetch("batch-queue", 5, "worker-1")
+    assert len(fetched) == 5
+    fetched_ids = [item.id for item in fetched]
+    assert len(set(fetched_ids)) == 5, f"Duplicate IDs found: {fetched_ids}"
+
+
+async def test_batch_enqueue_no_overwrite_in_processing():
+    """Unique IDs prevent items from overwriting each other in _processing."""
+    cfg = LoomConfig.from_env()
+    items = [QueueItem(id=f"dup-test-{i}", payload={"value": i}) for i in range(3)]
+    await cfg.queue.enqueue("overwrite-queue", items)
+
+    fetched = await cfg.queue.fetch("overwrite-queue", 3, "worker-1")
+    assert len(fetched) == 3
+
+    # Complete each item individually -- all must succeed
+    for item in fetched:
+        ok = await cfg.queue.complete("overwrite-queue", item.id)
+        assert ok, f"Failed to complete item {item.id}"
