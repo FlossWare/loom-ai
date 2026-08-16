@@ -258,6 +258,54 @@ async def test_is_retryable_runtime_connection_error():
     assert ConsensusEngine._is_retryable(exc)
 
 
+async def test_is_not_retryable_port_5000():
+    """Port 5000 in URL must not match '500' status code."""
+    exc = RuntimeError("llm api error 400 from http://api:5000/v1: bad request")
+    assert not ConsensusEngine._is_retryable(exc)
+
+
+async def test_is_not_retryable_port_5003():
+    """Port 5003 in URL must not match '500' status code."""
+    exc = RuntimeError("llm api error 400 from http://api:5003/v1: bad request")
+    assert not ConsensusEngine._is_retryable(exc)
+
+
+async def test_is_not_retryable_port_5029():
+    """Port 5029 in URL must not match '502' status code."""
+    exc = RuntimeError("llm api error 400 from http://api:5029/v1: bad request")
+    assert not ConsensusEngine._is_retryable(exc)
+
+
+async def test_is_not_retryable_port_5039():
+    """Port 5039 in URL must not match '503' status code."""
+    exc = RuntimeError("llm api error 400 from http://api:5039/v1: bad request")
+    assert not ConsensusEngine._is_retryable(exc)
+
+
+async def test_is_not_retryable_port_5049():
+    """Port 5049 in URL must not match '504' status code."""
+    exc = RuntimeError("llm api error 400 from http://api:5049/v1: bad request")
+    assert not ConsensusEngine._is_retryable(exc)
+
+
+async def test_is_not_retryable_port_4290():
+    """Port 4290 in URL must not match '429' status code."""
+    exc = RuntimeError("llm api error 400 from http://api:4290/v1: bad request")
+    assert not ConsensusEngine._is_retryable(exc)
+
+
+async def test_is_retryable_500_with_port():
+    """Real 500 error from a URL with port must still be retryable."""
+    exc = RuntimeError("llm api error 500 from http://api:8080/v1: internal error")
+    assert ConsensusEngine._is_retryable(exc)
+
+
+async def test_is_retryable_429_with_port_5000():
+    """Real 429 error from port 5000 must still be retryable."""
+    exc = RuntimeError("llm api error 429 from http://api:5000/v1: rate limited")
+    assert ConsensusEngine._is_retryable(exc)
+
+
 def test_consensus_engine_importable():
     from loom_ai import ConsensusEngine, ConsensusResult
 
