@@ -38,6 +38,7 @@ class ThompsonSamplingSelector:
     """
 
     def __init__(self) -> None:
+        self._rng = random.Random()  # noqa: S311
         # (strategy, task_type) -> arm state
         self._arms: dict[tuple[str, str], _BanditArm] = {}
 
@@ -62,7 +63,7 @@ class ThompsonSamplingSelector:
 
         for strategy in candidates:
             arm = self._get_arm(strategy, task_type)
-            sample = random.betavariate(arm.alpha, arm.beta)
+            sample = self._rng.betavariate(arm.alpha, arm.beta)
             if sample > best_sample:
                 best_sample = sample
                 best_strategy = strategy
