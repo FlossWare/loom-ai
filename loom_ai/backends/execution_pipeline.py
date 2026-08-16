@@ -12,6 +12,28 @@ Two failure modes are supported:
   next step.
 
 Zero external dependencies -- stdlib only.
+
+Relationship to ExecutionEngine
+-------------------------------
+This pipeline is a **sequential step runner** -- it executes a flat list
+of steps one at a time with operational lifecycle support (cancellation,
+deadlines, observers).  It does *not* handle dependency graphs or
+concurrent execution.
+
+The DAG-aware :class:`~loom_ai.execution.ExecutionEngine` is the
+higher-level orchestrator.  It resolves task dependencies via topological
+sorting and dispatches independent tasks concurrently in waves, using a
+:class:`~loom_ai.protocols.TaskRunner` for individual task execution.
+
+The intended layering is::
+
+    ExecutionEngine        (DAG orchestration, topological waves)
+      +-- ExecutionPipeline  (sequential step runner, this module)
+            +-- TaskRunner   (single task execution primitive)
+
+Both components are complementary: the engine decomposes a DAG into
+sequential waves; this pipeline (or a similar implementation) can run
+each wave's steps with deadline and cancellation support.
 """
 
 from __future__ import annotations

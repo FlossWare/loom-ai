@@ -206,10 +206,39 @@ A typical multi-model consensus request flows through these stages:
    - arbiter_error: str | None
 ```
 
-For DAG-based task execution, the `ExecutionEngine` runs tasks in topological
-waves.  Independent tasks execute concurrently via `asyncio.gather`.  A failed
-task cancels its pending transitive dependents without blocking independent
-branches.
+### Execution Hierarchy
+
+Loom's execution layer is composed of three complementary levels that form
+a clear hierarchy:
+
+```text
+ExecutionEngine              (DAG orchestration, topological waves)
+  └── SequentialExecutionPipeline  (sequential step runner)
+       └── TaskRunner              (single task execution primitive)
+```
+
+**TaskRunner** (`loom_ai/protocols.py`) -- the lowest-level primitive.  Runs
+a single `Task` through a configured backend (e.g. `LLMTaskRunner`,
+`NoopTaskRunner`) and returns a result.  This is the unit of work.
+
+**ExecutionPipeline / SequentialExecutionPipeline**
+(`loom_ai/contracts_execution.py`, `loom_ai/backends/execution_pipeline.py`) --
+runs a flat sequence of `ExecutionStep` objects one at a time.  Provides
+operational lifecycle support: cancellation between steps, ISO-8601 deadline
+enforcement, fail-fast vs continue-on-error modes, and observer notifications
+at each step boundary.  This is a sequential runner, not a DAG orchestrator.
+
+**ExecutionEngine** (`loom_ai/execution.py`) -- the highest-level component.
+Accepts an `ExecutionPlan` containing tasks with explicit dependency edges,
+performs topological sorting, and executes independent tasks concurrently in
+waves via `asyncio.gather`.  A failed task cancels its pending transitive
+dependents without blocking independent branches of the DAG.
+
+These layers are complementary, not competing.  `ExecutionEngine` decomposes a
+DAG into sequential waves of concurrent tasks; `SequentialExecutionPipeline`
+(or a similar `ExecutionPipeline` implementation) can run each wave's steps
+with deadline and cancellation support.  `TaskRunner` is the leaf-level
+executor used by both.
 
 ---
 

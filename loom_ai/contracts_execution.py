@@ -13,6 +13,21 @@ This module covers three contract areas:
 - **ExecutionStep** -- a single executable unit in a pipeline (#210)
 - **ExecutionPipeline** -- orchestrates a sequence of steps (#210)
 - **ExecutionObserver** -- receives lifecycle notifications (#210)
+
+Relationship to ExecutionEngine
+-------------------------------
+``ExecutionPipeline`` is the **sequential execution primitive** -- it
+runs a flat list of steps with cancellation and deadline support.  It is
+*not* a replacement for DAG-based execution.
+
+The DAG-aware :class:`~loom_ai.execution.ExecutionEngine` sits above
+this contract in the execution hierarchy.  It resolves task dependencies
+via topological sorting and dispatches concurrent waves, optionally
+using an ``ExecutionPipeline`` implementation to run each wave's
+steps sequentially.
+
+See :mod:`loom_ai.execution` and
+:mod:`loom_ai.backends.execution_pipeline` for the full hierarchy.
 """
 
 from __future__ import annotations
