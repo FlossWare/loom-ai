@@ -70,7 +70,7 @@ class EmbeddingRecord:
 
 def _content_hash(text: str) -> str:
     """Return a SHA-256 hex digest for *text*."""
-    return hashlib.sha256(text.encode("utf-8")).hexdigest()
+    return hashlib.sha256(text.encode("utf-8")).hexdigest()  # noqa: S324  # NOSONAR — content-addressing hash, not used for security
 
 
 def _simple_embedding(text: str, dim: int = 64) -> list[float]:

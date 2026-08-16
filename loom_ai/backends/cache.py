@@ -25,7 +25,7 @@ def _content_hash(messages: list[dict]) -> str:
     dict insertion order.
     """
     serialised = json.dumps(messages, sort_keys=True, default=str)
-    return hashlib.sha256(serialised.encode()).hexdigest()
+    return hashlib.sha256(serialised.encode()).hexdigest()  # noqa: S324  # NOSONAR — content-addressing hash, not used for security
 
 
 class PromptCachePolicy:

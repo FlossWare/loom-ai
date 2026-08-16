@@ -138,7 +138,7 @@ class HttpLLMBackend:
 
         def _do_request() -> ChatResponse:
             try:
-                with urllib.request.urlopen(
+                with urllib.request.urlopen(  # noqa: S310  # NOSONAR — URL is from constructor config, not user input
                     req, timeout=self._timeout, context=self._ssl_ctx
                 ) as resp:
                     body = resp.read().decode("utf-8")
@@ -186,7 +186,7 @@ class HttpLLMBackend:
 
         def _stream_reader() -> None:
             try:
-                with urllib.request.urlopen(
+                with urllib.request.urlopen(  # noqa: S310  # NOSONAR — URL is from constructor config, not user input
                     req, timeout=self._timeout, context=self._ssl_ctx
                 ) as resp:
                     for raw_line in resp:
@@ -255,7 +255,7 @@ class HttpLLMBackend:
 
         def _do_request() -> list[str]:
             try:
-                with urllib.request.urlopen(
+                with urllib.request.urlopen(  # noqa: S310  # NOSONAR — URL is from constructor config, not user input
                     req, timeout=self._timeout, context=self._ssl_ctx
                 ) as resp:
                     body = resp.read().decode("utf-8")

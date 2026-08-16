@@ -358,7 +358,7 @@ class ConsensusCache:
     def hash_prompt(prompt: str, models: Sequence[str]) -> str:
         """Deterministic SHA-256 hash for a prompt + model set."""
         key_material = prompt + "\x00" + ",".join(sorted(models))
-        return hashlib.sha256(key_material.encode()).hexdigest()
+        return hashlib.sha256(key_material.encode()).hexdigest()  # noqa: S324  # NOSONAR — content-addressing hash, not used for security
 
     def get(self, key: str) -> ConsensusOutcome | None:
         """Return a cached outcome, or ``None`` on miss / expiry."""
