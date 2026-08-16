@@ -626,5 +626,11 @@ def main() -> None:
     config = LoomConfig.from_env()
     app = create_app(config)
     host = os.environ.get("LOOM_HOST", "127.0.0.1")
-    port = int(os.environ.get("LOOM_PORT", "5000"))
+    raw_port = os.environ.get("LOOM_PORT", "5000")
+    try:
+        port = int(raw_port)
+    except ValueError:
+        raise SystemExit(f"LOOM_PORT: invalid integer {raw_port!r}") from None
+    if not 1 <= port <= 65535:
+        raise SystemExit(f"LOOM_PORT: {port} is outside valid range 1-65535")
     uvicorn.run(app, host=host, port=port)
