@@ -18,6 +18,7 @@ from __future__ import annotations
 
 import asyncio
 import random
+import re
 import time
 from dataclasses import dataclass, field
 from typing import TYPE_CHECKING
@@ -276,7 +277,6 @@ class ConsensusEngine:
             msg = str(exc).lower()
             if "connection error" in msg:
                 return True
-            for code in ("429", "500", "502", "503", "504"):
-                if code in msg:
-                    return True
+            if re.search(r"\b(429|500|502|503|504)\b", msg):
+                return True
         return False
