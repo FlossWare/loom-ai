@@ -131,9 +131,10 @@ class MemoryStorageBackend:
     async def store_chunks(self, document_id: str, chunks: list[Chunk]) -> int:
         stored = 0
         for chunk in chunks:
+            if chunk.id not in self._chunks:
+                self._chunks_by_doc.setdefault(document_id, []).append(chunk.id)
+                self._chunk_order.append(chunk.id)
             self._chunks[chunk.id] = chunk
-            self._chunks_by_doc.setdefault(document_id, []).append(chunk.id)
-            self._chunk_order.append(chunk.id)
             stored += 1
         return stored
 

@@ -110,6 +110,67 @@ async def test_memory_search():
     assert "Python" in results[0].content
 
 
+async def test_store_chunks_no_duplicates_on_re_store():
+    """Re-storing chunks must not duplicate secondary index entries (#41)."""
+    cfg = LoomConfig.from_env()
+    doc = Document(id="dup-doc", title="Dup", content="body", url="", category="test")
+    await cfg.storage.store_document(doc)
+
+    chunk = Chunk(
+        id="dup-c-1",
+        document_id="dup-doc",
+        content="hello",
+        chunk_index=0,
+        content_hash="h1",
+    )
+
+    # Store the same chunk twice (simulates HTTP retry)
+    await cfg.storage.store_chunks("dup-doc", [chunk])
+    await cfg.storage.store_chunks("dup-doc", [chunk])
+
+    # get_chunks must return exactly one entry, not two
+    chunks = await cfg.storage.get_chunks("dup-doc")
+    assert len(chunks) == 1
+
+    # count_chunks must agree with primary store size
+    count = await cfg.storage.count_chunks()
+    assert count == 1
+
+    # get_pending_chunks must not return duplicates
+    pending = await cfg.storage.get_pending_chunks(10)
+    pending_ids = [c.id for c in pending]
+    assert pending_ids.count("dup-c-1") == 1
+
+
+async def test_store_chunks_updates_content_on_re_store():
+    """Re-storing a chunk with updated content must replace the old entry."""
+    cfg = LoomConfig.from_env()
+    doc = Document(id="upd-doc", title="Upd", content="body", url="", category="test")
+    await cfg.storage.store_document(doc)
+
+    chunk_v1 = Chunk(
+        id="upd-c-1",
+        document_id="upd-doc",
+        content="version 1",
+        chunk_index=0,
+        content_hash="h1",
+    )
+    chunk_v2 = Chunk(
+        id="upd-c-1",
+        document_id="upd-doc",
+        content="version 2",
+        chunk_index=0,
+        content_hash="h2",
+    )
+
+    await cfg.storage.store_chunks("upd-doc", [chunk_v1])
+    await cfg.storage.store_chunks("upd-doc", [chunk_v2])
+
+    chunks = await cfg.storage.get_chunks("upd-doc")
+    assert len(chunks) == 1
+    assert chunks[0].content == "version 2"
+
+
 def test_dataclass_construction():
     doc = Document(id="d", title="T", content="C", url="", category="")
     assert doc.id == "d"
