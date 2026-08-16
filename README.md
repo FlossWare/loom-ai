@@ -4,6 +4,52 @@
 
 Pluggable AI orchestration framework with swappable backends. Zero required dependencies.
 
+## Architecture
+
+Loom is an orchestration substrate built around provider-neutral contracts. The core defines stable interfaces; external projects and services may implement those contracts without becoming Loom dependencies.
+
+```text
+                         Loom Core
+                            |
+             +--------------+--------------+
+             |              |              |
+        Agent Runtime   Context Engine  Capabilities
+             |              |              |
+       Goose / native   Headroom /      MCP / native /
+       / other agents   native Loom     external tools
+             |              |              |
+             +--------------+--------------+
+                            |
+                     Model Providers
+              Claude / OpenAI / Gemini /
+              Nemotron / Nex-N2 / local
+                            |
+                    Evaluation Engines
+               Loom / G0DM0D3 / Agent Island
+```
+
+### Pluggability principles
+
+- **Model Provider** — interchangeable inference/model endpoints.
+- **Agent Runtime** — interchangeable agent execution environments.
+- **Context Engine** — interchangeable context construction, compression, and cache-aware middleware.
+- **Capability/Tool Backend** — interchangeable native, MCP, and external tool implementations.
+- **Evaluation Engine** — interchangeable evaluation, ranking, tournament, and benchmark systems.
+- **Storage, Queue, Secrets, Embedding, Search, Graph, and Task Runner** remain independently replaceable backends.
+
+External projects are **interoperability targets and implementations**, not architectural dependencies. Loom should define the contract first and validate it against multiple implementations.
+
+### Current contract work
+
+- **#81** — Context engineering and reversible compression
+- **#82** — Prompt-cache awareness and optimization
+- **#83** — Pluggable agent runtime contract
+- **#84** — Pluggable context engine contract
+- **#85** — Pluggable capability and tool backend contract
+- **#86** — Pluggable evaluation engine contract
+
+This distinction is intentional: Loom can **use** an external project without incorporating it, and can **assimilate** an architectural idea without making the source project a dependency.
+
 ## Install
 
 ```bash
