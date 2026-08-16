@@ -226,7 +226,7 @@ class SimpleFeedbackLoopDetector:
         return []
 
     def _check_concept_collapse(
-        self, data: list[dict[str, Any]]
+        self, _data: list[dict[str, Any]]
     ) -> list[FeedbackLoopRisk]:
         """Layer 4: placeholder -- always passes.
 
