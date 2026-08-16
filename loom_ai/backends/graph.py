@@ -305,6 +305,30 @@ class InMemoryKnowledgeGraph:
         _visit(start_id, 0)
         return visited
 
+    def _outgoing_neighbors(self, node: str) -> list[str]:
+        """Return target entity ids reachable via outgoing edges from *node*."""
+        neighbors: list[str] = []
+        for rid in sorted(self._outgoing.get(node, set())):
+            rel = self._relationships.get(rid)
+            if rel is not None:
+                neighbors.append(rel.target_id)
+        return neighbors
+
+    @staticmethod
+    def _reconstruct_path(
+        parent: dict[str, str],
+        source_id: str,
+        target_id: str,
+    ) -> list[str]:
+        """Walk the *parent* map back from *target_id* to *source_id*."""
+        path = [target_id]
+        cur = target_id
+        while cur != source_id:
+            cur = parent[cur]
+            path.append(cur)
+        path.reverse()
+        return path
+
     async def find_path(
         self,
         source_id: str,
@@ -332,23 +356,12 @@ class InMemoryKnowledgeGraph:
             node, depth = queue.popleft()
             if depth >= max_depth:
                 continue
-            for rid in sorted(self._outgoing.get(node, set())):
-                rel = self._relationships.get(rid)
-                if rel is None:
-                    continue
-                neighbor = rel.target_id
+            for neighbor in self._outgoing_neighbors(node):
                 if neighbor in seen:
                     continue
                 parent[neighbor] = node
                 if neighbor == target_id:
-                    # Reconstruct path.
-                    path = [target_id]
-                    cur = target_id
-                    while cur != source_id:
-                        cur = parent[cur]
-                        path.append(cur)
-                    path.reverse()
-                    return path
+                    return self._reconstruct_path(parent, source_id, target_id)
                 seen.add(neighbor)
                 queue.append((neighbor, depth + 1))
 

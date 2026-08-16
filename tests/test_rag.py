@@ -68,7 +68,9 @@ def test_cosine_similarity_opposite():
 
 def test_content_hash_deterministic():
     """Same content produces the same hash."""
-    assert _content_hash("hello") == _content_hash("hello")
+    hash1 = _content_hash("hello")
+    hash2 = _content_hash("hello")
+    assert hash1 == hash2
 
 
 def test_content_hash_different():
