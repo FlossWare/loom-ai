@@ -222,8 +222,9 @@ async def test_stream_to_events_propagates_error():
     """stream_to_events must re-raise source exceptions and emit error."""
     events: list[StreamEvent] = []
 
+    event_stream = stream_to_events(_failing_stream("x"))
     with pytest.raises(RuntimeError, match="stream broke"):
-        async for event in stream_to_events(_failing_stream("x")):
+        async for event in event_stream:
             events.append(event)
 
     assert len(events) == 2
