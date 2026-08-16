@@ -15,7 +15,8 @@ def manager() -> InMemoryConversationManager:
 async def test_create_add_get_flow(manager: InMemoryConversationManager):
     """Basic round-trip: create session, add messages, retrieve them."""
     sid = await manager.create_session()
-    assert isinstance(sid, str) and len(sid) > 0
+    assert isinstance(sid, str)
+    assert len(sid) > 0
 
     await manager.add_message(sid, ChatMessage(role="user", content="Hello"))
     await manager.add_message(sid, ChatMessage(role="assistant", content="Hi there"))
@@ -152,8 +153,9 @@ async def test_export_transcript_empty_session(manager: InMemoryConversationMana
 
 async def test_unknown_session_raises(manager: InMemoryConversationManager):
     """Operations on a non-existent session raise KeyError."""
+    msg = ChatMessage(role="user", content="hi")
     with pytest.raises(KeyError):
-        await manager.add_message("nonexistent", ChatMessage(role="user", content="hi"))
+        await manager.add_message("nonexistent", msg)
 
     with pytest.raises(KeyError):
         await manager.get_messages("nonexistent")
