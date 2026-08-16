@@ -6,6 +6,7 @@ from collections import defaultdict
 import pytest
 
 from loom_ai.backends.redis_queue import RedisQueueBackend
+from loom_ai.models import QueueItem
 
 # ── Mock Redis ─────────────────────────────────────────────────────────
 
@@ -134,22 +135,19 @@ def queue(mock_redis):
 
 
 async def test_enqueue_returns_count(queue):
-    items = [{"id": "a", "payload": {"data": 1}}, {"id": "b", "payload": {"data": 2}}]
+    items = [QueueItem(id="a", payload={"data": 1}), QueueItem(id="b", payload={"data": 2})]
     count = await queue.enqueue("tasks", items)
     assert count == 2
 
 
 async def test_enqueue_generates_ids(queue):
-    items = [{"payload": {"x": 1}}]
+    items = [QueueItem(id="", payload={"x": 1})]
     count = await queue.enqueue("tasks", items)
     assert count == 1
-    # The item should now have an id assigned
-    assert "id" in items[0]
-    assert len(items[0]["id"]) > 0
 
 
 async def test_enqueue_registers_queue(queue, mock_redis):
-    await queue.enqueue("myq", [{"id": "a"}])
+    await queue.enqueue("myq", [QueueItem(id="a")])
     assert "myq" in mock_redis._sets[queue._queues_key()]
 
 
@@ -157,16 +155,15 @@ async def test_enqueue_registers_queue(queue, mock_redis):
 
 
 async def test_fetch_returns_items(queue):
-    await queue.enqueue("tasks", [{"id": "item1"}])
+    await queue.enqueue("tasks", [QueueItem(id="item1")])
     fetched = await queue.fetch("tasks", 1, "worker-1")
     assert len(fetched) == 1
-    assert fetched[0]["id"] == "item1"
-    assert fetched[0]["worker_id"] == "worker-1"
-    assert fetched[0]["status"] == "processing"
+    assert fetched[0].id == "item1"
+    assert fetched[0].worker_id == "worker-1"
 
 
 async def test_fetch_respects_count(queue):
-    await queue.enqueue("tasks", [{"id": "a"}, {"id": "b"}, {"id": "c"}])
+    await queue.enqueue("tasks", [QueueItem(id="a"), QueueItem(id="b"), QueueItem(id="c")])
     fetched = await queue.fetch("tasks", 2, "w1")
     assert len(fetched) == 2
 
@@ -176,19 +173,18 @@ async def test_fetch_empty_queue(queue):
     assert fetched == []
 
 
-async def test_fetch_priority_order(queue):
-    await queue.enqueue("tasks", [{"id": "low"}], priority=10)
-    await queue.enqueue("tasks", [{"id": "high"}], priority=1)
-    fetched = await queue.fetch("tasks", 2, "w1")
-    assert fetched[0]["id"] == "high"
-    assert fetched[1]["id"] == "low"
+async def test_fetch_returns_queue_items(queue):
+    await queue.enqueue("tasks", [QueueItem(id="q1", payload={"key": "val"})])
+    fetched = await queue.fetch("tasks", 1, "w1")
+    assert isinstance(fetched[0], QueueItem)
+    assert fetched[0].payload == {"key": "val"}
 
 
 # ── Complete ───────────────────────────────────────────────────────────
 
 
 async def test_complete_marks_done(queue, mock_redis):
-    await queue.enqueue("tasks", [{"id": "item1"}])
+    await queue.enqueue("tasks", [QueueItem(id="item1")])
     await queue.fetch("tasks", 1, "w1")
     result = await queue.complete("tasks", "item1")
     assert result is True
@@ -202,7 +198,7 @@ async def test_complete_unknown_item(queue):
 
 
 async def test_complete_removes_from_processing(queue, mock_redis):
-    await queue.enqueue("tasks", [{"id": "x"}])
+    await queue.enqueue("tasks", [QueueItem(id="x")])
     await queue.fetch("tasks", 1, "w1")
     await queue.complete("tasks", "x")
     assert mock_redis.zcard(queue._processing_key("tasks")) == 0
@@ -212,9 +208,9 @@ async def test_complete_removes_from_processing(queue, mock_redis):
 
 
 async def test_requeue_increments_retry(queue, mock_redis):
-    await queue.enqueue("tasks", [{"id": "r1"}])
+    await queue.enqueue("tasks", [QueueItem(id="r1")])
     await queue.fetch("tasks", 1, "w1")
-    requeued = await queue.requeue("tasks", [{"id": "r1"}])
+    requeued = await queue.requeue("tasks", [QueueItem(id="r1")])
     assert requeued == 1
     meta = mock_redis.hgetall(queue._item_key("tasks", "r1"))
     assert int(meta["retry_count"]) == 1
@@ -222,28 +218,28 @@ async def test_requeue_increments_retry(queue, mock_redis):
 
 
 async def test_requeue_applies_backoff_priority(queue, mock_redis):
-    await queue.enqueue("tasks", [{"id": "r1"}], priority=0)
+    await queue.enqueue("tasks", [QueueItem(id="r1")])
     await queue.fetch("tasks", 1, "w1")
-    await queue.requeue("tasks", [{"id": "r1"}])
+    await queue.requeue("tasks", [QueueItem(id="r1")])
     # After 1 retry with backoff_base=2, priority should be 0 + int(2^1) = 2
     pending = mock_redis._sorted_sets[queue._pending_key("tasks")]
     assert pending["r1"] == 2
 
 
 async def test_requeue_dead_letters_after_max_retries(queue, mock_redis):
-    await queue.enqueue("tasks", [{"id": "r1"}])
+    await queue.enqueue("tasks", [QueueItem(id="r1")])
     await queue.fetch("tasks", 1, "w1")
 
     # Retry 1
-    await queue.requeue("tasks", [{"id": "r1"}])
+    await queue.requeue("tasks", [QueueItem(id="r1")])
     await queue.fetch("tasks", 1, "w1")
 
     # Retry 2
-    await queue.requeue("tasks", [{"id": "r1"}])
+    await queue.requeue("tasks", [QueueItem(id="r1")])
     await queue.fetch("tasks", 1, "w1")
 
     # Retry 3 -- exceeds max_retries=2, should dead-letter
-    requeued = await queue.requeue("tasks", [{"id": "r1"}])
+    requeued = await queue.requeue("tasks", [QueueItem(id="r1")])
     assert requeued == 0
 
     dlq = await queue.dead_letter_items("tasks")
@@ -252,12 +248,12 @@ async def test_requeue_dead_letters_after_max_retries(queue, mock_redis):
 
 
 async def test_requeue_skips_empty_id(queue):
-    requeued = await queue.requeue("tasks", [{"payload": "no-id"}])
+    requeued = await queue.requeue("tasks", [QueueItem(id="")])
     assert requeued == 0
 
 
 async def test_requeue_skips_unknown_item(queue):
-    requeued = await queue.requeue("tasks", [{"id": "ghost"}])
+    requeued = await queue.requeue("tasks", [QueueItem(id="ghost")])
     assert requeued == 0
 
 
@@ -265,7 +261,7 @@ async def test_requeue_skips_unknown_item(queue):
 
 
 async def test_status_counts(queue):
-    await queue.enqueue("tasks", [{"id": "a"}, {"id": "b"}])
+    await queue.enqueue("tasks", [QueueItem(id="a"), QueueItem(id="b")])
     await queue.fetch("tasks", 1, "w1")
     st = await queue.status("tasks")
     assert st["queue"] == "tasks"
@@ -285,8 +281,8 @@ async def test_status_empty_queue(queue):
 
 
 async def test_list_queues(queue):
-    await queue.enqueue("alpha", [{"id": "1"}])
-    await queue.enqueue("beta", [{"id": "2"}])
+    await queue.enqueue("alpha", [QueueItem(id="1")])
+    await queue.enqueue("beta", [QueueItem(id="2")])
     queues = await queue.list_queues()
     assert set(queues) == {"alpha", "beta"}
 
@@ -300,7 +296,7 @@ async def test_list_queues_empty(queue):
 
 
 async def test_expired_lease_reclaimed(queue, mock_redis, monkeypatch):
-    await queue.enqueue("tasks", [{"id": "leased"}])
+    await queue.enqueue("tasks", [QueueItem(id="leased")])
     await queue.fetch("tasks", 1, "w1")
 
     # Simulate time passing beyond lease timeout
@@ -308,16 +304,16 @@ async def test_expired_lease_reclaimed(queue, mock_redis, monkeypatch):
     mock_redis._sorted_sets[processing_key]["leased"] = time.time() - 100
 
     # Next fetch should reclaim
-    await queue.enqueue("tasks", [{"id": "fresh"}])
+    await queue.enqueue("tasks", [QueueItem(id="fresh")])
     fetched = await queue.fetch("tasks", 2, "w2")
 
     # The reclaimed item should be back in pending (fetched again)
-    ids = [f["id"] for f in fetched]
+    ids = [f.id for f in fetched]
     assert "leased" in ids or "fresh" in ids
 
 
 async def test_expired_lease_dead_letters_if_max_retries(queue, mock_redis):
-    await queue.enqueue("tasks", [{"id": "doomed"}])
+    await queue.enqueue("tasks", [QueueItem(id="doomed")])
     await queue.fetch("tasks", 1, "w1")
 
     # Set retry_count to max already

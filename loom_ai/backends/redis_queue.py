@@ -23,6 +23,10 @@ from __future__ import annotations
 import json
 import time
 import uuid
+from typing import TYPE_CHECKING
+
+if TYPE_CHECKING:
+    from loom_ai.models import QueueItem
 
 try:
     import redis as _redis_lib  # noqa: F401
@@ -95,14 +99,11 @@ class RedisQueueBackend:
     async def enqueue(
         self,
         queue_name: str,
-        items: list[dict],
-        *,
-        priority: int = 0,
+        items: list[QueueItem],
     ) -> int:
         """Add items to the named queue.
 
-        Each item dict should have an ``"id"`` key; one is generated if
-        missing.  Items are placed in a sorted set scored by *priority*
+        Items are placed in a sorted set scored by priority 0
         (lower = higher priority).
 
         Returns the number of items enqueued.
@@ -110,19 +111,18 @@ class RedisQueueBackend:
         pipe = self._redis.pipeline()
         count = 0
         for item in items:
-            item_id = item.get("id") or uuid.uuid4().hex
-            item.setdefault("id", item_id)
+            item_id = item.id or uuid.uuid4().hex
             meta = {
                 "id": item_id,
-                "payload": json.dumps(item.get("payload", item)),
-                "priority": priority,
-                "enqueued_at": time.time(),
+                "payload": json.dumps(item.payload),
+                "priority": 0,
+                "enqueued_at": item.enqueued_at or time.time(),
                 "retry_count": 0,
-                "worker_id": "",
+                "worker_id": item.worker_id or "",
                 "status": "pending",
             }
             pipe.hset(self._item_key(queue_name, item_id), mapping=meta)
-            pipe.zadd(self._pending_key(queue_name), {item_id: priority})
+            pipe.zadd(self._pending_key(queue_name), {item_id: 0})
             pipe.sadd(self._queues_key(), queue_name)
             count += 1
         pipe.execute()
@@ -133,15 +133,17 @@ class RedisQueueBackend:
         queue_name: str,
         count: int,
         worker_id: str,
-    ) -> list[dict]:
+    ) -> list[QueueItem]:
         """Claim up to *count* items for *worker_id*.
 
         Reclaims any items whose leases have expired before attempting to
-        fetch new ones.  Returns a list of item metadata dicts.
+        fetch new ones.  Returns a list of QueueItem instances.
         """
+        from loom_ai.models import QueueItem as _QueueItem
+
         await self._reclaim_expired(queue_name)
 
-        fetched: list[dict] = []
+        fetched: list[QueueItem] = []
         for _ in range(count):
             result = self._redis.zpopmin(self._pending_key(queue_name))
             if not result:
@@ -160,8 +162,16 @@ class RedisQueueBackend:
                 mapping={"worker_id": worker_id, "status": "processing"},
             )
             raw = self._redis.hgetall(self._item_key(queue_name, item_id))
-            item = self._decode_hash(raw)
-            fetched.append(item)
+            meta = self._decode_hash(raw)
+            payload = json.loads(meta.get("payload", "{}"))
+            fetched.append(
+                _QueueItem(
+                    id=meta.get("id", item_id),
+                    payload=payload,
+                    enqueued_at=float(meta.get("enqueued_at", 0.0)),
+                    worker_id=meta.get("worker_id"),
+                )
+            )
         return fetched
 
     async def complete(self, queue_name: str, item_id: str) -> bool:
@@ -176,7 +186,7 @@ class RedisQueueBackend:
     async def requeue(
         self,
         queue_name: str,
-        items: list[dict],
+        items: list[QueueItem],
     ) -> int:
         """Return items to the queue for retry.
 
@@ -186,7 +196,7 @@ class RedisQueueBackend:
         """
         requeued = 0
         for item in items:
-            item_id = item.get("id", "")
+            item_id = item.id
             if not item_id:
                 continue
             key = self._item_key(queue_name, item_id)
