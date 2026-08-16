@@ -19,15 +19,21 @@ class StreamAdapter:
 
     Each ``str`` chunk becomes a ``StreamEvent(type="content", content=chunk)``.
     A final ``StreamEvent(type="done")`` is emitted after the source is
-    exhausted.
+    exhausted.  If the source raises an exception, a
+    ``StreamEvent(type="error", content=...)`` is emitted and the exception
+    is re-raised so callers observe the failure.
     """
 
     def __init__(self, source: AsyncIterator[str]) -> None:
         self._source = source
 
     async def __aiter__(self) -> AsyncIterator[StreamEvent]:
-        async for chunk in self._source:
-            yield StreamEvent(type="content", content=chunk)
+        try:
+            async for chunk in self._source:
+                yield StreamEvent(type="content", content=chunk)
+        except Exception as exc:
+            yield StreamEvent(type="error", content=str(exc))
+            raise
         yield StreamEvent(type="done")
 
 
@@ -78,8 +84,13 @@ async def stream_to_events(
     """Convert a plain ``str``-chunk stream into :class:`StreamEvent` items.
 
     This is a convenience async generator that behaves identically to
-    iterating over a :class:`StreamAdapter`.
+    iterating over a :class:`StreamAdapter`.  If *stream* raises, an
+    ``"error"`` event is emitted and the exception is re-raised.
     """
-    async for chunk in stream:
-        yield StreamEvent(type="content", content=chunk)
+    try:
+        async for chunk in stream:
+            yield StreamEvent(type="content", content=chunk)
+    except Exception as exc:
+        yield StreamEvent(type="error", content=str(exc))
+        raise
     yield StreamEvent(type="done")

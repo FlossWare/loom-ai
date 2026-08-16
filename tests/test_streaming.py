@@ -4,6 +4,8 @@ from __future__ import annotations
 
 from typing import AsyncIterator
 
+import pytest
+
 from loom_ai.backends.streaming import (
     StreamAdapter,
     ToolCallAccumulator,
@@ -21,6 +23,13 @@ async def _str_stream(*chunks: str) -> AsyncIterator[str]:
     """Return an async iterator that yields the given string chunks."""
     for chunk in chunks:
         yield chunk
+
+
+async def _failing_stream(*chunks: str) -> AsyncIterator[str]:
+    """Yield *chunks* then raise a ``RuntimeError``."""
+    for chunk in chunks:
+        yield chunk
+    raise RuntimeError("stream broke")
 
 
 # ---------------------------------------------------------------------------
@@ -167,3 +176,65 @@ async def test_stream_to_events_empty():
 
     assert len(events) == 1
     assert events[0].type == "done"
+
+
+# ---------------------------------------------------------------------------
+# Error propagation (#31, #36)
+# ---------------------------------------------------------------------------
+
+
+async def test_stream_adapter_propagates_error():
+    """StreamAdapter must re-raise source exceptions and emit an error event."""
+    adapter = StreamAdapter(_failing_stream("a", "b"))
+    events: list[StreamEvent] = []
+
+    with pytest.raises(RuntimeError, match="stream broke"):
+        async for event in adapter:
+            events.append(event)
+
+    # Two content events + one error event (no "done")
+    assert len(events) == 3
+    assert events[0] == StreamEvent(type="content", content="a")
+    assert events[1] == StreamEvent(type="content", content="b")
+    assert events[2].type == "error"
+    assert "stream broke" in (events[2].content or "")
+
+
+async def test_stream_adapter_error_on_first_chunk():
+    """StreamAdapter emits an error event even when the first chunk fails."""
+
+    async def _immediate_fail() -> AsyncIterator[str]:
+        raise RuntimeError("instant failure")
+        yield ""  # pragma: no cover -- makes this an async generator
+
+    adapter = StreamAdapter(_immediate_fail())
+    events: list[StreamEvent] = []
+
+    with pytest.raises(RuntimeError, match="instant failure"):
+        async for event in adapter:
+            events.append(event)
+
+    assert len(events) == 1
+    assert events[0].type == "error"
+
+
+async def test_stream_to_events_propagates_error():
+    """stream_to_events must re-raise source exceptions and emit error."""
+    events: list[StreamEvent] = []
+
+    with pytest.raises(RuntimeError, match="stream broke"):
+        async for event in stream_to_events(_failing_stream("x")):
+            events.append(event)
+
+    assert len(events) == 2
+    assert events[0] == StreamEvent(type="content", content="x")
+    assert events[1].type == "error"
+    assert "stream broke" in (events[1].content or "")
+
+
+async def test_stream_to_string_propagates_error():
+    """stream_to_string must propagate errors from the underlying stream."""
+    adapter = StreamAdapter(_failing_stream("partial"))
+
+    with pytest.raises(RuntimeError, match="stream broke"):
+        await stream_to_string(adapter)
