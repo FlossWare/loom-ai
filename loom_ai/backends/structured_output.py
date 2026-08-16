@@ -58,7 +58,7 @@ def _extract_json(text: str) -> str:
     return stripped
 
 
-def _validate_schema(parsed: dict, schema: dict) -> tuple[bool, str]:
+def _validate_schema(parsed: Any, schema: dict) -> tuple[bool, str]:
     """Validate *parsed* against *schema*.
 
     Returns ``(is_valid, error_message)``.  Uses ``jsonschema`` when
@@ -72,7 +72,16 @@ def _validate_schema(parsed: dict, schema: dict) -> tuple[bool, str]:
         except jsonschema.ValidationError as exc:
             return False, str(exc.message)
 
-    # Fallback: basic key checking
+    # Fallback: basic type + key checking
+    schema_type = schema.get("type")
+    if schema_type == "object" and not isinstance(parsed, dict):
+        return False, f"Expected object, got {type(parsed).__name__}"
+    if schema_type == "array" and not isinstance(parsed, list):
+        return False, f"Expected array, got {type(parsed).__name__}"
+
+    if not isinstance(parsed, dict):
+        return True, ""
+
     required = schema.get("required", [])
     properties = schema.get("properties", {})
 
@@ -199,10 +208,7 @@ class StructuredOutputBackend:
                 )
 
             # Validate against schema
-            is_valid, error_msg = _validate_schema(
-                parsed if isinstance(parsed, dict) else {},
-                schema,
-            )
+            is_valid, error_msg = _validate_schema(parsed, schema)
 
             if is_valid:
                 return StructuredResponse(
