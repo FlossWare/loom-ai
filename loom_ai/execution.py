@@ -12,7 +12,7 @@ import asyncio
 from collections import defaultdict
 from dataclasses import replace
 from datetime import datetime, timezone
-from typing import Any, Callable
+from typing import Any, Callable, cast
 
 from loom_ai.config import LoomConfig
 from loom_ai.models import ChatMessage, ExecutionPlan, Task, TaskStatus
@@ -109,20 +109,8 @@ class ExecutionEngine:
         :class:`CyclicDependencyError` if unresolvable pending tasks remain.
         """
         task_map = {t.id: t for t in plan.tasks}
-        all_ids = set(task_map)
-
-        for task in plan.tasks:
-            unknown = set(task.dependencies) - all_ids
-            if unknown:
-                raise CyclicDependencyError(
-                    f"Task {task.id!r} depends on unknown "
-                    f"tasks: {', '.join(sorted(unknown))}"
-                )
-
-        dependents: dict[str, set[str]] = defaultdict(set)
-        for task in plan.tasks:
-            for dep_id in task.dependencies:
-                dependents[dep_id].add(task.id)
+        self._validate_dependencies(plan.tasks, set(task_map))
+        dependents = self._build_dependents_map(plan.tasks)
 
         while True:
             ready = [
@@ -151,7 +139,10 @@ class ExecutionEngine:
                 "Cyclic dependency among tasks: " + ", ".join(sorted(stuck))
             )
 
-        return replace(plan, tasks=[task_map[t.id] for t in plan.tasks])
+        return cast(
+            ExecutionPlan,
+            replace(plan, tasks=[task_map[t.id] for t in plan.tasks]),
+        )
 
     async def retry_failed(self, plan: ExecutionPlan) -> ExecutionPlan:
         """Retry failed tasks and progressively release their dependents.
@@ -179,7 +170,10 @@ class ExecutionEngine:
         if not retried_any:
             return plan
 
-        updated = replace(plan, tasks=[task_map[t.id] for t in plan.tasks])
+        updated: ExecutionPlan = cast(
+            ExecutionPlan,
+            replace(plan, tasks=[task_map[t.id] for t in plan.tasks]),
+        )
 
         while True:
             updated = await self.execute_plan(updated)
@@ -205,15 +199,43 @@ class ExecutionEngine:
                     released = True
 
             if not released:
-                return replace(
-                    updated,
-                    tasks=[task_map[t.id] for t in updated.tasks],
+                return cast(
+                    ExecutionPlan,
+                    replace(
+                        updated,
+                        tasks=[task_map[t.id] for t in updated.tasks],
+                    ),
                 )
 
-            updated = replace(
-                updated,
-                tasks=[task_map[t.id] for t in updated.tasks],
+            updated = cast(
+                ExecutionPlan,
+                replace(
+                    updated,
+                    tasks=[task_map[t.id] for t in updated.tasks],
+                ),
             )
+
+    @staticmethod
+    def _validate_dependencies(tasks: list[Task], all_ids: set[str]) -> None:
+        """Raise if any task references an unknown dependency."""
+        for task in tasks:
+            unknown = set(task.dependencies) - all_ids
+            if unknown:
+                raise CyclicDependencyError(
+                    f"Task {task.id!r} depends on unknown "
+                    f"tasks: {', '.join(sorted(unknown))}"
+                )
+
+    @staticmethod
+    def _build_dependents_map(
+        tasks: list[Task],
+    ) -> dict[str, set[str]]:
+        """Return a mapping from task id to its direct dependents."""
+        dependents: dict[str, set[str]] = defaultdict(set)
+        for task in tasks:
+            for dep_id in task.dependencies:
+                dependents[dep_id].add(task.id)
+        return dependents
 
     @staticmethod
     def _now() -> str:
