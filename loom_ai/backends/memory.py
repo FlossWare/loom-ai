@@ -17,6 +17,7 @@ InMemoryPersistentMemory      -- dict-backed persistent memory store (#91)
 
 from __future__ import annotations
 
+import asyncio
 import math
 import threading
 import uuid
@@ -124,6 +125,8 @@ class MemoryStorageBackend:
         return True
 
     async def count_documents(self) -> int:
+        # async required by StorageBackend protocol contract
+        await asyncio.sleep(0)
         return len(self._documents)
 
     # -- Chunks -----------------------------------------------------------
@@ -327,6 +330,10 @@ class NoopEmbeddingBackend:
         return [[0.0] * dims for _ in texts]
 
     async def embed_single(self, text: str, *, model: str | None = None) -> list[float]:
+        # text required by EmbeddingBackend protocol contract
+        _ = text
+        # async required by EmbeddingBackend protocol contract
+        await asyncio.sleep(0)
         return [0.0] * self._resolve_dims(model)
 
     async def available_models(self) -> list[str]:
@@ -373,6 +380,8 @@ class MemorySearchBackend:
         document_title: str = "",
         source: str = "",
     ) -> bool:
+        # async required by SearchBackend protocol contract
+        await asyncio.sleep(0)
         if chunk.id in self._chunks:
             return False
         self._chunks[chunk.id] = chunk
