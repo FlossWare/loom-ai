@@ -382,8 +382,20 @@ class MemorySearchBackend:
     ) -> bool:
         # async required by SearchBackend protocol contract
         await asyncio.sleep(0)
-        if chunk.id in self._chunks:
-            return False
+        already_exists = chunk.id in self._chunks
+        changed = False
+
+        if not already_exists:
+            changed = True
+        else:
+            if self._chunks[chunk.id].content != chunk.content:
+                changed = True
+            if self._titles.get(chunk.id, "") != document_title:
+                changed = True
+            if self._sources.get(chunk.id, "") != source:
+                changed = True
+            if vector is not None and self._vectors.get(chunk.id) != vector:
+                changed = True
         self._chunks[chunk.id] = chunk
         if document_title:
             self._titles[chunk.id] = document_title
@@ -391,7 +403,7 @@ class MemorySearchBackend:
             self._sources[chunk.id] = source
         if vector is not None:
             self._vectors[chunk.id] = vector
-        return True
+        return changed
 
     async def text_search(self, query: str, *, limit: int = 10) -> list[SearchResult]:
         query_lower = query.lower()

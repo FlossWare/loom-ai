@@ -52,16 +52,16 @@ jobs:
         id: ruff
         continue-on-error: true
         run: |
-          ruff check loom_ai/ 2>&1 | tee ruff-output.txt
+          ruff check loom_ai/ tests/ 2>&1 | tee ruff-output.txt
           echo "exit_code=${PIPESTATUS[0]}" >> $GITHUB_OUTPUT
-          ERRORS=$(grep -c "^loom_ai" ruff-output.txt || echo "0")
+          ERRORS=$(grep -c "^loom_ai\|^tests" ruff-output.txt || echo "0")
           echo "error_count=$ERRORS" >> $GITHUB_OUTPUT
 
       - name: Format check with ruff
         id: format
         continue-on-error: true
         run: |
-          ruff format --check loom_ai/ 2>&1 | tee format-output.txt
+          ruff format --check loom_ai/ tests/ 2>&1 | tee format-output.txt
           echo "exit_code=${PIPESTATUS[0]}" >> $GITHUB_OUTPUT
 
       - name: Run tests with coverage
@@ -129,7 +129,17 @@ jobs:
       - name: Fail if quality gates not met
         if: |
           steps.ruff.outputs.exit_code != '0' ||
+          steps.format.outputs.exit_code != '0' ||
           steps.tests.outputs.exit_code != '0'
         run: |
           echo "Quality gates failed!"
+          if [ "${{ steps.ruff.outputs.exit_code }}" != "0" ]; then
+            echo "  - ruff check failed"
+          fi
+          if [ "${{ steps.format.outputs.exit_code }}" != "0" ]; then
+            echo "  - ruff format --check failed"
+          fi
+          if [ "${{ steps.tests.outputs.exit_code }}" != "0" ]; then
+            echo "  - pytest failed"
+          fi
           exit 1
