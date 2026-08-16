@@ -13,7 +13,6 @@ from __future__ import annotations
 from typing import Any
 
 from loom_ai.contracts_phase9 import (
-    AgentRuntime,
     CanonicalSourceIndex,
     CapabilityBackend,
     ContextCompressor,
@@ -21,6 +20,7 @@ from loom_ai.contracts_phase9 import (
     EvaluationEngine,
     HealthCheckPolicy,
     ModelEvaluationCandidate,
+    PluggableAgentRuntime,
     PromptCacheOptimizer,
     RequestValidator,
 )
@@ -146,7 +146,7 @@ class StubPromptCacheOptimizer:
         return {}
 
 
-class StubAgentRuntime:
+class StubPluggableAgentRuntime:
     async def invoke(self, invocation: AgentInvocation) -> AgentResult:
         return AgentResult(id="run-1", status="completed", output="done")
 
@@ -296,8 +296,8 @@ def test_prompt_cache_optimizer_conformance():
 
 
 def test_agent_runtime_conformance():
-    """StubAgentRuntime satisfies the protocol."""
-    assert isinstance(StubAgentRuntime(), AgentRuntime)
+    """StubPluggableAgentRuntime satisfies the protocol."""
+    assert isinstance(StubPluggableAgentRuntime(), PluggableAgentRuntime)
 
 
 def test_context_engine_conformance():
@@ -468,7 +468,7 @@ async def test_prompt_cache_metrics():
 
 async def test_agent_runtime_invoke():
     """invoke() returns an AgentResult with completed status."""
-    stub = StubAgentRuntime()
+    stub = StubPluggableAgentRuntime()
     invocation = AgentInvocation(task="write tests")
     result = await stub.invoke(invocation)
     assert isinstance(result, AgentResult)
@@ -477,20 +477,20 @@ async def test_agent_runtime_invoke():
 
 async def test_agent_runtime_cancel():
     """cancel() returns True."""
-    stub = StubAgentRuntime()
+    stub = StubPluggableAgentRuntime()
     assert await stub.cancel("run-1") is True
 
 
 async def test_agent_runtime_capabilities():
     """capabilities() returns a list of strings."""
-    stub = StubAgentRuntime()
+    stub = StubPluggableAgentRuntime()
     caps = await stub.capabilities()
     assert "tool_calling" in caps
 
 
 async def test_agent_runtime_health():
     """health() returns a dict with healthy status."""
-    stub = StubAgentRuntime()
+    stub = StubPluggableAgentRuntime()
     h = await stub.health()
     assert h["healthy"] is True
 

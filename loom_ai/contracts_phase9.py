@@ -14,7 +14,7 @@ Phase 9 covers ten contract areas:
 - **CanonicalSourceIndex** -- canonical-source vs derived-index pattern (#80)
 - **ContextCompressor** -- reversible context compression (#81)
 - **PromptCacheOptimizer** -- prompt-cache awareness and optimization (#82)
-- **AgentRuntime** -- pluggable agent runtime (#83)
+- **PluggableAgentRuntime** -- pluggable agent runtime (#83)
 - **ContextEngine** -- pluggable context engine (#84)
 - **CapabilityBackend** -- pluggable capability and tool backend (#85)
 - **EvaluationEngine** -- pluggable evaluation engine (#86)
@@ -220,7 +220,7 @@ class PromptCacheOptimizer(Protocol):
 
 
 @runtime_checkable
-class AgentRuntime(Protocol):
+class PluggableAgentRuntime(Protocol):
     """Provider-neutral contract for interchangeable agent runtimes.
 
     Supports lifecycle management, invocation, cancellation, capability
