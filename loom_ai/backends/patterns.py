@@ -28,6 +28,8 @@ if TYPE_CHECKING:
     from loom_ai.contracts_phase1 import ModelRouter
     from loom_ai.protocols import LLMBackend
 
+_MISSING_BACKEND_MSG = "Either router or backend must be provided"
+
 
 async def _call_model(
     task: str,
@@ -35,7 +37,7 @@ async def _call_model(
     *,
     router: ModelRouter | None = None,
     backend: LLMBackend | None = None,
-    config: dict | None = None,
+    _config: dict | None = None,
 ) -> ChatResponse:
     """Send *task* to a single model via *router* or *backend*.
 
@@ -53,7 +55,7 @@ async def _call_model(
             model=model,
         )
 
-    raise ValueError("Either router or backend must be provided")
+    raise ValueError(_MISSING_BACKEND_MSG)
 
 
 class ConsensusPattern:
@@ -74,14 +76,14 @@ class ConsensusPattern:
         config: dict | None = None,
     ) -> PatternResult:
         if router is None and backend is None:
-            raise ValueError("Either router or backend must be provided")
+            raise ValueError(_MISSING_BACKEND_MSG)
 
         start = time.perf_counter()
 
         async def _worker(model: str) -> dict:
             try:
                 resp = await _call_model(
-                    task, model, router=router, backend=backend, config=config
+                    task, model, router=router, backend=backend, _config=config
                 )
                 return {"model": model, "content": resp.content, "success": True}
             except Exception as exc:
@@ -134,7 +136,7 @@ class CascadePattern:
         config: dict | None = None,
     ) -> PatternResult:
         if router is None and backend is None:
-            raise ValueError("Either router or backend must be provided")
+            raise ValueError(_MISSING_BACKEND_MSG)
 
         start = time.perf_counter()
         errors: list[dict] = []
@@ -142,7 +144,7 @@ class CascadePattern:
         for model in models:
             try:
                 resp = await _call_model(
-                    task, model, router=router, backend=backend, config=config
+                    task, model, router=router, backend=backend, _config=config
                 )
                 duration_ms = (time.perf_counter() - start) * 1000
                 return PatternResult(
@@ -191,7 +193,7 @@ class MapReducePattern:
         config: dict | None = None,
     ) -> PatternResult:
         if router is None and backend is None:
-            raise ValueError("Either router or backend must be provided")
+            raise ValueError(_MISSING_BACKEND_MSG)
 
         start = time.perf_counter()
         cfg = config or {}
@@ -200,7 +202,7 @@ class MapReducePattern:
         async def _worker(model: str) -> dict:
             try:
                 resp = await _call_model(
-                    map_prompt, model, router=router, backend=backend, config=config
+                    map_prompt, model, router=router, backend=backend, _config=config
                 )
                 return {"model": model, "content": resp.content, "success": True}
             except Exception as exc:
