@@ -207,7 +207,7 @@ class SimpleLearningExtractor:
         return learnings
 
     async def update_strategy(
-        self, strategy: str, _outcome: str, *, reward: float
+        self, strategy: str, outcome: str, *, reward: float
     ) -> None:
         """Record a reward observation for Thompson Sampling bandit state.
 
@@ -216,6 +216,7 @@ class SimpleLearningExtractor:
         - success (reward >= 0.5): alpha += 1
         - failure (reward < 0.5):  beta  += 1
         """
+        _ = outcome
         state = self._strategies.setdefault(
             strategy,
             {"total_trials": 0, "total_reward": 0.0, "alpha": 1.0, "beta": 1.0},
