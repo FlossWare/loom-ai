@@ -1,9 +1,35 @@
-"""Model-agnostic execution engine for loom-ai.
+"""Model-agnostic DAG execution engine for loom-ai.
 
 Runs tasks in dependency order using topological waves.
 Independent tasks execute concurrently via ``asyncio.gather``.
 Failed tasks cancel pending transitive dependents but do not
 block independent branches of the DAG.
+
+Execution Hierarchy
+-------------------
+Loom's execution layer is composed of three levels:
+
+1. **TaskRunner** (``loom_ai.protocols.TaskRunner``) -- the lowest-level
+   primitive.  Runs a single ``Task`` and returns a result.
+
+2. **ExecutionPipeline** (``loom_ai.contracts_execution.ExecutionPipeline``,
+   implemented by ``loom_ai.backends.execution_pipeline.SequentialExecutionPipeline``)
+   -- runs a flat sequence of ``ExecutionStep`` objects with lifecycle
+   support (cancellation, deadlines, observers).  This is a sequential
+   step runner, not a DAG orchestrator.
+
+3. **ExecutionEngine** (this module) -- the highest-level component.
+   Accepts an ``ExecutionPlan`` containing tasks with explicit
+   dependencies, performs topological sorting, and executes independent
+   tasks concurrently in waves.  Each task is dispatched through a
+   ``TaskRunner``.
+
+``ExecutionEngine`` and ``SequentialExecutionPipeline`` are complementary,
+not competing.  The engine handles DAG decomposition and concurrency; the
+pipeline handles flat sequential execution with operational concerns
+(deadlines, cancellation).  A future integration could use a pipeline
+instance to execute each wave's steps sequentially, composing the two
+layers.
 """
 
 from __future__ import annotations
