@@ -127,6 +127,27 @@ try:
         id: str | None = None
         properties: dict = Field(default_factory=dict)
 
+    class QueueItemIn(BaseModel):
+        id: str | None = None
+        payload: dict = Field(default_factory=dict)
+
+    class EnqueueRequest(BaseModel):
+        items: list[QueueItemIn]
+
+    class FetchRequest(BaseModel):
+        count: int = 1
+        worker_id: str = "unknown"
+
+    class CompleteRequest(BaseModel):
+        id: str
+
+    class RequeueItemIn(BaseModel):
+        id: str
+        payload: dict = Field(default_factory=dict)
+
+    class RequeueRequest(BaseModel):
+        items: list[RequeueItemIn]
+
 except ImportError:  # pydantic not installed (server extra not required)
     pass
 
@@ -245,7 +266,7 @@ def _mount_storage_routes(app: FastAPI, config: LoomConfig, auth_deps: list) -> 
 
 
 def _mount_queue_routes(app: FastAPI, config: LoomConfig, auth_deps: list) -> None:
-    from fastapi import APIRouter, Request
+    from fastapi import APIRouter
 
     router = APIRouter(prefix="/pipeline", tags=["pipeline"], dependencies=auth_deps)
 
@@ -254,46 +275,36 @@ def _mount_queue_routes(app: FastAPI, config: LoomConfig, auth_deps: list) -> No
         return await config.queue.status(queue_name)
 
     @router.post("/queues/{queue_name}/enqueue")
-    async def queue_enqueue(queue_name: str, request: Request):
-        data = await request.json()
+    async def queue_enqueue(queue_name: str, body: EnqueueRequest):
         from loom_ai.models import QueueItem
 
-        items_data = data.get("items", [data])
         ts = int(time.time() * 1000)
         items = [
             QueueItem(
-                id=item.get("id", f"q-{ts}-{i}"),
-                payload=item,
+                id=item.id or f"q-{ts}-{i}",
+                payload=item.payload,
                 enqueued_at=time.time(),
             )
-            for i, item in enumerate(items_data)
+            for i, item in enumerate(body.items)
         ]
         count = await config.queue.enqueue(queue_name, items)
         return {"enqueued": count}
 
     @router.post("/queues/{queue_name}/fetch")
-    async def queue_fetch(queue_name: str, request: Request):
-        data = await request.json()
-        items = await config.queue.fetch(
-            queue_name, data.get("count", 1), data.get("worker_id", "unknown")
-        )
+    async def queue_fetch(queue_name: str, body: FetchRequest):
+        items = await config.queue.fetch(queue_name, body.count, body.worker_id)
         return {"items": [i.__dict__ for i in items], "count": len(items)}
 
     @router.post("/queues/{queue_name}/complete")
-    async def queue_complete(queue_name: str, request: Request):
-        data = await request.json()
-        ok = await config.queue.complete(queue_name, data.get("id", ""))
+    async def queue_complete(queue_name: str, body: CompleteRequest):
+        ok = await config.queue.complete(queue_name, body.id)
         return {"completed": ok}
 
     @router.post("/queues/{queue_name}/requeue")
-    async def queue_requeue(queue_name: str, request: Request):
-        data = await request.json()
+    async def queue_requeue(queue_name: str, body: RequeueRequest):
         from loom_ai.models import QueueItem
 
-        items = [
-            QueueItem(id=item.get("id", ""), payload=item)
-            for item in data.get("items", [])
-        ]
+        items = [QueueItem(id=item.id, payload=item.payload) for item in body.items]
         count = await config.queue.requeue(queue_name, items)
         return {"requeued": count}
 
