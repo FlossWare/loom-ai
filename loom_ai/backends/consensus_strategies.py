@@ -29,10 +29,9 @@ import hashlib
 import logging
 import threading
 import time
-from abc import ABC, abstractmethod
 from collections import OrderedDict
 from dataclasses import dataclass, field
-from typing import Sequence
+from typing import Any, Protocol, Sequence, runtime_checkable
 
 from loom_ai.models import ChatResponse
 
@@ -61,7 +60,7 @@ class ConsensusOutcome:
     selected: ChatResponse
     strategy: str
     scores: list[float] = field(default_factory=list)
-    metadata: dict = field(default_factory=dict)
+    metadata: dict[str, Any] = field(default_factory=dict)
 
 
 @dataclass
@@ -108,14 +107,14 @@ def _jaccard(a: set[str], b: set[str]) -> float:
 # ── Abstract strategy ─────────────────────────────────────────────────
 
 
-class ConsensusStrategy(ABC):
-    """Base class for consensus strategies.
+@runtime_checkable
+class ResponseConsensusStrategy(Protocol):
+    """Protocol for consensus strategies.
 
-    Subclasses implement :meth:`select` which receives the model
+    Implementations provide :meth:`select` which receives the model
     responses and returns a :class:`ConsensusOutcome`.
     """
 
-    @abstractmethod
     def select(self, responses: Sequence[ChatResponse]) -> ConsensusOutcome:
         """Choose a single consensus response from *responses*.
 
@@ -127,7 +126,7 @@ class ConsensusStrategy(ABC):
 # ── Strategies ─────────────────────────────────────────────────────────
 
 
-class MajorityVoteStrategy(ConsensusStrategy):
+class MajorityVoteStrategy:
     """Select the response most similar to the majority.
 
     For each response, compute average Jaccard similarity to all other
@@ -164,7 +163,7 @@ class MajorityVoteStrategy(ConsensusStrategy):
         )
 
 
-class WeightedConsensusStrategy(ConsensusStrategy):
+class WeightedConsensusStrategy:
     """Select the response with the highest model weight.
 
     Parameters
@@ -202,7 +201,7 @@ class WeightedConsensusStrategy(ConsensusStrategy):
         )
 
 
-class QualityThresholdStrategy(ConsensusStrategy):
+class QualityThresholdStrategy:
     """Filter by quality then select the highest-scoring response.
 
     Quality is estimated as the average Jaccard similarity of each
