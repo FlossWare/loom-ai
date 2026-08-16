@@ -10,7 +10,7 @@ dependencies beyond ``typing``.
 
 Phase 8 covers nine contract areas:
 
-- **CapabilityRegistry** -- agent capability registry and discovery (#70)
+- **EvalCapabilityRegistry** -- agent capability registry and discovery (#70)
 - **CapabilitySelector** -- capability health, fallback, and backend
   selection (#71)
 - **InteractionEvaluator** -- multi-agent interaction evaluation (#72)
@@ -31,7 +31,7 @@ Design notes
 Phase 8 introduces capability-level abstractions that complement but do
 not duplicate earlier phases:
 
-- ``CapabilityRegistry`` (#70) is a *capability-level* registry.
+- ``EvalCapabilityRegistry`` (#70) is a *capability-level* registry.
   ``WorkerRegistry`` (Phase 3) manages fleet worker nodes; this contract
   manages the *capabilities* those workers (and external services) expose.
 
@@ -58,7 +58,6 @@ from typing import TYPE_CHECKING, Protocol, runtime_checkable
 
 if TYPE_CHECKING:
     from loom_ai.models_phase8 import (
-        CapabilityDescriptor,
         CapabilityHealthState,
         CapabilityProvider,
         ComparisonResult,
@@ -66,8 +65,9 @@ if TYPE_CHECKING:
         ConsensusDecision,
         EnvironmentAction,
         EnvironmentConfig,
-        EnvironmentObservation,
         EnvironmentState,
+        EvalCapabilityDescriptor,
+        EvalEnvironmentObservation,
         InferenceParameters,
         InteractionOutcome,
         InteractionTrajectory,
@@ -86,7 +86,7 @@ if TYPE_CHECKING:
 
 
 @runtime_checkable
-class CapabilityRegistry(Protocol):
+class EvalCapabilityRegistry(Protocol):
     """Provider-neutral registry for capabilities that agents can discover
     and consume without coupling to individual tools, models, or services.
 
@@ -94,7 +94,7 @@ class CapabilityRegistry(Protocol):
     capability may have multiple provider implementations.
     """
 
-    async def register_capability(self, capability: CapabilityDescriptor) -> None:
+    async def register_capability(self, capability: EvalCapabilityDescriptor) -> None:
         """Register a new capability descriptor."""
         ...
 
@@ -104,11 +104,13 @@ class CapabilityRegistry(Protocol):
 
     async def discover(
         self, *, capability_type: str | None = None
-    ) -> list[CapabilityDescriptor]:
+    ) -> list[EvalCapabilityDescriptor]:
         """Discover available capabilities, optionally filtered by type."""
         ...
 
-    async def get_capability(self, capability_id: str) -> CapabilityDescriptor | None:
+    async def get_capability(
+        self, capability_id: str
+    ) -> EvalCapabilityDescriptor | None:
         """Return a capability by id, or ``None`` if not found."""
         ...
 
@@ -257,7 +259,7 @@ class EvaluationEnvironment(Protocol):
 
     async def step(
         self, agent_id: str, action: EnvironmentAction
-    ) -> EnvironmentObservation:
+    ) -> EvalEnvironmentObservation:
         """Apply an agent action and return the resulting observation."""
         ...
 

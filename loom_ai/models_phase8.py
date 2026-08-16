@@ -18,7 +18,7 @@ from dataclasses import dataclass, field
 
 
 @dataclass
-class CapabilityDescriptor:
+class EvalCapabilityDescriptor:
     """Identity and metadata for a registered capability.
 
     A capability represents a unit of functionality (e.g. "text-embedding",
@@ -174,7 +174,7 @@ class EnvironmentAction:
 
 
 @dataclass
-class EnvironmentObservation:
+class EvalEnvironmentObservation:
     """Observation returned after an action in the evaluation environment."""
 
     state: EnvironmentState

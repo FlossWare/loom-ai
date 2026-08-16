@@ -8,9 +8,9 @@ that the stub methods return the expected model types.
 from __future__ import annotations
 
 from loom_ai.contracts_phase8 import (
-    CapabilityRegistry,
     CapabilitySelector,
     ConsensusStrategy,
+    EvalCapabilityRegistry,
     EvaluationEnvironment,
     InferenceOptimizer,
     InteractionEvaluator,
@@ -19,7 +19,6 @@ from loom_ai.contracts_phase8 import (
     TournamentRunner,
 )
 from loom_ai.models_phase8 import (
-    CapabilityDescriptor,
     CapabilityHealthState,
     CapabilityProvider,
     ComparisonResult,
@@ -27,8 +26,9 @@ from loom_ai.models_phase8 import (
     ConsensusDecision,
     EnvironmentAction,
     EnvironmentConfig,
-    EnvironmentObservation,
     EnvironmentState,
+    EvalCapabilityDescriptor,
+    EvalEnvironmentObservation,
     InferenceParameters,
     InteractionOutcome,
     InteractionParticipant,
@@ -47,9 +47,9 @@ from loom_ai.models_phase8 import (
 # ── Helpers ────────────────────────────────────────────────────────────────
 
 
-def _cap(cap_id: str = "cap-1") -> CapabilityDescriptor:
+def _cap(cap_id: str = "cap-1") -> EvalCapabilityDescriptor:
     """Shorthand factory for a test capability descriptor."""
-    return CapabilityDescriptor(
+    return EvalCapabilityDescriptor(
         id=cap_id,
         name="text-embedding",
         version="1.0",
@@ -90,14 +90,14 @@ def _consensus_candidate(cid: str = "cc-1", model: str = "opus") -> ConsensusCan
 # ── Stub implementations ──────────────────────────────────────────────────
 
 
-class StubCapabilityRegistry:
-    """Minimal stub satisfying the CapabilityRegistry protocol."""
+class StubEvalCapabilityRegistry:
+    """Minimal stub satisfying the EvalCapabilityRegistry protocol."""
 
     def __init__(self) -> None:
-        self._caps: dict[str, CapabilityDescriptor] = {}
+        self._caps: dict[str, EvalCapabilityDescriptor] = {}
         self._providers: dict[str, list[CapabilityProvider]] = {}
 
-    async def register_capability(self, capability: CapabilityDescriptor) -> None:
+    async def register_capability(self, capability: EvalCapabilityDescriptor) -> None:
         self._caps[capability.id] = capability
 
     async def deregister_capability(self, capability_id: str) -> bool:
@@ -105,13 +105,15 @@ class StubCapabilityRegistry:
 
     async def discover(
         self, *, capability_type: str | None = None
-    ) -> list[CapabilityDescriptor]:
+    ) -> list[EvalCapabilityDescriptor]:
         caps = list(self._caps.values())
         if capability_type is not None:
             caps = [c for c in caps if c.capability_type == capability_type]
         return caps
 
-    async def get_capability(self, capability_id: str) -> CapabilityDescriptor | None:
+    async def get_capability(
+        self, capability_id: str
+    ) -> EvalCapabilityDescriptor | None:
         return self._caps.get(capability_id)
 
     async def register_provider(
@@ -233,7 +235,7 @@ class StubEvaluationEnvironment:
 
     async def step(
         self, agent_id: str, action: EnvironmentAction
-    ) -> EnvironmentObservation:
+    ) -> EvalEnvironmentObservation:
         self._step += 1
         self._trajectory.append(
             {"agent": agent_id, "action": action.action_type, "step": self._step}
@@ -242,7 +244,7 @@ class StubEvaluationEnvironment:
             environment_id="env-1",
             step_number=self._step,
         )
-        return EnvironmentObservation(state=state)
+        return EvalEnvironmentObservation(state=state)
 
     async def get_state(self, *, agent_id: str | None = None) -> EnvironmentState:
         return EnvironmentState(
@@ -387,14 +389,14 @@ class StubConsensusStrategy:
 # ── Protocol conformance tests ────────────────────────────────────────────
 
 
-class TestCapabilityRegistryProtocol:
-    """CapabilityRegistry protocol conformance."""
+class TestEvalCapabilityRegistryProtocol:
+    """EvalCapabilityRegistry protocol conformance."""
 
     def test_isinstance(self) -> None:
-        assert isinstance(StubCapabilityRegistry(), CapabilityRegistry)
+        assert isinstance(StubEvalCapabilityRegistry(), EvalCapabilityRegistry)
 
     async def test_register_and_discover(self) -> None:
-        reg = StubCapabilityRegistry()
+        reg = StubEvalCapabilityRegistry()
         cap = _cap()
         await reg.register_capability(cap)
         found = await reg.discover()
@@ -402,10 +404,10 @@ class TestCapabilityRegistryProtocol:
         assert found[0].id == "cap-1"
 
     async def test_discover_by_type(self) -> None:
-        reg = StubCapabilityRegistry()
+        reg = StubEvalCapabilityRegistry()
         await reg.register_capability(_cap("c1"))
         await reg.register_capability(
-            CapabilityDescriptor(
+            EvalCapabilityDescriptor(
                 id="c2", name="chat", version="1.0", capability_type="chat"
             )
         )
@@ -414,24 +416,24 @@ class TestCapabilityRegistryProtocol:
         assert embedding_caps[0].id == "c1"
 
     async def test_deregister(self) -> None:
-        reg = StubCapabilityRegistry()
+        reg = StubEvalCapabilityRegistry()
         await reg.register_capability(_cap())
         assert await reg.deregister_capability("cap-1") is True
         assert await reg.deregister_capability("cap-1") is False
 
     async def test_get_capability(self) -> None:
-        reg = StubCapabilityRegistry()
+        reg = StubEvalCapabilityRegistry()
         await reg.register_capability(_cap())
         result = await reg.get_capability("cap-1")
         assert result is not None
         assert result.name == "text-embedding"
 
     async def test_get_capability_not_found(self) -> None:
-        reg = StubCapabilityRegistry()
+        reg = StubEvalCapabilityRegistry()
         assert await reg.get_capability("missing") is None
 
     async def test_register_and_list_providers(self) -> None:
-        reg = StubCapabilityRegistry()
+        reg = StubEvalCapabilityRegistry()
         await reg.register_capability(_cap())
         await reg.register_provider("cap-1", _provider("p1"))
         await reg.register_provider("cap-1", _provider("p2"))
@@ -439,7 +441,7 @@ class TestCapabilityRegistryProtocol:
         assert len(providers) == 2
 
     async def test_list_providers_empty(self) -> None:
-        reg = StubCapabilityRegistry()
+        reg = StubEvalCapabilityRegistry()
         assert await reg.list_providers("missing") == []
 
 
@@ -576,7 +578,7 @@ class TestEvaluationEnvironmentProtocol:
         await env.reset()
         action = EnvironmentAction(action_type="move", agent_id="a1")
         obs = await env.step("a1", action)
-        assert isinstance(obs, EnvironmentObservation)
+        assert isinstance(obs, EvalEnvironmentObservation)
         assert obs.state.step_number == 1
 
     async def test_multiple_steps(self) -> None:
@@ -779,7 +781,7 @@ class TestModelsPhase8:
     """Verify Phase 8 model dataclasses instantiate correctly."""
 
     def test_capability_descriptor_defaults(self) -> None:
-        cap = CapabilityDescriptor(
+        cap = EvalCapabilityDescriptor(
             id="c1", name="embed", version="1.0", capability_type="embedding"
         )
         assert cap.schema == {}
@@ -849,7 +851,7 @@ class TestModelsPhase8:
 
     def test_environment_observation(self) -> None:
         state = EnvironmentState(environment_id="e1")
-        eo = EnvironmentObservation(state=state)
+        eo = EvalEnvironmentObservation(state=state)
         assert eo.reward == 0.0
         assert eo.info == {}
 
