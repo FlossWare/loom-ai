@@ -16,6 +16,7 @@ Zero external dependencies -- stdlib only.
 
 from __future__ import annotations
 
+import asyncio
 import time
 from datetime import datetime, timezone
 from typing import Any
@@ -73,93 +74,31 @@ class SequentialExecutionPipeline:
             for idx, step in enumerate(steps):
                 step_id = f"step-{idx}"
 
-                # -- cancellation check --------------------------------------
-                if context.cancelled:
-                    step_results.append(
-                        StepResult(step_id=step_id, status=StepStatus.CANCELLED)
-                    )
+                if self._should_skip(context):
+                    step_results.append(self._make_skip_result(step_id, context))
                     continue
 
-                # -- deadline check ------------------------------------------
-                if context.deadline and self._deadline_exceeded(context.deadline):
-                    step_results.append(
-                        StepResult(
-                            step_id=step_id,
-                            status=StepStatus.CANCELLED,
-                            error="deadline exceeded",
-                        )
-                    )
-                    context.cancelled = True
-                    continue
-
-                # -- execute the step ----------------------------------------
                 await self._notify_step_start(step_id, context)
+                result, failed = await self._execute_step(step, step_id, context)
+                step_results.append(result)
 
-                step_start = time.monotonic()
-                try:
-                    result = await step.execute(context)
-                    elapsed_ms = (time.monotonic() - step_start) * 1000
-
-                    # Ensure duration is populated.
-                    if result.duration_ms == 0.0:
-                        result = StepResult(
-                            step_id=result.step_id or step_id,
-                            status=result.status,
-                            output=result.output,
-                            duration_ms=elapsed_ms,
-                            error=result.error,
-                        )
-
-                    step_results.append(result)
-                    await self._notify_step_complete(step_id, result)
-
-                    if result.status == StepStatus.FAILED:
-                        had_failure = True
-                        if self._fail_fast:
-                            # Cancel remaining steps.
-                            for remaining_idx in range(idx + 1, len(steps)):
-                                step_results.append(
-                                    StepResult(
-                                        step_id=f"step-{remaining_idx}",
-                                        status=StepStatus.CANCELLED,
-                                    )
-                                )
-                            break
-
-                except Exception as exc:
-                    elapsed_ms = (time.monotonic() - step_start) * 1000
+                if failed:
                     had_failure = True
-                    error_result = StepResult(
-                        step_id=step_id,
-                        status=StepStatus.FAILED,
-                        error=str(exc),
-                        duration_ms=elapsed_ms,
-                    )
-                    step_results.append(error_result)
-                    await self._notify_step_error(step_id, exc)
-
                     if self._fail_fast:
-                        for remaining_idx in range(idx + 1, len(steps)):
-                            step_results.append(
-                                StepResult(
-                                    step_id=f"step-{remaining_idx}",
-                                    status=StepStatus.CANCELLED,
-                                )
-                            )
+                        self._cancel_remaining(idx, len(steps), step_results)
                         break
 
-            # -- compute aggregate status ------------------------------------
             total_ms = (time.monotonic() - pipeline_start) * 1000
             status = self._derive_status(step_results, context.cancelled, had_failure)
 
-            result = ExecutionResult(
+            execution_result = ExecutionResult(
                 execution_id=context.execution_id,
                 steps=step_results,
                 status=status,
                 total_duration_ms=total_ms,
             )
-            await self._notify_execution_complete(result)
-            return result
+            await self._notify_execution_complete(execution_result)
+            return execution_result
         finally:
             self._contexts.pop(context.execution_id, None)
 
@@ -169,6 +108,7 @@ class SequentialExecutionPipeline:
         The pipeline checks this flag between steps, so the current step
         will finish before cancellation takes effect.
         """
+        await asyncio.sleep(0)
         ctx = self._contexts.get(execution_id)
         if ctx is None:
             return False
@@ -176,6 +116,72 @@ class SequentialExecutionPipeline:
         return True
 
     # -- internal helpers ----------------------------------------------------
+
+    @staticmethod
+    def _should_skip(context: ExecutionContext) -> bool:
+        """Return True if the step should be skipped (cancelled or past deadline)."""
+        if context.cancelled:
+            return True
+        if context.deadline:
+            return SequentialExecutionPipeline._deadline_exceeded(context.deadline)
+        return False
+
+    @staticmethod
+    def _make_skip_result(step_id: str, context: ExecutionContext) -> StepResult:
+        """Create a CANCELLED StepResult, setting the deadline flag if needed."""
+        if not context.cancelled and context.deadline:
+            context.cancelled = True
+            return StepResult(
+                step_id=step_id,
+                status=StepStatus.CANCELLED,
+                error="deadline exceeded",
+            )
+        return StepResult(step_id=step_id, status=StepStatus.CANCELLED)
+
+    async def _execute_step(
+        self, step: Any, step_id: str, context: ExecutionContext
+    ) -> tuple[StepResult, bool]:
+        """Run a single step and return ``(result, failed)``."""
+        step_start = time.monotonic()
+        try:
+            result = await step.execute(context)
+            elapsed_ms = (time.monotonic() - step_start) * 1000
+
+            if result.duration_ms <= 0:
+                result = StepResult(
+                    step_id=result.step_id or step_id,
+                    status=result.status,
+                    output=result.output,
+                    duration_ms=elapsed_ms,
+                    error=result.error,
+                )
+
+            await self._notify_step_complete(step_id, result)
+            return result, result.status == StepStatus.FAILED
+
+        except Exception as exc:
+            elapsed_ms = (time.monotonic() - step_start) * 1000
+            error_result = StepResult(
+                step_id=step_id,
+                status=StepStatus.FAILED,
+                error=str(exc),
+                duration_ms=elapsed_ms,
+            )
+            await self._notify_step_error(step_id, exc)
+            return error_result, True
+
+    @staticmethod
+    def _cancel_remaining(
+        current_idx: int, total: int, results: list[StepResult]
+    ) -> None:
+        """Append CANCELLED results for all steps after *current_idx*."""
+        for remaining_idx in range(current_idx + 1, total):
+            results.append(
+                StepResult(
+                    step_id=f"step-{remaining_idx}",
+                    status=StepStatus.CANCELLED,
+                )
+            )
 
     @staticmethod
     def _deadline_exceeded(deadline: str) -> bool:

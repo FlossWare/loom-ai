@@ -140,12 +140,11 @@ async def test_add_edge_missing_source_raises(graph_backend):
     n2 = GraphNode(id="target-only", label="Node")
     await graph_backend.add_node(n2)
 
+    edge = GraphEdge(
+        id="bad-e",
+        source="no-source",
+        target="target-only",
+        label="link",
+    )
     with pytest.raises(ValueError):
-        await graph_backend.add_edge(
-            GraphEdge(
-                id="bad-e",
-                source="no-source",
-                target="target-only",
-                label="link",
-            )
-        )
+        await graph_backend.add_edge(edge)
