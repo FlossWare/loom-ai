@@ -72,7 +72,7 @@ print(result.synthesis.content)
 
 ## Protocol Contracts
 
-Loom defines **53 `@runtime_checkable` Protocol contracts** across 10 phases, all using structural subtyping (no ABC inheritance required).
+Loom defines **81 `@runtime_checkable` Protocol contracts** across 12 modules, all using structural subtyping (no ABC inheritance required). The recommended import path is `from loom_ai.contracts import ...` which re-exports every contract through a single stable facade. See [docs/contracts.md](docs/contracts.md) for the full inventory.
 
 ### Core Protocols (`protocols.py`)
 
@@ -90,21 +90,25 @@ Loom defines **53 `@runtime_checkable` Protocol contracts** across 10 phases, al
 | `TaskRunner` | Task execution strategy | Noop (pass-through) |
 | `IdempotentStore` | Upsert semantics marker | All storage backends |
 
-### Phase 1–3: Orchestration Contracts
+### Phase 1–3: Orchestration Contracts (21 contracts)
 
 Structured output, conversation, memory, model routing, consensus patterns, knowledge/RAG, streaming, workflow, learning, strategy selection, budget tracking, transcripts, resilience (circuit breaker), observability, session management, worker registry, caching, evaluation, feedback loops, and human-in-the-loop.
 
-### Phase 4–9: Advanced Contracts
+### Phase 4–9: Advanced Contracts (43 contracts)
 
 Knowledge graphs, temporal stores, belief management, evaluation suites, telemetry, inference routing, agent lifecycle, agent memory, output validation, security gates, program optimization, agent loops, recipe execution, ACP interoperability, context assembly, trajectory stores, agent environments, provider/capability/policy registries, catalog synchronization, tournament runners, consensus strategies, model evaluation, context compression, prompt cache optimization, pluggable runtimes, health checks, and request validation.
 
-### REST API Contracts (`contracts_api.py`)
+### Execution Contracts (`contracts_execution.py`, 3 contracts)
+
+Execution steps, sequential pipeline with cancellation/deadlines, and execution observers.
+
+### REST API Contracts (`contracts_api.py`, 3 contracts)
 
 Request lifecycle, error handling, and middleware protocols.
 
 ## Backend Implementations
 
-36 pluggable backend modules in `loom_ai/backends/`:
+37 pluggable backend modules in `loom_ai/backends/`:
 
 | Backend | Purpose |
 |---------|---------|
