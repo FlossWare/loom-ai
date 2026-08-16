@@ -22,11 +22,6 @@ from loom_ai.models_phase1 import RetrievalResult
 _CHARS_PER_TOKEN = 4
 
 
-# ══════════════════════════════════════════════════════════════════════════
-# ChunkingStrategy
-# ══════════════════════════════════════════════════════════════════════════
-
-
 class TokenChunker:
     """Sentence-aware text chunker with token-bounded overlap.
 
@@ -121,11 +116,6 @@ class TokenChunker:
 
         tail.reverse()
         return tail, total
-
-
-# ══════════════════════════════════════════════════════════════════════════
-# KnowledgePipeline
-# ══════════════════════════════════════════════════════════════════════════
 
 
 class InMemoryKnowledgePipeline:
