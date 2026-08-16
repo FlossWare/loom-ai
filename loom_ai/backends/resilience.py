@@ -90,6 +90,7 @@ class CircuitBreakerPolicy:
         self, provider: str, *, success: bool, latency_ms: float
     ) -> None:
         """Record the outcome of a request to *provider*."""
+        _ = latency_ms  # protocol-mandated; reserved for future latency tracking
         ps = self._get(provider)
         now = time.time()
 

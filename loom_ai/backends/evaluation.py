@@ -110,7 +110,7 @@ class SimpleEvaluationHarness:
         if self._backend is None:
             return EvaluationResult(
                 verdict="ACCEPT",
-                scores={dim: 5 for dim in _DIMENSIONS},
+                scores=dict.fromkeys(_DIMENSIONS, 5),
                 reasoning="No backend configured; returning default ACCEPT.",
                 evaluator_models=[],
             )
