@@ -11,7 +11,8 @@ dependencies beyond ``typing``.
 Phase 7 covers four contract areas:
 
 - **ProviderRegistry** -- model and provider discovery (#66)
-- **CapabilityRegistry** -- provider capability, limits, and quota metadata (#67)
+- **ProviderCapabilityRegistry** -- provider capability, limits,
+  and quota metadata (#67)
 - **PolicyRegistry** -- provider policy, privacy, and eligibility metadata (#68)
 - **CatalogSynchronizer** -- model catalog synchronization and staleness (#69)
 """
@@ -92,7 +93,7 @@ class ProviderRegistry(Protocol):
 
 
 @runtime_checkable
-class CapabilityRegistry(Protocol):
+class ProviderCapabilityRegistry(Protocol):
     """Standardized metadata for operational constraints.
 
     Tracks rate limits, quotas, pricing, and context limits to feed

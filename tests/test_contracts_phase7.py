@@ -10,9 +10,9 @@ from __future__ import annotations
 import pytest
 
 from loom_ai.contracts_phase7 import (
-    CapabilityRegistry,
     CatalogSynchronizer,
     PolicyRegistry,
+    ProviderCapabilityRegistry,
     ProviderRegistry,
 )
 from loom_ai.models_phase7 import (
@@ -148,11 +148,11 @@ class StubProviderRegistry:
         return True
 
 
-# ── Stub: CapabilityRegistry ────────────────────────────────────────────
+# ── Stub: ProviderCapabilityRegistry ────────────────────────────────────
 
 
-class StubCapabilityRegistry:
-    """Minimal in-memory CapabilityRegistry for conformance testing."""
+class StubProviderCapabilityRegistry:
+    """Minimal in-memory ProviderCapabilityRegistry for conformance testing."""
 
     def __init__(self) -> None:
         self._caps: dict[tuple[str, str], ProviderCapabilities] = {}
@@ -414,31 +414,31 @@ class TestProviderRegistryConformance:
 # ═══════════════════════════════════════════════════════════════════════
 
 
-class TestCapabilityRegistryConformance:
-    """CapabilityRegistry protocol conformance and basic behaviour."""
+class TestProviderCapabilityRegistryConformance:
+    """ProviderCapabilityRegistry protocol conformance and basic behaviour."""
 
     def test_isinstance_check(self):
-        assert isinstance(StubCapabilityRegistry(), CapabilityRegistry)
+        assert isinstance(StubProviderCapabilityRegistry(), ProviderCapabilityRegistry)
 
     async def test_set_and_get_capabilities(self):
-        reg = StubCapabilityRegistry()
+        reg = StubProviderCapabilityRegistry()
         caps = _capabilities("or1", "gpt-4o")
         await reg.set_capabilities(caps)
         assert (await reg.get_capabilities("or1", "gpt-4o")) is caps
 
     async def test_get_capabilities_not_found(self):
-        reg = StubCapabilityRegistry()
+        reg = StubProviderCapabilityRegistry()
         assert (await reg.get_capabilities("x", "y")) is None
 
     async def test_list_capabilities_unfiltered(self):
-        reg = StubCapabilityRegistry()
+        reg = StubProviderCapabilityRegistry()
         await reg.set_capabilities(_capabilities("or1", "m1"))
         await reg.set_capabilities(_capabilities("or2", "m2"))
         result = await reg.list_capabilities()
         assert len(result) == 2
 
     async def test_list_capabilities_filtered(self):
-        reg = StubCapabilityRegistry()
+        reg = StubProviderCapabilityRegistry()
         await reg.set_capabilities(_capabilities("or1", "m1"))
         await reg.set_capabilities(_capabilities("or2", "m2"))
         result = await reg.list_capabilities(provider_id="or1")
@@ -446,7 +446,7 @@ class TestCapabilityRegistryConformance:
         assert result[0].model_id == "m1"
 
     async def test_record_observed_limits(self):
-        reg = StubCapabilityRegistry()
+        reg = StubProviderCapabilityRegistry()
         await reg.set_capabilities(_capabilities("or1", "m1"))
         await reg.record_observed_limits(
             "or1", "m1", requests_per_minute=60, tokens_per_minute=10000
@@ -458,25 +458,25 @@ class TestCapabilityRegistryConformance:
         assert caps.rate_limits.tokens_per_minute == 10000
 
     async def test_check_quota_with_remaining(self):
-        reg = StubCapabilityRegistry()
+        reg = StubProviderCapabilityRegistry()
         caps = _capabilities("or1", "m1")
         caps.quota = QuotaStatus(daily_limit=100, daily_used=50, daily_remaining=50)
         await reg.set_capabilities(caps)
         assert await reg.check_quota("or1", "m1") is True
 
     async def test_check_quota_exhausted(self):
-        reg = StubCapabilityRegistry()
+        reg = StubProviderCapabilityRegistry()
         caps = _capabilities("or1", "m1")
         caps.quota = QuotaStatus(daily_limit=100, daily_used=100, daily_remaining=0)
         await reg.set_capabilities(caps)
         assert await reg.check_quota("or1", "m1") is False
 
     async def test_check_quota_unknown_provider(self):
-        reg = StubCapabilityRegistry()
+        reg = StubProviderCapabilityRegistry()
         assert await reg.check_quota("unknown", "unknown") is True
 
     async def test_set_capabilities_overwrites(self):
-        reg = StubCapabilityRegistry()
+        reg = StubProviderCapabilityRegistry()
         caps1 = _capabilities("or1", "m1")
         caps1.context_limit = 4096
         await reg.set_capabilities(caps1)
