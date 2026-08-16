@@ -54,7 +54,7 @@ if TYPE_CHECKING:
 # ---------------------------------------------------------------------------
 
 try:
-    from pydantic import BaseModel, Field
+    from pydantic import BaseModel, Field, model_validator
 
     class StoreDocumentRequest(BaseModel):
         content: str
@@ -132,7 +132,18 @@ try:
         payload: dict = Field(default_factory=dict)
 
     class EnqueueRequest(BaseModel):
-        items: list[QueueItemIn]
+        items: list[QueueItemIn] = []
+
+        @model_validator(mode="before")
+        @classmethod
+        def _accept_single_item(cls, data):
+            if isinstance(data, dict) and "items" not in data:
+                if "payload" in data:
+                    return {"items": [data]}
+                raise ValueError(
+                    "Request must contain 'items' list or a single-item 'payload'"
+                )
+            return data
 
     class FetchRequest(BaseModel):
         count: int = 1

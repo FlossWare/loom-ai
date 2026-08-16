@@ -28,12 +28,14 @@ def _make_client(monkeypatch) -> TestClient:
 
 
 def test_enqueue_missing_items(monkeypatch):
+    """Empty body (no items, no payload) should return 422."""
     client = _make_client(monkeypatch)
     resp = client.post("/pipeline/queues/test-q/enqueue", json={})
     assert resp.status_code == 422
 
 
 def test_enqueue_empty_body(monkeypatch):
+    """Empty body should return 422 with detail."""
     client = _make_client(monkeypatch)
     resp = client.post("/pipeline/queues/test-q/enqueue", json={})
     assert resp.status_code == 422
@@ -65,6 +67,52 @@ def test_enqueue_valid_with_id(monkeypatch):
     )
     assert resp.status_code == 200
     assert resp.json()["enqueued"] == 1
+
+
+# -- Single-item shorthand (issue #230) ------------------------------------
+
+
+def test_enqueue_single_item_shorthand(monkeypatch):
+    """Single item body without 'items' wrapper should be accepted."""
+    client = _make_client(monkeypatch)
+    resp = client.post(
+        "/pipeline/queues/test-q/enqueue",
+        json={"payload": {"task": "x"}},
+    )
+    assert resp.status_code == 200
+    assert resp.json()["enqueued"] == 1
+
+
+def test_enqueue_single_item_with_id(monkeypatch):
+    """Single item with explicit id should be accepted."""
+    client = _make_client(monkeypatch)
+    resp = client.post(
+        "/pipeline/queues/test-q/enqueue",
+        json={"id": "custom-id", "payload": {"task": "y"}},
+    )
+    assert resp.status_code == 200
+    assert resp.json()["enqueued"] == 1
+
+
+def test_enqueue_wrapped_form_still_works(monkeypatch):
+    """The original wrapped form must continue to work."""
+    client = _make_client(monkeypatch)
+    resp = client.post(
+        "/pipeline/queues/test-q/enqueue",
+        json={"items": [{"payload": {"a": 1}}, {"payload": {"b": 2}}]},
+    )
+    assert resp.status_code == 200
+    assert resp.json()["enqueued"] == 2
+
+
+def test_enqueue_no_items_no_payload_returns_422(monkeypatch):
+    """Body with neither 'items' nor 'payload' should be rejected."""
+    client = _make_client(monkeypatch)
+    resp = client.post(
+        "/pipeline/queues/test-q/enqueue",
+        json={},
+    )
+    assert resp.status_code == 422
 
 
 # -- /pipeline/queues/{queue_name}/fetch -----------------------------------
@@ -169,14 +217,15 @@ def test_requeue_valid(monkeypatch):
 # -- Verify 422 detail includes field name --------------------------------
 
 
-def test_422_detail_mentions_items_field(monkeypatch):
-    """The error response should tell the caller *which* field was missing."""
+def test_422_detail_mentions_items_or_payload(monkeypatch):
+    """The error response should tell the caller what was expected."""
     client = _make_client(monkeypatch)
     resp = client.post("/pipeline/queues/test-q/enqueue", json={})
     assert resp.status_code == 422
     detail = resp.json()["detail"]
-    field_names = [err.get("loc", [])[-1] for err in detail if err.get("loc")]
-    assert "items" in field_names
+    # The model_validator raises a descriptive error mentioning 'items' and 'payload'
+    detail_text = str(detail)
+    assert "items" in detail_text or "payload" in detail_text
 
 
 def test_422_detail_mentions_id_field(monkeypatch):
