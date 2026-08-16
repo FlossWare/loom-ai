@@ -85,7 +85,10 @@ class SimpleFeedbackLoopDetector:
         Checks four layers (see class docstring).
         """
         if self._usage_fetcher is not None:
-            fetched = await self._usage_fetcher()
+            try:
+                fetched = await self._usage_fetcher()
+            except Exception:
+                fetched = None
             if fetched:
                 self._usage_data = list(fetched)
 
