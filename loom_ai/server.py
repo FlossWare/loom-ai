@@ -42,11 +42,96 @@ if TYPE_CHECKING:
 
     from loom_ai.config import LoomConfig
 
+# ---------------------------------------------------------------------------
+# Pydantic request models – FastAPI validates these automatically and returns
+# 422 with a descriptive error body when required fields are missing.
+#
+# Pydantic ships with FastAPI (optional dependency), so the try/except keeps
+# the module importable without installing the server extra.
+# ---------------------------------------------------------------------------
 
-def create_app(config: LoomConfig) -> "FastAPI":
+try:
+    from pydantic import BaseModel, Field
+
+    class StoreDocumentRequest(BaseModel):
+        content: str
+        id: str | None = None
+        title: str = "Untitled"
+        url: str = ""
+        category: str = ""
+        metadata: dict = Field(default_factory=dict)
+
+    class StoreChunksRequest(BaseModel):
+        document_id: str
+        chunks: list
+
+    class EmbeddingItem(BaseModel):
+        chunk_id: str = ""
+        vector: list[float] | None = None
+        embedding: list[float] | None = None
+        model: str = "unknown"
+        provider: str = "api"
+
+    class StoreEmbeddingsRequest(BaseModel):
+        embeddings: list[EmbeddingItem]
+
+    class SemanticSearchRequest(BaseModel):
+        vector: list[float]
+        limit: int = 10
+
+    class HybridSearchRequest(BaseModel):
+        query: str
+        vector: list[float]
+        limit: int = 10
+        text_weight: float = 0.5
+
+    class ChatMessageIn(BaseModel):
+        role: str
+        content: str
+
+    class LLMChatRequest(BaseModel):
+        messages: list[ChatMessageIn]
+        model: str | None = None
+        temperature: float = 0.7
+        max_tokens: int | None = None
+
+    class ConsensusGatherRequest(BaseModel):
+        messages: list[ChatMessageIn]
+        models: list[str]
+        temperature: float = 0.7
+
+    class ConsensusSynthesizeRequest(BaseModel):
+        prompt: str
+        models: list[str]
+        arbiter_model: str | None = None
+        tool_name: str = "design"
+        temperature: float = 0.7
+        arbiter_temperature: float = 0.3
+
+    class ToolCallRequest(BaseModel):
+        name: str
+        arguments: dict = Field(default_factory=dict)
+
+    class AddNodeRequest(BaseModel):
+        label: str
+        id: str | None = None
+        properties: dict = Field(default_factory=dict)
+
+    class AddEdgeRequest(BaseModel):
+        source: str
+        target: str
+        label: str
+        id: str | None = None
+        properties: dict = Field(default_factory=dict)
+
+except ImportError:  # pydantic not installed (server extra not required)
+    pass
+
+
+def create_app(config: LoomConfig) -> FastAPI:
     """Build a FastAPI application wiring only the active backends."""
     try:
-        from fastapi import FastAPI, HTTPException, Request  # noqa: F811
+        from fastapi import FastAPI, HTTPException, Request
     except ImportError as exc:
         raise ImportError(
             "FastAPI server requires 'fastapi' and 'uvicorn'.  "
@@ -58,7 +143,7 @@ def create_app(config: LoomConfig) -> "FastAPI":
     auth_deps: list = []
 
     if api_key:
-        from fastapi import Depends, Security  # noqa: F811
+        from fastapi import Depends, Security
         from fastapi.security import HTTPAuthorizationCredentials, HTTPBearer
 
         security = HTTPBearer()
@@ -123,17 +208,16 @@ def create_app(config: LoomConfig) -> "FastAPI":
         }
 
     @storage_router.post("/documents")
-    async def store_document(request: Request):
-        data = await request.json()
+    async def store_document(body: StoreDocumentRequest):
         from loom_ai.models import Document
 
         doc = Document(
-            id=data.get("id", f"doc-{int(time.time() * 1000)}"),
-            title=data.get("title", "Untitled"),
-            content=data["content"],
-            url=data.get("url", ""),
-            category=data.get("category", ""),
-            metadata=data.get("metadata", {}),
+            id=body.id or f"doc-{int(time.time() * 1000)}",
+            title=body.title,
+            content=body.content,
+            url=body.url,
+            category=body.category,
+            metadata=body.metadata,
         )
         doc_id = await config.storage.store_document(doc)
         return {"id": doc_id, "stored": True}
@@ -144,42 +228,44 @@ def create_app(config: LoomConfig) -> "FastAPI":
         return {"chunks": [c.__dict__ for c in chunks], "count": len(chunks)}
 
     @storage_router.post("/chunks/store")
-    async def store_chunks(request: Request):
+    async def store_chunks(body: StoreChunksRequest):
         import hashlib
 
         from loom_ai.models import Chunk
 
-        data = await request.json()
         chunks = []
-        for i, c in enumerate(data["chunks"]):
-            content = c if isinstance(c, str) else c.get("content", "")
+        for i, c in enumerate(body.chunks):
+            content = (
+                c
+                if isinstance(c, str)
+                else (c.get("content", "") if isinstance(c, dict) else "")
+            )
             chunks.append(
                 Chunk(
-                    id=f"chunk-{data['document_id']}-{i}",
-                    document_id=data["document_id"],
+                    id=f"chunk-{body.document_id}-{i}",
+                    document_id=body.document_id,
                     content=content,
                     chunk_index=i,
                     content_hash=hashlib.sha256(content.encode()).hexdigest()[:16],
                 )
             )
-        stored = await config.storage.store_chunks(data["document_id"], chunks)
+        stored = await config.storage.store_chunks(body.document_id, chunks)
         return {"stored": stored, "total": len(chunks)}
 
     @storage_router.post("/chunks/store-embeddings")
-    async def store_embeddings(request: Request):
-        data = await request.json()
+    async def store_embeddings(body: StoreEmbeddingsRequest):
         from loom_ai.models import Embedding
 
         embeddings = []
-        for emb in data["embeddings"]:
-            vector = emb.get("vector") or emb.get("embedding", [])
+        for emb in body.embeddings:
+            vector = emb.vector or emb.embedding or []
             embeddings.append(
                 Embedding(
-                    id=f"emb-{emb.get('chunk_id', '')}",
-                    chunk_id=emb.get("chunk_id", ""),
+                    id=f"emb-{emb.chunk_id}",
+                    chunk_id=emb.chunk_id,
                     vector=vector,
-                    model=emb.get("model", "unknown"),
-                    provider=emb.get("provider", "api"),
+                    model=emb.model,
+                    provider=emb.provider,
                     dimensions=len(vector),
                 )
             )
@@ -249,21 +335,17 @@ def create_app(config: LoomConfig) -> "FastAPI":
         return {"results": [r.__dict__ for r in results], "query": q}
 
     @search_router.post("/semantic")
-    async def semantic_search(request: Request):
-        data = await request.json()
-        results = await config.search.semantic_search(
-            data["vector"], limit=data.get("limit", 10)
-        )
+    async def semantic_search(body: SemanticSearchRequest):
+        results = await config.search.semantic_search(body.vector, limit=body.limit)
         return {"results": [r.__dict__ for r in results]}
 
     @search_router.post("/hybrid")
-    async def hybrid_search(request: Request):
-        data = await request.json()
+    async def hybrid_search(body: HybridSearchRequest):
         results = await config.search.hybrid_search(
-            data["query"],
-            data["vector"],
-            limit=data.get("limit", 10),
-            text_weight=data.get("text_weight", 0.5),
+            body.query,
+            body.vector,
+            limit=body.limit,
+            text_weight=body.text_weight,
         )
         return {"results": [r.__dict__ for r in results]}
 
@@ -296,19 +378,17 @@ def create_app(config: LoomConfig) -> "FastAPI":
             return {"models": models, "count": len(models)}
 
         @llm_router.post("/chat")
-        async def llm_chat(request: Request):
-            data = await request.json()
+        async def llm_chat(body: LLMChatRequest):
             from loom_ai.models import ChatMessage
 
             messages = [
-                ChatMessage(role=m["role"], content=m["content"])
-                for m in data["messages"]
+                ChatMessage(role=m.role, content=m.content) for m in body.messages
             ]
             resp = await config.llm.chat(
                 messages,
-                model=data.get("model"),
-                temperature=data.get("temperature", 0.7),
-                max_tokens=data.get("max_tokens"),
+                model=body.model,
+                temperature=body.temperature,
+                max_tokens=body.max_tokens,
             )
             return resp.__dict__
 
@@ -320,34 +400,31 @@ def create_app(config: LoomConfig) -> "FastAPI":
         )
 
         @consensus_router.post("/gather")
-        async def consensus_gather(request: Request):
-            data = await request.json()
+        async def consensus_gather(body: ConsensusGatherRequest):
             from loom_ai.models import ChatMessage
 
             messages = [
-                ChatMessage(role=m["role"], content=m["content"])
-                for m in data["messages"]
+                ChatMessage(role=m.role, content=m.content) for m in body.messages
             ]
             responses, failed = await config.consensus.gather(
-                messages, data["models"], temperature=data.get("temperature", 0.7)
+                messages, body.models, temperature=body.temperature
             )
             return {
                 "responses": [r.__dict__ for r in responses],
                 "count": len(responses),
                 "failed_models": failed,
-                "models_queried": data["models"],
+                "models_queried": body.models,
             }
 
         @consensus_router.post("/synthesize")
-        async def consensus_synthesize(request: Request):
-            data = await request.json()
+        async def consensus_synthesize(body: ConsensusSynthesizeRequest):
             result = await config.consensus.synthesize(
-                data["prompt"],
-                data["models"],
-                arbiter_model=data.get("arbiter_model"),
-                tool_name=data.get("tool_name", "design"),
-                temperature=data.get("temperature", 0.7),
-                arbiter_temperature=data.get("arbiter_temperature", 0.3),
+                body.prompt,
+                body.models,
+                arbiter_model=body.arbiter_model,
+                tool_name=body.tool_name,
+                temperature=body.temperature,
+                arbiter_temperature=body.arbiter_temperature,
             )
             return {
                 "synthesis": result.synthesis.__dict__,
@@ -370,11 +447,8 @@ def create_app(config: LoomConfig) -> "FastAPI":
             return {"tools": [t.__dict__ for t in tools], "count": len(tools)}
 
         @tools_router.post("/call")
-        async def call_tool(request: Request):
-            data = await request.json()
-            result = await config.tools.call_tool(
-                data["name"], data.get("arguments", {})
-            )
+        async def call_tool(body: ToolCallRequest):
+            result = await config.tools.call_tool(body.name, body.arguments)
             return result.__dict__
 
         app.include_router(tools_router)
@@ -423,14 +497,13 @@ def create_app(config: LoomConfig) -> "FastAPI":
         )
 
         @graph_router.post("/nodes")
-        async def add_node(request: Request):
-            data = await request.json()
+        async def add_node(body: AddNodeRequest):
             from loom_ai.models import GraphNode
 
             node = GraphNode(
-                id=data.get("id", f"node-{int(time.time() * 1000)}"),
-                label=data["label"],
-                properties=data.get("properties", {}),
+                id=body.id or f"node-{int(time.time() * 1000)}",
+                label=body.label,
+                properties=body.properties,
             )
             node_id = await config.graph.add_node(node)
             return {"id": node_id}
@@ -448,16 +521,15 @@ def create_app(config: LoomConfig) -> "FastAPI":
             return {"neighbors": [n.__dict__ for n in neighbors]}
 
         @graph_router.post("/edges")
-        async def add_edge(request: Request):
-            data = await request.json()
+        async def add_edge(body: AddEdgeRequest):
             from loom_ai.models import GraphEdge
 
             edge = GraphEdge(
-                id=data.get("id", f"edge-{int(time.time() * 1000)}"),
-                source=data["source"],
-                target=data["target"],
-                label=data["label"],
-                properties=data.get("properties", {}),
+                id=body.id or f"edge-{int(time.time() * 1000)}",
+                source=body.source,
+                target=body.target,
+                label=body.label,
+                properties=body.properties,
             )
             edge_id = await config.graph.add_edge(edge)
             return {"id": edge_id}
