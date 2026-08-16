@@ -79,6 +79,7 @@ class GeneticOptimizer:
         crossover_rate: float = 0.7,
         tournament_size: int = 3,
         elitism: int = 1,
+        seed: int | None = None,
     ) -> None:
         if population_size < 2:
             raise ValueError("population_size must be >= 2")
@@ -94,6 +95,9 @@ class GeneticOptimizer:
         self.population: list[Individual] = []
         self.generation: int = 0
         self._best: Individual | None = None
+        # Instance-level PRNG for reproducibility and isolation.
+        # Not used for security/cryptographic purposes (GA optimizer only).
+        self._rng = random.Random(seed)
 
     # -- Initialisation --------------------------------------------------
 
@@ -107,7 +111,7 @@ class GeneticOptimizer:
 
     def _random_individual(self) -> Individual:
         """Return an individual with uniformly sampled gene values."""
-        genes = {p.name: random.uniform(p.low, p.high) for p in self.params}
+        genes = {p.name: self._rng.uniform(p.low, p.high) for p in self.params}
         return Individual(genes=genes)
 
     # -- Core GA loop ----------------------------------------------------
@@ -181,7 +185,7 @@ class GeneticOptimizer:
             p1 = self._tournament_select()
             p2 = self._tournament_select()
 
-            if random.random() < self.crossover_rate:
+            if self._rng.random() < self.crossover_rate:
                 c1, c2 = self._crossover(p1, p2)
             else:
                 c1 = Individual(genes=dict(p1.genes))
@@ -198,7 +202,7 @@ class GeneticOptimizer:
 
     def _tournament_select(self) -> Individual:
         """Select one individual via tournament selection."""
-        contestants = random.sample(self.population, self.tournament_size)
+        contestants = self._rng.sample(self.population, self.tournament_size)
         return max(contestants, key=lambda i: i.fitness)
 
     def _crossover(
@@ -208,7 +212,7 @@ class GeneticOptimizer:
         c1_genes: dict[str, float] = {}
         c2_genes: dict[str, float] = {}
         for p in self.params:
-            if random.random() < 0.5:
+            if self._rng.random() < 0.5:
                 c1_genes[p.name] = p1.genes[p.name]
                 c2_genes[p.name] = p2.genes[p.name]
             else:
@@ -220,8 +224,8 @@ class GeneticOptimizer:
         """Apply Gaussian mutation to each gene with probability mutation_rate."""
         bounds = {p.name: p for p in self.params}
         for name in ind.genes:
-            if random.random() < self.mutation_rate:
-                delta = random.gauss(0, self.mutation_sigma)
+            if self._rng.random() < self.mutation_rate:
+                delta = self._rng.gauss(0, self.mutation_sigma)
                 new_val = ind.genes[name] + delta
                 b = bounds[name]
                 ind.genes[name] = max(b.low, min(b.high, new_val))

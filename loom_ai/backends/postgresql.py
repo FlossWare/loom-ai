@@ -51,6 +51,9 @@ def _require_asyncpg() -> None:
         )
 
 
+_DELETE_ONE = "DELETE 1"
+
+
 def _dsn_from_env() -> str:
     """Build a DSN from ``LOOM_PG_*`` environment variables."""
     host = os.environ.get("LOOM_PG_HOST", "localhost")
@@ -160,7 +163,7 @@ class PostgresqlStorageBackend:
             result = await conn.execute(
                 "DELETE FROM documents WHERE id = $1", document_id
             )
-        return result == "DELETE 1"
+        return result == _DELETE_ONE
 
     async def count_documents(self) -> int:
         async with self._pool.acquire() as conn:
@@ -528,7 +531,7 @@ class PostgresqlSecretsBackend:
     async def delete(self, name: str) -> bool:
         async with self._pool.acquire() as conn:
             result = await conn.execute("DELETE FROM secrets WHERE name = $1", name)
-        return result == "DELETE 1"
+        return result == _DELETE_ONE
 
 
 # ======================================================================
@@ -723,7 +726,7 @@ class PostgresqlPersistentMemory:
         """Remove a memory by name.  Return ``True`` if it existed."""
         async with self._pool.acquire() as conn:
             result = await conn.execute("DELETE FROM memories WHERE name = $1", name)
-        return result == "DELETE 1"
+        return result == _DELETE_ONE
 
     async def list_memories(
         self, *, memory_type: str | None = None

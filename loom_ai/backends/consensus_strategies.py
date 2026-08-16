@@ -37,6 +37,8 @@ from loom_ai.models import ChatResponse
 
 logger = logging.getLogger(__name__)
 
+_EMPTY_RESPONSES_MSG = "Cannot reach consensus with zero responses"
+
 
 # ── Data types ─────────────────────────────────────────────────────────
 
@@ -136,7 +138,7 @@ class MajorityVoteStrategy:
 
     def select(self, responses: Sequence[ChatResponse]) -> ConsensusOutcome:
         if not responses:
-            raise ValueError("Cannot reach consensus with zero responses")
+            raise ValueError(_EMPTY_RESPONSES_MSG)
         if len(responses) == 1:
             return ConsensusOutcome(
                 selected=responses[0],
@@ -186,7 +188,7 @@ class WeightedConsensusStrategy:
 
     def select(self, responses: Sequence[ChatResponse]) -> ConsensusOutcome:
         if not responses:
-            raise ValueError("Cannot reach consensus with zero responses")
+            raise ValueError(_EMPTY_RESPONSES_MSG)
 
         scores = [self._weights.get(r.model, self._default_weight) for r in responses]
         best_idx = max(range(len(scores)), key=lambda i: scores[i])
@@ -222,7 +224,7 @@ class QualityThresholdStrategy:
 
     def select(self, responses: Sequence[ChatResponse]) -> ConsensusOutcome:
         if not responses:
-            raise ValueError("Cannot reach consensus with zero responses")
+            raise ValueError(_EMPTY_RESPONSES_MSG)
 
         if len(responses) == 1:
             return ConsensusOutcome(
