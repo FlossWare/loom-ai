@@ -9,8 +9,8 @@ methods can be awaited without error.
 from __future__ import annotations
 
 from loom_ai.contracts_phase5 import (
+    AgentLifecycleRuntime,
     AgentMemory,
-    AgentRuntime,
     EvalSuite,
     GenAITelemetry,
     InferenceRouter,
@@ -20,8 +20,8 @@ from loom_ai.contracts_phase5 import (
 )
 from loom_ai.models_phase5 import (
     AgentEvent,
+    AgentLifecycleState,
     AgentMemoryEntry,
-    AgentState,
     CapabilityPolicy,
     Checkpoint,
     ContentScanResult,
@@ -172,11 +172,11 @@ class StubInferenceRouter:
         return list(self._endpoints)
 
 
-class StubAgentRuntime:
-    """Minimal AgentRuntime conforming to the protocol."""
+class StubAgentLifecycleRuntime:
+    """Minimal AgentLifecycleRuntime conforming to the protocol."""
 
     def __init__(self) -> None:
-        self._states: dict[str, AgentState] = {}
+        self._states: dict[str, AgentLifecycleState] = {}
         self._checkpoints: dict[str, Checkpoint] = {}
         self._events: dict[str, list[AgentEvent]] = {}
         self._counter = 0
@@ -185,12 +185,12 @@ class StubAgentRuntime:
         self,
         agent_id: str,
         *,
-        initial_state: AgentState | None = None,
+        initial_state: AgentLifecycleState | None = None,
         config: dict | None = None,
     ) -> str:
         self._counter += 1
         run_id = f"run-{self._counter}"
-        state = initial_state or AgentState(agent_id=agent_id, step="init")
+        state = initial_state or AgentLifecycleState(agent_id=agent_id, step="init")
         self._states[run_id] = state
         self._events[run_id] = [AgentEvent(event_type="started", agent_id=agent_id)]
         return run_id
@@ -236,7 +236,7 @@ class StubAgentRuntime:
         if state:
             state.status = "interrupted"
 
-    async def get_state(self, run_id: str) -> AgentState | None:
+    async def get_state(self, run_id: str) -> AgentLifecycleState | None:
         return self._states.get(run_id)
 
     async def get_events(self, run_id: str, *, limit: int = 50) -> list[AgentEvent]:
@@ -584,19 +584,19 @@ class TestInferenceRouterProtocol:
         assert healthy[0].id == "a"
 
 
-class TestAgentRuntimeProtocol:
-    """AgentRuntime (#54) protocol conformance and basic behaviour."""
+class TestAgentLifecycleRuntimeProtocol:
+    """AgentLifecycleRuntime (#54) protocol conformance and basic behaviour."""
 
     def test_isinstance_check(self) -> None:
-        assert isinstance(StubAgentRuntime(), AgentRuntime)
+        assert isinstance(StubAgentLifecycleRuntime(), AgentLifecycleRuntime)
 
     async def test_start_returns_run_id(self) -> None:
-        rt = StubAgentRuntime()
+        rt = StubAgentLifecycleRuntime()
         run_id = await rt.start("agent-1")
         assert run_id == "run-1"
 
     async def test_checkpoint_and_resume(self) -> None:
-        rt = StubAgentRuntime()
+        rt = StubAgentLifecycleRuntime()
         run_id = await rt.start("agent-1")
         cp = await rt.checkpoint(run_id)
         assert cp.agent_id == "agent-1"
@@ -604,7 +604,7 @@ class TestAgentRuntimeProtocol:
         assert new_run != run_id
 
     async def test_handoff(self) -> None:
-        rt = StubAgentRuntime()
+        rt = StubAgentLifecycleRuntime()
         run_id = await rt.start("agent-1")
         ho = await rt.handoff(run_id, "agent-2", reason="escalation")
         assert ho.from_agent == "agent-1"
@@ -612,7 +612,7 @@ class TestAgentRuntimeProtocol:
         assert ho.reason == "escalation"
 
     async def test_interrupt_changes_status(self) -> None:
-        rt = StubAgentRuntime()
+        rt = StubAgentLifecycleRuntime()
         run_id = await rt.start("agent-1")
         await rt.interrupt(run_id, reason="user request")
         state = await rt.get_state(run_id)
@@ -620,11 +620,11 @@ class TestAgentRuntimeProtocol:
         assert state.status == "interrupted"
 
     async def test_get_state_returns_none_for_unknown(self) -> None:
-        rt = StubAgentRuntime()
+        rt = StubAgentLifecycleRuntime()
         assert await rt.get_state("nonexistent") is None
 
     async def test_get_events(self) -> None:
-        rt = StubAgentRuntime()
+        rt = StubAgentLifecycleRuntime()
         run_id = await rt.start("agent-1")
         events = await rt.get_events(run_id)
         assert len(events) == 1
@@ -983,7 +983,7 @@ class TestModelsPhase5:
         assert rd.fallback_used is False
 
     def test_agent_state_defaults(self) -> None:
-        s = AgentState(agent_id="a1", step="init")
+        s = AgentLifecycleState(agent_id="a1", step="init")
         assert s.status == "running"
         assert s.data == {}
 

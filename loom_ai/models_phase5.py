@@ -165,7 +165,7 @@ class RoutingDecision:
 
 
 @dataclass
-class AgentState:
+class AgentLifecycleState:
     """Serialisable snapshot of an agent's execution state."""
 
     agent_id: str
@@ -181,7 +181,7 @@ class Checkpoint:
 
     id: str
     agent_id: str
-    state: AgentState | None = None
+    state: AgentLifecycleState | None = None
     step: str = ""
     created_at: str = ""
     metadata: dict = field(default_factory=dict)

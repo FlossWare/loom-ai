@@ -13,7 +13,7 @@ Phase 5 covers eight core contract areas:
 - **EvalSuite** -- dataset-driven evaluation and regression testing (#51)
 - **GenAITelemetry** -- GenAI-specific observability and telemetry (#52)
 - **InferenceRouter** -- model provider, inference, and adaptive routing (#53)
-- **AgentRuntime** -- agent lifecycle, state, and durable execution (#54)
+- **AgentLifecycleRuntime** -- agent lifecycle, state, and durable execution (#54)
 - **AgentMemory** -- persistent, scoped, typed agent memory (#55)
 - **OutputValidator** -- schema-driven output validation and tool auth (#56)
 - **SecurityGate** -- AI security, authorization, and trust boundaries (#57)
@@ -27,8 +27,8 @@ from typing import TYPE_CHECKING, Any, Protocol, runtime_checkable
 if TYPE_CHECKING:
     from loom_ai.models_phase5 import (
         AgentEvent,
+        AgentLifecycleState,
         AgentMemoryEntry,
-        AgentState,
         CapabilityPolicy,
         Checkpoint,
         ContentScanResult,
@@ -196,12 +196,12 @@ class InferenceRouter(Protocol):
 
 
 @runtime_checkable
-class AgentRuntime(Protocol):
+class AgentLifecycleRuntime(Protocol):
     """Agent lifecycle management with durable execution semantics.
 
     Complements :class:`~loom_ai.contracts_phase2.WorkflowEngine` which
     handles multi-phase workflow execution and resumption.
-    ``AgentRuntime`` focuses on individual agent lifecycle -- explicit
+    ``AgentLifecycleRuntime`` focuses on individual agent lifecycle -- explicit
     state management, checkpointing, handoffs between agents, tool-call
     lifecycle, retries, interruption, and resumption with durable
     execution guarantees.
@@ -211,7 +211,7 @@ class AgentRuntime(Protocol):
         self,
         agent_id: str,
         *,
-        initial_state: AgentState | None = None,
+        initial_state: AgentLifecycleState | None = None,
         config: dict | None = None,
     ) -> str:
         """Start an agent and return its run id."""
@@ -240,7 +240,7 @@ class AgentRuntime(Protocol):
         """Interrupt a running agent, preserving state for later resumption."""
         ...
 
-    async def get_state(self, run_id: str) -> AgentState | None:
+    async def get_state(self, run_id: str) -> AgentLifecycleState | None:
         """Return the current state of an agent run."""
         ...
 
