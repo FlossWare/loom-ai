@@ -97,6 +97,54 @@ def _validate_schema(parsed: Any, schema: dict) -> tuple[bool, str]:
     return True, ""
 
 
+def _try_parse_json(raw_text: str) -> tuple[Any, str | None]:
+    """Extract and parse JSON from *raw_text*.
+
+    Returns ``(parsed_value, error_message)``.  On success,
+    *error_message* is ``None``.  On failure, *parsed_value* is ``None``
+    and *error_message* describes the parse error.
+    """
+    try:
+        extracted = _extract_json(raw_text)
+        return json.loads(extracted), None
+    except ValueError as exc:
+        return None, str(exc)
+
+
+def _normalize_parsed(parsed: Any) -> dict:
+    """Wrap non-dict parsed values in ``{"_value": parsed}``."""
+    if isinstance(parsed, dict):
+        return parsed
+    return {"_value": parsed}
+
+
+def _append_retry_messages(
+    messages: list[ChatMessage],
+    assistant_text: str,
+    fix_prompt: str,
+) -> None:
+    """Append an assistant reply and a user fix-prompt to *messages*."""
+    messages.append(ChatMessage(role="assistant", content=assistant_text))
+    messages.append(ChatMessage(role="user", content=fix_prompt))
+
+
+def _build_response(
+    raw_text: str,
+    parsed: dict | None,
+    *,
+    schema_valid: bool,
+    retries_used: int,
+) -> StructuredResponse:
+    """Build a ``StructuredResponse`` from the given parts."""
+    return StructuredResponse(
+        content=raw_text,
+        parsed=parsed,
+        schema_valid=schema_valid,
+        raw_text=raw_text,
+        retries_used=retries_used,
+    )
+
+
 class StructuredOutputBackend:
     """Wraps any ``LLMBackend`` to add structured-output support.
 
@@ -126,7 +174,7 @@ class StructuredOutputBackend:
         messages: list[ChatMessage],
         *,
         schema: dict | None = None,
-        tools: list[dict] | None = None,
+        _tools: list[dict] | None = None,
         response_format: str = "text",
         max_retries: int = 3,
         **kwargs: Any,
@@ -167,43 +215,28 @@ class StructuredOutputBackend:
             )
             raw_text = response.content
 
-            # Try to parse as JSON
-            try:
-                extracted = _extract_json(raw_text)
-                parsed = json.loads(extracted)
-            except (json.JSONDecodeError, ValueError):
+            parsed, parse_error = _try_parse_json(raw_text)
+
+            if parse_error is not None:
                 if attempt < max_retries:
                     retries_used += 1
-                    working_messages.append(
-                        ChatMessage(role="assistant", content=raw_text),
-                    )
-                    working_messages.append(
-                        ChatMessage(
-                            role="user",
-                            content=(
-                                "Your previous response was not valid JSON. "
-                                "Please respond with valid JSON only."
-                            ),
-                        ),
+                    _append_retry_messages(
+                        working_messages,
+                        raw_text,
+                        "Your previous response was not valid JSON. "
+                        "Please respond with valid JSON only.",
                     )
                     continue
-
-                # Exhausted retries -- return what we have
-                return StructuredResponse(
-                    content=raw_text,
-                    parsed=None,
-                    schema_valid=False,
-                    raw_text=raw_text,
-                    retries_used=retries_used,
+                return _build_response(
+                    raw_text, None, schema_valid=False, retries_used=retries_used
                 )
 
             # If no schema, parsed JSON is good enough
             if schema is None:
-                return StructuredResponse(
-                    content=raw_text,
-                    parsed=parsed if isinstance(parsed, dict) else {"_value": parsed},
+                return _build_response(
+                    raw_text,
+                    _normalize_parsed(parsed),
                     schema_valid=True,
-                    raw_text=raw_text,
                     retries_used=retries_used,
                 )
 
@@ -211,47 +244,35 @@ class StructuredOutputBackend:
             is_valid, error_msg = _validate_schema(parsed, schema)
 
             if is_valid:
-                return StructuredResponse(
-                    content=raw_text,
-                    parsed=parsed if isinstance(parsed, dict) else {"_value": parsed},
+                return _build_response(
+                    raw_text,
+                    _normalize_parsed(parsed),
                     schema_valid=True,
-                    raw_text=raw_text,
                     retries_used=retries_used,
                 )
 
             # Schema validation failed -- retry with a fix prompt
             if attempt < max_retries:
                 retries_used += 1
-                working_messages.append(
-                    ChatMessage(role="assistant", content=raw_text),
-                )
-                working_messages.append(
-                    ChatMessage(
-                        role="user",
-                        content=(
-                            "Your JSON response did not match the "
-                            f"required schema. Error: {error_msg}. "
-                            "Please fix and respond with valid JSON "
-                            "matching the schema."
-                        ),
-                    ),
+                _append_retry_messages(
+                    working_messages,
+                    raw_text,
+                    "Your JSON response did not match the "
+                    f"required schema. Error: {error_msg}. "
+                    "Please fix and respond with valid JSON "
+                    "matching the schema.",
                 )
                 continue
 
             # Exhausted retries with schema failure
-            return StructuredResponse(
-                content=raw_text,
-                parsed=parsed if isinstance(parsed, dict) else {"_value": parsed},
+            return _build_response(
+                raw_text,
+                _normalize_parsed(parsed),
                 schema_valid=False,
-                raw_text=raw_text,
                 retries_used=retries_used,
             )
 
         # Should not reach here, but satisfy the type checker
-        return StructuredResponse(  # pragma: no cover
-            content=raw_text,
-            parsed=None,
-            schema_valid=False,
-            raw_text=raw_text,
-            retries_used=retries_used,
+        return _build_response(  # pragma: no cover
+            raw_text, None, schema_valid=False, retries_used=retries_used
         )
