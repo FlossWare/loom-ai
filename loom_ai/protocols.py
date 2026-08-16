@@ -34,11 +34,47 @@ if TYPE_CHECKING:
 
 
 @runtime_checkable
+class IdempotentStore(Protocol):
+    """Marker protocol for backends with idempotent write semantics.
+
+    Any backend that satisfies this protocol guarantees the following
+    contract for every write / upsert method:
+
+    1. **Same result** -- calling the method twice with identical arguments
+       produces the same observable state as calling it once.
+    2. **No duplicates** -- repeated calls never create duplicate records;
+       existing records are silently replaced (upsert).
+    3. **Safe retries** -- callers (HTTP handlers, queue workers, cron
+       jobs) may safely retry without additional deduplication logic.
+
+    Conforming write methods include (but are not limited to):
+
+    - ``StorageBackend.store_document``
+    - ``StorageBackend.store_chunks``
+    - ``StorageBackend.store_embeddings``
+    - ``SearchBackend.index``
+    - ``PersistentMemoryBackend.store``
+    - ``GraphBackend.add_node``
+
+    Implementations should document any method where idempotency does
+    **not** hold (e.g. ``QueueBackend.enqueue``, which intentionally
+    appends duplicates).
+    """
+
+    ...
+
+
+@runtime_checkable
 class StorageBackend(Protocol):
-    """Async persistence for documents, chunks, and embeddings."""
+    """Async persistence for documents, chunks, and embeddings.
+
+    All ``store_*`` methods are **idempotent**: calling them twice with
+    the same data produces the same observable state as calling once.
+    See :class:`IdempotentStore` for the full contract.
+    """
 
     async def store_document(self, document: Document) -> str:
-        """Persist *document* and return its id."""
+        """Persist *document* and return its id.  Idempotent by document id."""
         ...
 
     async def get_document(self, document_id: str) -> Document | None:
@@ -60,7 +96,11 @@ class StorageBackend(Protocol):
         ...
 
     async def store_chunks(self, document_id: str, chunks: list[Chunk]) -> int:
-        """Store chunks for a document and return the count stored."""
+        """Store chunks for a document and return the count stored.
+
+        Idempotent by chunk id -- re-storing a chunk with the same id
+        replaces the previous content without creating duplicates.
+        """
         ...
 
     async def get_chunks(self, document_id: str) -> list[Chunk]:
@@ -86,7 +126,10 @@ class StorageBackend(Protocol):
         ...
 
     async def store_embeddings(self, embeddings: list[Embedding]) -> int:
-        """Persist embedding vectors and return the count stored."""
+        """Persist embedding vectors and return the count stored.
+
+        Idempotent by embedding id -- re-storing replaces previous values.
+        """
         ...
 
     async def count_embeddings(self) -> int:
@@ -181,7 +224,12 @@ class SearchBackend(Protocol):
         document_title: str = "",
         source: str = "",
     ) -> bool:
-        """Index a chunk."""
+        """Index a chunk.  Idempotent by chunk id (upsert semantics).
+
+        Returns ``True`` if new data was written, ``False`` if the chunk
+        was already indexed with identical content.  Re-indexing with
+        updated content replaces the previous entry.
+        """
         ...
 
     async def text_search(self, query: str, *, limit: int = 10) -> list[SearchResult]:

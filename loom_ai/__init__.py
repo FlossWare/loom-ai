@@ -53,6 +53,7 @@ from loom_ai.models import (
 from loom_ai.protocols import (
     EmbeddingBackend,
     GraphBackend,
+    IdempotentStore,
     LLMBackend,
     QueueBackend,
     ResourceProvider,
@@ -89,6 +90,7 @@ __all__ = [
     "NoopTaskRunner",
     "EmbeddingBackend",
     "GraphBackend",
+    "IdempotentStore",
     "LLMBackend",
     "QueueBackend",
     "ResourceProvider",
