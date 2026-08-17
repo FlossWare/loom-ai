@@ -202,6 +202,21 @@ class MemoryStorageBackend:
     async def store_embeddings(self, embeddings: list[Embedding]) -> int:
         stored = 0
         for emb in embeddings:
+            # When an embedding ID is reused for a different chunk, remove
+            # the old chunk_id marker so get_pending_chunks() no longer
+            # incorrectly skips it.  (#250)
+            existing = self._embeddings.get(emb.id)
+            if existing is not None and existing.chunk_id != emb.chunk_id:
+                # Only discard the old marker when no *other* embedding
+                # still references that chunk.
+                old_cid = existing.chunk_id
+                still_referenced = any(
+                    e.chunk_id == old_cid
+                    for eid, e in self._embeddings.items()
+                    if eid != emb.id
+                )
+                if not still_referenced:
+                    self._embedded_chunk_ids.discard(old_cid)
             self._embeddings[emb.id] = emb
             self._embedded_chunk_ids.add(emb.chunk_id)
             stored += 1

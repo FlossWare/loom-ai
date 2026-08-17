@@ -163,6 +163,50 @@ async def test_store_embeddings_upsert_replaces_vector():
     assert await storage.count_embeddings() == 1
 
 
+async def test_store_embeddings_reuse_id_clears_stale_chunk_marker():
+    """Reusing an embedding ID for a different chunk clears the old marker.
+
+    Regression test for #250: when an embedding ID is reassigned to a new
+    chunk_id, the old chunk_id must be removed from ``_embedded_chunk_ids``
+    so that ``get_pending_chunks()`` correctly returns the now-unembedded
+    old chunk.
+    """
+    storage = MemoryStorageBackend()
+
+    # Set up two chunks under a document.
+    doc = Document(id="d-1", title="T", content="C", url="", category="test")
+    chunk_a = Chunk(id="c-a", document_id="d-1", content="alpha", chunk_index=0)
+    chunk_b = Chunk(id="c-b", document_id="d-1", content="beta", chunk_index=1)
+    await storage.store_document(doc)
+    await storage.store_chunks("d-1", [chunk_a, chunk_b])
+
+    # Embed both chunks.
+    emb_a = Embedding(
+        id="e-1", chunk_id="c-a", vector=[0.1], model="m", provider="p", dimensions=1
+    )
+    emb_b = Embedding(
+        id="e-2", chunk_id="c-b", vector=[0.2], model="m", provider="p", dimensions=1
+    )
+    await storage.store_embeddings([emb_a, emb_b])
+
+    # Both chunks are embedded -- no pending chunks.
+    assert await storage.get_pending_chunks(10) == []
+
+    # Reassign embedding "e-1" from chunk "c-a" to chunk "c-b".
+    emb_reassigned = Embedding(
+        id="e-1", chunk_id="c-b", vector=[0.3], model="m", provider="p", dimensions=1
+    )
+    await storage.store_embeddings([emb_reassigned])
+
+    # chunk "c-a" is no longer covered by any embedding, so it must
+    # reappear as pending.
+    pending = await storage.get_pending_chunks(10)
+    pending_ids = [c.id for c in pending]
+    assert "c-a" in pending_ids, (
+        "Old chunk should be pending after its embedding was reassigned"
+    )
+
+
 # ── SearchBackend.index ──────────────────────────────────────────────
 
 
