@@ -299,8 +299,9 @@ class MemoryQueueBackend:
         with self._lock:
             self._ensure_queue(queue_name)
             return {
-                "queued": len(self._queues[queue_name]),
+                "pending": len(self._queues[queue_name]),
                 "processing": len(self._processing[queue_name]),
+                "dead_letter": 0,
             }
 
     async def list_queues(self) -> list[str]:
