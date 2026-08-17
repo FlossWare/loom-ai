@@ -136,6 +136,14 @@ class InMemoryKnowledgeGraph:
         """Persist a relationship and return its id."""
         rid = relationship.id or str(uuid.uuid4())
         relationship.id = rid
+
+        # If the ID already exists, remove stale adjacency entries so
+        # neighbour traversal does not follow the edge from wrong nodes.
+        old = self._relationships.get(rid)
+        if old is not None:
+            self._outgoing.get(old.source_id, set()).discard(rid)
+            self._incoming.get(old.target_id, set()).discard(rid)
+
         self._relationships[rid] = relationship
 
         self._outgoing.setdefault(relationship.source_id, set()).add(rid)
