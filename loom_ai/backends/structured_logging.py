@@ -19,7 +19,7 @@ import uuid
 from typing import TYPE_CHECKING
 
 if TYPE_CHECKING:
-    pass
+    pass  # NOSONAR — reserved for future protocol type imports
 
 
 class _JsonFormatter(logging.Formatter):
@@ -86,7 +86,7 @@ class StructuredLoggingObservability:
 
     # -- ObservabilityBackend protocol ------------------------------------
 
-    async def record_metric(
+    async def record_metric(  # NOSONAR — async required by ObservabilityBackend protocol
         self, name: str, value: float, *, labels: dict | None = None
     ) -> None:
         """Record a numeric metric data point."""
@@ -105,7 +105,7 @@ class StructuredLoggingObservability:
             extra={"_structured_extra": entry},
         )
 
-    async def log_event(
+    async def log_event(  # NOSONAR — async required by ObservabilityBackend protocol
         self,
         event: str,
         *,
@@ -129,7 +129,7 @@ class StructuredLoggingObservability:
             extra={"_structured_extra": entry},
         )
 
-    async def start_span(self, name: str, *, parent: str | None = None) -> str:
+    async def start_span(self, name: str, *, parent: str | None = None) -> str:  # NOSONAR — async required by ObservabilityBackend protocol
         """Begin a tracing span and return its span id."""
         span_id = uuid.uuid4().hex
         self._spans[span_id] = {
@@ -154,7 +154,7 @@ class StructuredLoggingObservability:
         )
         return span_id
 
-    async def end_span(self, span_id: str, *, status: str = "ok") -> None:
+    async def end_span(self, span_id: str, *, status: str = "ok") -> None:  # NOSONAR — async required by ObservabilityBackend protocol
         """Close a tracing span."""
         if span_id not in self._spans:
             raise KeyError(f"Unknown span id: {span_id}")

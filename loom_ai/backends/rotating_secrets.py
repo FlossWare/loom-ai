@@ -88,27 +88,25 @@ class RotatingSecretsBackend:
 
     # -- SecretsBackend interface --------------------------------------------
 
+    def _validate(self, name: str, value: str) -> bool:
+        if self._is_expired(name):
+            return False
+        if self._validator and not self._validator(name, value):
+            return False
+        return True
+
     async def get(self, name: str) -> str | None:
         if name in self._rotated:
-            if self._is_expired(name):
-                return None
             value = self._rotated[name]
-            if self._validator and not self._validator(name, value):
-                return None
-            return value
+            return value if self._validate(name, value) else None
 
         for backend in self._backends:
             try:
                 value = await backend.get(name)
             except Exception:
                 continue
-            if value is None:
-                continue
-            if self._is_expired(name):
-                return None
-            if self._validator and not self._validator(name, value):
-                continue
-            return value
+            if value is not None and self._validate(name, value):
+                return value
 
         return None
 

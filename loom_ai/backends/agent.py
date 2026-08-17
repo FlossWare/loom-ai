@@ -129,7 +129,7 @@ class InMemoryAgentLoop:
         self._turns.setdefault(agent_id, []).append(turn)
         return turn
 
-    async def pause(self, agent_id: str) -> AgentCheckpoint:
+    async def pause(self, agent_id: str) -> AgentCheckpoint:  # NOSONAR — async required by AgentLoop protocol
         state = self._ensure_state(agent_id)
         state.status = "paused"
 
@@ -148,7 +148,7 @@ class InMemoryAgentLoop:
             created_at=datetime.now(timezone.utc).isoformat(),
         )
 
-    async def resume(self, checkpoint: AgentCheckpoint) -> AgentState:
+    async def resume(self, checkpoint: AgentCheckpoint) -> AgentState:  # NOSONAR — async required by AgentLoop protocol
         agent_id = checkpoint.agent_id
         if checkpoint.state is not None:
             restored = AgentState(
@@ -165,7 +165,7 @@ class InMemoryAgentLoop:
         self._states[agent_id] = restored
         return restored
 
-    async def cancel(self, agent_id: str) -> bool:
+    async def cancel(self, agent_id: str) -> bool:  # NOSONAR — async required by AgentLoop protocol
         if agent_id not in self._states:
             return False
         state = self._states[agent_id]
@@ -174,10 +174,10 @@ class InMemoryAgentLoop:
         state.status = "cancelled"
         return True
 
-    async def state(self, agent_id: str) -> AgentState:
+    async def state(self, agent_id: str) -> AgentState:  # NOSONAR — async required by AgentLoop protocol
         return self._ensure_state(agent_id)
 
-    async def register_operation(self, operation: AgentOperation) -> None:
+    async def register_operation(self, operation: AgentOperation) -> None:  # NOSONAR — async required by AgentLoop protocol
         for agent_id, ops in self._operations.items():
             for i, existing in enumerate(ops):
                 if existing.name == operation.name:
@@ -185,8 +185,7 @@ class InMemoryAgentLoop:
                     return
         self._global_operations.append(operation)
 
-    async def list_operations(self, agent_id: str) -> list[AgentOperation]:
-        _ = agent_id
+    async def list_operations(self, agent_id: str) -> list[AgentOperation]:  # NOSONAR — async required by AgentLoop protocol
         return list(self._operations.get(agent_id, []))
 
     # -- Tool management (not part of AgentLoop protocol) ----------------------
@@ -199,7 +198,7 @@ class InMemoryAgentLoop:
         """Return all registered tool definitions."""
         return list(self._registered_tools.values())
 
-    async def select_tools(
+    async def select_tools(  # NOSONAR — async required by ToolProvider protocol
         self, *, names: list[str] | None = None
     ) -> list[ToolDefinition]:
         """Select tools by name, or return all if *names* is ``None``."""
