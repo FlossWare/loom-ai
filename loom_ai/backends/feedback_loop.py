@@ -11,6 +11,7 @@ SimpleFeedbackLoopDetector -- in-memory feedback-loop detector
 
 from __future__ import annotations
 
+import time
 from collections import Counter
 from datetime import datetime, timezone
 from typing import Any, Callable
@@ -72,7 +73,9 @@ class SimpleFeedbackLoopDetector:
         role:
             Role the model played: ``"generator"``, ``"evaluator"``, etc.
         """
-        self._usage_data.append({"model": model, "role": role})
+        self._usage_data.append(
+            {"model": model, "role": role, "timestamp": time.time()}
+        )
 
     # ── protocol methods ────────────────────────────────────────────────
 
@@ -92,7 +95,12 @@ class SimpleFeedbackLoopDetector:
             if fetched:
                 self._usage_data = list(fetched)
 
-        data = self._usage_data
+        cutoff = time.time() - window_days * 86400
+        data = [
+            entry
+            for entry in self._usage_data
+            if entry.get("timestamp") is None or entry["timestamp"] >= cutoff
+        ]
         risks: list[FeedbackLoopRisk] = []
 
         risks.extend(self._check_model_dominance(data))

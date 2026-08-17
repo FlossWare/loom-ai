@@ -1,5 +1,7 @@
 """Tests for the SimpleFeedbackLoopDetector backend."""
 
+import time
+
 from loom_ai.backends.feedback_loop import SimpleFeedbackLoopDetector
 from loom_ai.contracts_phase3 import FeedbackLoopDetector
 from loom_ai.models_phase3 import FeedbackLoopReport
@@ -145,3 +147,70 @@ async def test_concept_collapse_placeholder():
     report = await detector.analyze()
     collapse_risks = [r for r in report.risks if r.layer == "concept_collapse"]
     assert len(collapse_risks) == 0
+
+
+async def test_window_days_excludes_old_entries():
+    """Entries older than the window are excluded from analysis."""
+    now = time.time()
+    old_entries = [
+        {"model": "gpt-4o", "role": "generator", "timestamp": now - 86400 * 10}
+    ] * 8
+    recent_entries = [
+        {"model": "claude-opus", "role": "generator", "timestamp": now - 86400},
+        {"model": "gemini-pro", "role": "generator", "timestamp": now - 86400},
+    ]
+    # Old entries would cause dominance (8/10) but are outside 7-day window
+    detector = SimpleFeedbackLoopDetector(usage_data=old_entries + recent_entries)
+    report = await detector.analyze(window_days=7)
+    dominance_risks = [r for r in report.risks if r.layer == "model_dominance"]
+    assert len(dominance_risks) == 0
+
+
+async def test_window_days_includes_recent_entries():
+    """Entries within the window are included in analysis."""
+    now = time.time()
+    data = [
+        {"model": "gpt-4o", "role": "generator", "timestamp": now - 86400}
+    ] * 8 + [
+        {"model": "claude-opus", "role": "generator", "timestamp": now - 86400},
+        {"model": "gemini-pro", "role": "generator", "timestamp": now - 86400},
+    ]
+    detector = SimpleFeedbackLoopDetector(usage_data=data)
+    report = await detector.analyze(window_days=7)
+    dominance_risks = [r for r in report.risks if r.layer == "model_dominance"]
+    assert len(dominance_risks) == 1
+    assert dominance_risks[0].metric_value == 0.8
+
+
+async def test_window_days_includes_entries_without_timestamp():
+    """Entries without timestamps are included for backward compatibility."""
+    now = time.time()
+    legacy_entries = [{"model": "gpt-4o", "role": "generator"}] * 8
+    recent_entries = [
+        {"model": "claude-opus", "role": "generator", "timestamp": now - 86400},
+        {"model": "gemini-pro", "role": "generator", "timestamp": now - 86400},
+    ]
+    detector = SimpleFeedbackLoopDetector(
+        usage_data=legacy_entries + recent_entries
+    )
+    report = await detector.analyze(window_days=7)
+    dominance_risks = [r for r in report.risks if r.layer == "model_dominance"]
+    assert len(dominance_risks) == 1
+
+
+async def test_window_days_default_filters_correctly():
+    """Default window_days=7 filters out entries older than 7 days."""
+    now = time.time()
+    # 8 old entries (8 days ago) + 2 recent => no dominance
+    old_data = [
+        {"model": "gpt-4o", "role": "generator", "timestamp": now - 86400 * 8}
+    ] * 8
+    recent_data = [
+        {"model": "claude-opus", "role": "generator", "timestamp": now},
+        {"model": "gemini-pro", "role": "generator", "timestamp": now},
+    ]
+    detector = SimpleFeedbackLoopDetector(usage_data=old_data + recent_data)
+    report = await detector.analyze()
+    assert report.window_days == 7
+    dominance_risks = [r for r in report.risks if r.layer == "model_dominance"]
+    assert len(dominance_risks) == 0
