@@ -1,6 +1,5 @@
 """Tests for loom_ai.backends.adversarial."""
 
-
 import pytest
 
 from loom_ai.backends.adversarial import (

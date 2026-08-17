@@ -278,8 +278,7 @@ class RedisQueueBackend:
         def _sync() -> list[dict]:
             raw_items = self._redis.lrange(self._dlq_key(queue_name), 0, -1)
             return [
-                json.loads(r.decode() if isinstance(r, bytes) else r)
-                for r in raw_items
+                json.loads(r.decode() if isinstance(r, bytes) else r) for r in raw_items
             ]
 
         return await asyncio.to_thread(_sync)
@@ -299,9 +298,7 @@ class RedisQueueBackend:
             )
             reclaimed = 0
             for raw_id in expired:
-                item_id = (
-                    raw_id.decode() if isinstance(raw_id, bytes) else str(raw_id)
-                )
+                item_id = raw_id.decode() if isinstance(raw_id, bytes) else str(raw_id)
                 key = self._item_key(queue_name, item_id)
                 meta = self._decode_hash(self._redis.hgetall(key))
                 retry_count = int(meta.get("retry_count", 0)) + 1
@@ -318,9 +315,7 @@ class RedisQueueBackend:
                             "worker_id": "",
                         },
                     )
-                    self._redis.zadd(
-                        self._pending_key(queue_name), {item_id: priority}
-                    )
+                    self._redis.zadd(self._pending_key(queue_name), {item_id: priority})
                 self._redis.zrem(self._processing_key(queue_name), item_id)
                 reclaimed += 1
             return reclaimed
@@ -329,9 +324,7 @@ class RedisQueueBackend:
 
     # -- Dead-letter handling --------------------------------------------
 
-    def _dead_letter_sync(
-        self, queue_name: str, item_id: str, meta: dict
-    ) -> None:
+    def _dead_letter_sync(self, queue_name: str, item_id: str, meta: dict) -> None:
         """Move an item to the dead-letter queue (synchronous helper).
 
         Called from within ``asyncio.to_thread`` blocks so all Redis I/O
