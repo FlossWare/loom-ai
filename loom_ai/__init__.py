@@ -7,10 +7,11 @@ MCP tool/resource contracts for a clean public API.
 
 Quick start::
 
+    import asyncio
     from loom_ai import LoomConfig
 
     # Zero-config: all in-memory / no-op backends
-    cfg = LoomConfig.from_env()
+    cfg = asyncio.run(LoomConfig.from_env())
 
     # Or inject your own backends
     cfg = LoomConfig(

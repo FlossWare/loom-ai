@@ -196,19 +196,19 @@ async def test_list_resources_empty():
     assert resources == []
 
 
-def test_loom_config_defaults_mcp_none():
+async def test_loom_config_defaults_mcp_none():
     from loom_ai import LoomConfig
 
-    cfg = LoomConfig.from_env()
+    cfg = await LoomConfig.from_env()
     assert cfg.tools is None
     assert cfg.resources is None
 
 
-def test_loom_config_mcp_memory(monkeypatch: pytest.MonkeyPatch):
+async def test_loom_config_mcp_memory(monkeypatch: pytest.MonkeyPatch):
     from loom_ai import LoomConfig
 
     monkeypatch.setenv("LOOM_TOOLS", "memory")
     monkeypatch.setenv("LOOM_RESOURCES", "memory")
-    cfg = LoomConfig.from_env()
+    cfg = await LoomConfig.from_env()
     assert isinstance(cfg.tools, ToolProvider)
     assert isinstance(cfg.resources, ResourceProvider)

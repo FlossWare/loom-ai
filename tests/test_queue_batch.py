@@ -11,7 +11,7 @@ from loom_ai import LoomConfig, QueueItem
 
 async def test_batch_enqueue_generates_unique_ids():
     """Items enqueued without explicit IDs must each get a distinct ID."""
-    cfg = LoomConfig.from_env()
+    cfg = await LoomConfig.from_env()
 
     # Simulate the server's ID-generation logic (post-fix) for items
     # without explicit IDs.
@@ -47,7 +47,7 @@ async def test_new_id_scheme_produces_unique_ids():
 
 async def test_batch_items_all_completable():
     """Every batch-enqueued item must be independently completable."""
-    cfg = LoomConfig.from_env()
+    cfg = await LoomConfig.from_env()
 
     ts = int(time.time() * 1000)
     items = [QueueItem(id=f"q-{ts}-{i}", payload={"v": i}) for i in range(5)]
@@ -65,7 +65,7 @@ async def test_batch_items_all_completable():
 
 async def test_duplicate_ids_cause_processing_overwrite():
     """With duplicate IDs, fetched items overwrite each other in _processing."""
-    cfg = LoomConfig.from_env()
+    cfg = await LoomConfig.from_env()
 
     # Enqueue 3 items with the SAME ID (the old bug)
     items = [QueueItem(id="same-id", payload={"index": i}) for i in range(3)]
@@ -87,7 +87,7 @@ async def test_duplicate_ids_cause_processing_overwrite():
 
 async def test_explicit_ids_preserved():
     """When items supply their own IDs, those IDs must be used as-is."""
-    cfg = LoomConfig.from_env()
+    cfg = await LoomConfig.from_env()
     items = [
         QueueItem(id="my-1", payload={"task": "x"}),
         QueueItem(id="my-2", payload={"task": "y"}),

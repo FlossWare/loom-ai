@@ -28,8 +28,8 @@ def test_version_xy_format():
     assert re.match(r"^\d+\.\d+$", loom_ai.__version__)
 
 
-def test_from_env_defaults():
-    cfg = LoomConfig.from_env()
+async def test_from_env_defaults():
+    cfg = await LoomConfig.from_env()
     assert isinstance(cfg.storage, StorageBackend)
     assert isinstance(cfg.queue, QueueBackend)
     assert isinstance(cfg.secrets, SecretsBackend)
@@ -40,7 +40,7 @@ def test_from_env_defaults():
 
 
 async def test_memory_storage_roundtrip():
-    cfg = LoomConfig.from_env()
+    cfg = await LoomConfig.from_env()
     doc = Document(
         id="test-1",
         title="Test Doc",
@@ -60,7 +60,7 @@ async def test_memory_storage_roundtrip():
 
 
 async def test_memory_queue_roundtrip():
-    cfg = LoomConfig.from_env()
+    cfg = await LoomConfig.from_env()
     item = QueueItem(id="q-1", payload={"task": "embed"})
     await cfg.queue.enqueue("test-queue", [item])
 
@@ -80,21 +80,21 @@ async def test_env_secrets():
     import os
 
     os.environ["LOOM_TEST_KEY"] = "secret-value"
-    cfg = LoomConfig.from_env()
+    cfg = await LoomConfig.from_env()
     val = await cfg.secrets.get("LOOM_TEST_KEY")
     assert val == "secret-value"
     del os.environ["LOOM_TEST_KEY"]
 
 
 async def test_noop_embedding():
-    cfg = LoomConfig.from_env()
+    cfg = await LoomConfig.from_env()
     vectors = await cfg.embedding.embed(["hello", "world"])
     assert len(vectors) == 2
     assert all(len(v) > 0 for v in vectors)
 
 
 async def test_memory_search():
-    cfg = LoomConfig.from_env()
+    cfg = await LoomConfig.from_env()
     await cfg.search.index(
         Chunk(
             id="c-1",
@@ -112,7 +112,7 @@ async def test_memory_search():
 
 async def test_store_chunks_no_duplicates_on_re_store():
     """Re-storing chunks must not duplicate secondary index entries (#41)."""
-    cfg = LoomConfig.from_env()
+    cfg = await LoomConfig.from_env()
     doc = Document(id="dup-doc", title="Dup", content="body", url="", category="test")
     await cfg.storage.store_document(doc)
 
@@ -144,7 +144,7 @@ async def test_store_chunks_no_duplicates_on_re_store():
 
 async def test_store_chunks_updates_content_on_re_store():
     """Re-storing a chunk with updated content must replace the old entry."""
-    cfg = LoomConfig.from_env()
+    cfg = await LoomConfig.from_env()
     doc = Document(id="upd-doc", title="Upd", content="body", url="", category="test")
     await cfg.storage.store_document(doc)
 
@@ -214,7 +214,7 @@ def test_dataclass_construction():
 
 async def test_batch_enqueue_unique_ids():
     """Batch-enqueued items must have unique IDs so no data is lost on fetch."""
-    cfg = LoomConfig.from_env()
+    cfg = await LoomConfig.from_env()
     items = [QueueItem(id=f"batch-{i}", payload={"index": i}) for i in range(5)]
     count = await cfg.queue.enqueue("batch-queue", items)
     assert count == 5
@@ -227,7 +227,7 @@ async def test_batch_enqueue_unique_ids():
 
 async def test_batch_enqueue_no_overwrite_in_processing():
     """Unique IDs prevent items from overwriting each other in _processing."""
-    cfg = LoomConfig.from_env()
+    cfg = await LoomConfig.from_env()
     items = [QueueItem(id=f"dup-test-{i}", payload={"value": i}) for i in range(3)]
     await cfg.queue.enqueue("overwrite-queue", items)
 

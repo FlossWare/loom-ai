@@ -7,6 +7,8 @@ Valid requests are also tested to confirm they still succeed (200).
 
 from __future__ import annotations
 
+import asyncio
+
 from fastapi.testclient import TestClient
 
 from loom_ai.config import LoomConfig
@@ -20,7 +22,7 @@ def _make_client(monkeypatch) -> TestClient:
     monkeypatch.setenv("LOOM_TOOLS", "memory")
     monkeypatch.setenv("LOOM_RESOURCES", "memory")
     monkeypatch.delenv("LOOM_LLM_BASE_URL", raising=False)
-    cfg = LoomConfig.from_env()
+    cfg = asyncio.run(LoomConfig.from_env())
     return TestClient(create_app(cfg))
 
 

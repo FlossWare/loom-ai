@@ -6,6 +6,8 @@ required field and asserts the response is 422 with a descriptive error body.
 
 from __future__ import annotations
 
+import asyncio
+
 from fastapi.testclient import TestClient
 
 from loom_ai.config import LoomConfig
@@ -20,7 +22,7 @@ def _make_client(monkeypatch) -> TestClient:
     monkeypatch.setenv("LOOM_RESOURCES", "memory")
     # LLM + consensus require a base URL; skip — tested separately.
     monkeypatch.delenv("LOOM_LLM_BASE_URL", raising=False)
-    cfg = LoomConfig.from_env()
+    cfg = asyncio.run(LoomConfig.from_env())
     return TestClient(create_app(cfg))
 
 
@@ -222,7 +224,7 @@ def _make_llm_client(monkeypatch) -> TestClient:
     monkeypatch.setenv("LOOM_RESOURCES", "memory")
     monkeypatch.setenv("LOOM_LLM_BASE_URL", "http://fake:1234")
     monkeypatch.setenv("LOOM_LLM_API_KEY", "fake-key")
-    cfg = LoomConfig.from_env()
+    cfg = asyncio.run(LoomConfig.from_env())
     return TestClient(create_app(cfg))
 
 

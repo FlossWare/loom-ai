@@ -1,5 +1,7 @@
 """Tests for server authentication middleware."""
 
+import asyncio
+
 from fastapi.testclient import TestClient
 
 
@@ -11,7 +13,7 @@ def _make_app(monkeypatch, api_key=None):
     from loom_ai.config import LoomConfig
     from loom_ai.server import create_app
 
-    return create_app(LoomConfig.from_env())
+    return create_app(asyncio.run(LoomConfig.from_env()))
 
 
 def test_health_no_auth_required(monkeypatch):
