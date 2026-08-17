@@ -40,7 +40,7 @@ def _patch_user_agent(backend: HttpLLMBackend) -> HttpLLMBackend:
 SIMPLE_PROMPT = [ChatMessage(role="user", content="Say hello in one word.")]
 
 
-@pytest.fixture()
+@pytest.fixture
 def mistral_backend() -> HttpLLMBackend:
     return HttpLLMBackend(
         base_url="https://api.mistral.ai/v1",
@@ -50,7 +50,7 @@ def mistral_backend() -> HttpLLMBackend:
     )
 
 
-@pytest.fixture()
+@pytest.fixture
 def google_backend() -> HttpLLMBackend:
     return HttpLLMBackend(
         base_url="https://generativelanguage.googleapis.com/v1beta/openai",
@@ -60,7 +60,7 @@ def google_backend() -> HttpLLMBackend:
     )
 
 
-@pytest.fixture()
+@pytest.fixture
 def groq_backend() -> HttpLLMBackend:
     backend = HttpLLMBackend(
         base_url="https://api.groq.com/openai/v1",

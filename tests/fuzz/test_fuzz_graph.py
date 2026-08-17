@@ -11,7 +11,7 @@ from __future__ import annotations
 import asyncio
 
 import pytest
-from hypothesis import given, settings
+from hypothesis import assume, given, settings
 from hypothesis import strategies as st
 
 from loom_ai.backends.memory import MemoryGraphBackend
@@ -94,8 +94,7 @@ class TestGraphFuzz:
     )
     @settings(max_examples=50, deadline=None)
     def test_add_edge_between_fuzz_nodes(self, n1_id, n2_id, edge_id, edge_label):
-        if n1_id == n2_id:
-            return
+        assume(n1_id != n2_id)
         backend = MemoryGraphBackend()
         _run(backend.add_node(GraphNode(id=n1_id, label="A", properties={})))
         _run(backend.add_node(GraphNode(id=n2_id, label="B", properties={})))
@@ -118,7 +117,7 @@ class TestGraphFuzz:
         edge = GraphEdge(
             id=edge_id, source="no-such-node", target="target", label=edge_label
         )
-        with pytest.raises(ValueError):
+        with pytest.raises(ValueError):  # NOSONAR — single invocation: _run is a sync wrapper
             _run(backend.add_edge(edge))
 
     @given(node_id=FUZZ_ID)

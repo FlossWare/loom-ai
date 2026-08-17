@@ -96,6 +96,18 @@ class RetryPolicy:
         return min(raw, self.backoff_cap)
 
 
+async def _record_outcome(
+    resilience: ResiliencePolicy | None,
+    provider: str,
+    t0: float,
+    *,
+    success: bool,
+) -> None:
+    if resilience is not None:
+        elapsed_ms = (time.monotonic() - t0) * 1000
+        await resilience.record_outcome(provider, success=success, latency_ms=elapsed_ms)
+
+
 def async_retry(
     policy: RetryPolicy | None = None,
     *,
@@ -134,21 +146,13 @@ def async_retry(
             for attempt in range(policy.max_retries + 1):
                 try:
                     result = await fn(*args, **kwargs)
-                    if resilience is not None:
-                        elapsed_ms = (time.monotonic() - t0) * 1000
-                        await resilience.record_outcome(
-                            provider, success=True, latency_ms=elapsed_ms
-                        )
+                    await _record_outcome(resilience, provider, t0, success=True)
                     return result
                 except Exception as exc:
                     last_exc = exc
 
                     if not policy.is_retryable(exc):
-                        if resilience is not None:
-                            elapsed_ms = (time.monotonic() - t0) * 1000
-                            await resilience.record_outcome(
-                                provider, success=False, latency_ms=elapsed_ms
-                            )
+                        await _record_outcome(resilience, provider, t0, success=False)
                         raise
 
                     logger.warning(
@@ -160,16 +164,11 @@ def async_retry(
                     )
 
                     if attempt < policy.max_retries:
-                        delay = policy.delay(attempt)
-                        await asyncio.sleep(delay)
+                        await asyncio.sleep(policy.delay(attempt))
 
-            if resilience is not None:
-                elapsed_ms = (time.monotonic() - t0) * 1000
-                await resilience.record_outcome(
-                    provider, success=False, latency_ms=elapsed_ms
-                )
+            await _record_outcome(resilience, provider, t0, success=False)
 
-            assert last_exc is not None  # guaranteed by loop executing at least once
+            assert last_exc is not None
             raise RetriesExhaustedError(
                 f"{fn.__qualname__} failed after {policy.max_retries + 1} attempts",
                 attempts=policy.max_retries + 1,
