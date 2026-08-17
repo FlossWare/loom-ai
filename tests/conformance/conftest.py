@@ -7,6 +7,8 @@ same conformance suite against a PostgreSQL, Redis, or other backend.
 
 from __future__ import annotations
 
+from typing import AsyncIterator
+
 import pytest
 
 from loom_ai import LoomConfig
@@ -18,6 +20,56 @@ from loom_ai.backends.memory import (
     MemoryStorageBackend,
     NoopEmbeddingBackend,
 )
+from loom_ai.backends.memory_mcp import MemoryResourceProvider, MemoryToolProvider
+from loom_ai.execution import NoopTaskRunner
+from loom_ai.models import (
+    ChatMessage,
+    ChatResponse,
+    ResourceDefinition,
+    ToolDefinition,
+)
+
+# ── Stub LLM backend (no network required) ──────────────────────────────
+
+
+class StubLLMBackend:
+    """Minimal in-memory LLM backend for conformance testing.
+
+    Returns a fixed response for ``chat()``, yields a single delta for
+    ``chat_stream()``, and exposes one pseudo-model via ``list_models()``.
+    No network calls are made.
+    """
+
+    async def chat(
+        self,
+        messages: list[ChatMessage],
+        *,
+        model: str | None = None,
+        temperature: float = 0.7,
+        max_tokens: int | None = None,
+    ) -> ChatResponse:
+        return ChatResponse(
+            content="stub response",
+            model=model or "stub-model",
+            provider="stub",
+        )
+
+    async def chat_stream(
+        self,
+        messages: list[ChatMessage],
+        *,
+        model: str | None = None,
+        temperature: float = 0.7,
+        max_tokens: int | None = None,
+    ) -> AsyncIterator[str]:
+        yield "stub"
+        yield " response"
+
+    async def list_models(self) -> list[str]:
+        return ["stub-model"]
+
+
+# ── Fixtures ─────────────────────────────────────────────────────────────
 
 
 @pytest.fixture
@@ -54,6 +106,57 @@ def search_backend() -> MemorySearchBackend:
 def graph_backend() -> MemoryGraphBackend:
     """Fresh in-memory graph backend for each test."""
     return MemoryGraphBackend()
+
+
+@pytest.fixture
+def llm_backend() -> StubLLMBackend:
+    """Fresh stub LLM backend for each test."""
+    return StubLLMBackend()
+
+
+@pytest.fixture
+def tool_provider() -> MemoryToolProvider:
+    """Fresh in-memory tool provider with one registered tool."""
+    provider = MemoryToolProvider()
+
+    async def _echo(**kwargs: object) -> dict:
+        return {"echo": kwargs}
+
+    provider.register(
+        ToolDefinition(
+            name="echo",
+            description="Echoes back the input arguments.",
+            input_schema={
+                "type": "object",
+                "properties": {"message": {"type": "string"}},
+                "required": ["message"],
+            },
+        ),
+        _echo,
+    )
+    return provider
+
+
+@pytest.fixture
+def resource_provider() -> MemoryResourceProvider:
+    """Fresh in-memory resource provider with one registered resource."""
+    provider = MemoryResourceProvider()
+    provider.register(
+        ResourceDefinition(
+            uri="loom://test/greeting",
+            name="greeting",
+            description="A test greeting resource.",
+            mime_type="text/plain",
+        ),
+        "Hello, Loom!",
+    )
+    return provider
+
+
+@pytest.fixture
+def task_runner() -> NoopTaskRunner:
+    """Fresh noop task runner for each test."""
+    return NoopTaskRunner()
 
 
 @pytest.fixture
