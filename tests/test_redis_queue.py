@@ -2,6 +2,7 @@
 
 import time
 from collections import defaultdict
+from unittest.mock import MagicMock, patch
 
 import pytest
 
@@ -371,3 +372,63 @@ def test_decode_hash_strings():
     raw = {"key": "value"}
     decoded = RedisQueueBackend._decode_hash(raw)
     assert decoded == {"key": "value"}
+
+
+# -- Import path (issue #245) ------------------------------------------------
+
+
+def test_config_imports_from_redis_queue_module():
+    """Verify that config._build_queue imports from the correct module path."""
+    import ast
+    import inspect
+    import textwrap
+
+    from loom_ai.config import LoomConfig
+
+    source = textwrap.dedent(inspect.getsource(LoomConfig._build_queue))
+    tree = ast.parse(source)
+    imports = [
+        node
+        for node in ast.walk(tree)
+        if isinstance(node, ast.ImportFrom)
+    ]
+    redis_import = [
+        imp for imp in imports if imp.module and "redis" in imp.module
+    ]
+    assert len(redis_import) == 1
+    assert redis_import[0].module == "loom_ai.backends.redis_queue"
+
+
+# -- from_env() (issue #245) -------------------------------------------------
+
+
+def test_from_env_reads_loom_redis_url(monkeypatch):
+    """RedisQueueBackend.from_env() reads LOOM_REDIS_URL and builds a client."""
+    mock_client = MagicMock()
+    mock_redis_mod = MagicMock()
+    mock_redis_mod.Redis.from_url.return_value = mock_client
+
+    monkeypatch.setenv("LOOM_REDIS_URL", "redis://myhost:6380/2")
+
+    with patch("loom_ai.backends.redis_queue._redis_lib", mock_redis_mod):
+        backend = RedisQueueBackend.from_env()
+
+    mock_redis_mod.Redis.from_url.assert_called_once_with("redis://myhost:6380/2")
+    assert backend._redis is mock_client
+
+
+def test_from_env_uses_default_url(monkeypatch):
+    """RedisQueueBackend.from_env() falls back to localhost when env var unset."""
+    monkeypatch.delenv("LOOM_REDIS_URL", raising=False)
+
+    mock_client = MagicMock()
+    mock_redis_mod = MagicMock()
+    mock_redis_mod.Redis.from_url.return_value = mock_client
+
+    with patch("loom_ai.backends.redis_queue._redis_lib", mock_redis_mod):
+        backend = RedisQueueBackend.from_env()
+
+    mock_redis_mod.Redis.from_url.assert_called_once_with(
+        "redis://localhost:6379/0"
+    )
+    assert isinstance(backend, RedisQueueBackend)

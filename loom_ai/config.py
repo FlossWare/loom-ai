@@ -140,7 +140,7 @@ class LoomConfig:
             return MemoryQueueBackend()
         if kind == "redis":
             try:
-                from loom_ai.backends.redis import (
+                from loom_ai.backends.redis_queue import (
                     RedisQueueBackend,  # type: ignore[import-not-found]
                 )
             except ImportError as exc:

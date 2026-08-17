@@ -22,6 +22,7 @@ from __future__ import annotations
 
 import asyncio
 import json
+import os
 import time
 import uuid
 
@@ -70,6 +71,21 @@ class RedisQueueBackend:
         self._max_retries = max_retries
         self._backoff_base = backoff_base
         self._prefix = key_prefix
+
+    # -- Factory ---------------------------------------------------------
+
+    @classmethod
+    def from_env(cls) -> RedisQueueBackend:
+        """Build a RedisQueueBackend from environment variables.
+
+        Environment variables
+        ---------------------
+        LOOM_REDIS_URL : str
+            Redis connection URL (default ``redis://localhost:6379/0``).
+        """
+        url = os.environ.get("LOOM_REDIS_URL", "redis://localhost:6379/0")
+        client = _redis_lib.Redis.from_url(url)  # type: ignore[union-attr]
+        return cls(client)
 
     # -- Key helpers -----------------------------------------------------
 
