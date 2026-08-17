@@ -353,6 +353,21 @@ async def test_no_retries():
     assert len(backend.calls) == 1
 
 
+async def test_tools_kwarg_accepted():
+    """Passing tools=[...] reaches the parameter instead of being swallowed by **kwargs."""
+    data = {"result": "ok"}
+    backend = MockLLMBackend(responses=[json.dumps(data)])
+    structured = StructuredOutputBackend(backend)
+
+    result = await structured.chat_structured(
+        [ChatMessage(role="user", content="Check")],
+        tools=[{"type": "function"}],
+    )
+
+    assert result.parsed == data
+    assert result.schema_valid is True
+
+
 async def test_satisfies_protocol():
     """StructuredOutputBackend satisfies StructuredOutputMixin protocol."""
     from loom_ai.contracts_phase1 import StructuredOutputMixin
