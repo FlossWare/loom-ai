@@ -8,13 +8,32 @@ Security model:
     - When LOOM_API_KEY is unset, the server is intentionally unauthenticated.
       This is safe only when bound to localhost or behind a reverse proxy /
       network policy. Do not bind to 0.0.0.0 without setting LOOM_API_KEY.
-    - When LOOM_API_KEY is set, all routes except /health require a valid
-      Bearer token. /health is always unauthenticated for probe compatibility.
+    - When LOOM_API_KEY is set, all routes except /health and /ready require
+      a valid Bearer token.
     - Missing Authorization header: 403 (from HTTPBearer).
       Invalid Bearer token: 401 (from verify_api_key).
     - /secrets/{name} returns plaintext secret values by design. When auth is
       enabled, only callers with the API key can access them. When auth is
       disabled, localhost binding is the sole access control.
+
+Unauthenticated endpoints:
+    /health  -- Liveness probe.  Returns {"status": "healthy"} and backend
+                class names.  Always unauthenticated so Kubernetes
+                livenessProbe, Docker HEALTHCHECK, and load-balancer health
+                checks work without credentials.  Exposes backend *types*
+                (e.g. "MemoryStorageBackend") but never connection strings,
+                hostnames, or credentials.
+    /ready   -- Readiness probe.  Actively pings each required backend and
+                returns {"status": "ready"} or {"status": "not_ready"} with
+                per-component pass/fail.  Also unauthenticated for probe
+                compatibility.  Error messages are sanitized to avoid
+                leaking connection details.
+
+Non-loopback exposure:
+    When binding to a non-loopback address (e.g. LOOM_HOST=0.0.0.0),
+    operators MUST set LOOM_API_KEY.  The unauthenticated /health and
+    /ready endpoints are safe to expose because they never include secrets,
+    connection strings, or stack traces.
 
 Usage:
     # Auto-configure from LOOM_* env vars:
@@ -184,6 +203,21 @@ def _extract_chunk_content(chunk_data: object) -> str:
     if isinstance(chunk_data, dict):
         return chunk_data.get("content", "")
     return ""
+
+
+async def _check_backend(name: str, coro) -> dict:
+    """Run a single backend health check and return a sanitized result.
+
+    Returns ``{"healthy": True}`` on success, or
+    ``{"healthy": False, "error": "<type>"}`` on failure.
+    Error messages are limited to the exception type name so that
+    connection strings and credentials are never exposed.
+    """
+    try:
+        await coro
+        return {"healthy": True}
+    except Exception as exc:  # noqa: BLE001
+        return {"healthy": False, "error": type(exc).__name__}
 
 
 # ---------------------------------------------------------------------------
@@ -596,6 +630,34 @@ def create_app(config: LoomConfig) -> FastAPI:
             "resources": _backend_name(config.resources),
         }
         return {"status": "healthy", "backends": backends}
+
+    @app.get("/ready")
+    async def ready():
+        checks: dict = {
+            "storage": await _check_backend(
+                "storage", config.storage.count_documents()
+            ),
+            "queue": await _check_backend(
+                "queue", config.queue.list_queues()
+            ),
+            "secrets": await _check_backend(
+                "secrets", config.secrets.list_names()
+            ),
+            "search": await _check_backend(
+                "search", config.search.text_search("", limit=1)
+            ),
+        }
+        if config.llm is not None:
+            checks["llm"] = await _check_backend(
+                "llm", config.llm.list_models()
+            )
+        if config.graph is not None:
+            checks["graph"] = await _check_backend(
+                "graph", config.graph.get_node("__readiness_probe__")
+            )
+        all_healthy = all(c["healthy"] for c in checks.values())
+        status = "ready" if all_healthy else "not_ready"
+        return {"status": status, "checks": checks}
 
     # Mount always-available routers
     _mount_storage_routes(app, config, auth_deps)
