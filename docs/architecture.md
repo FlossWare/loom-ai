@@ -148,7 +148,7 @@ cfg = LoomConfig(
 **Environment-based auto-detection** (`LoomConfig.from_env()`):
 
 ```python
-cfg = LoomConfig.from_env()
+cfg = await LoomConfig.from_env()  # async -- some backends need await
 ```
 
 Reads `LOOM_*` environment variables and lazily imports the appropriate
