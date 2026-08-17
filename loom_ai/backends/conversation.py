@@ -74,10 +74,10 @@ class InMemoryConversationManager:
 
         # Walk backwards from the end, accumulating tokens
         total = 0
-        start_index = len(messages)
+        start_index = len(messages) - 1  # Always include the last message
         for i in range(len(messages) - 1, -1, -1):
             msg_tokens = _estimate_tokens(messages[i])
-            if total + msg_tokens > max_tokens:
+            if total + msg_tokens > max_tokens and i < len(messages) - 1:
                 break
             total += msg_tokens
             start_index = i

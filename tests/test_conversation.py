@@ -170,6 +170,61 @@ async def test_unknown_session_raises(manager: InMemoryConversationManager):
         await manager.export_transcript("nonexistent")
 
 
+async def test_get_messages_last_message_exceeds_max_tokens(
+    manager: InMemoryConversationManager,
+):
+    """When the most recent message alone exceeds max_tokens, it is still returned."""
+    sid = await manager.create_session()
+    # 400 chars -> 100 tokens, budget is only 10
+    await manager.add_message(sid, ChatMessage(role="user", content="x" * 400))
+
+    messages = await manager.get_messages(sid, max_tokens=10)
+    assert len(messages) == 1
+    assert messages[0].content == "x" * 400
+
+
+async def test_get_messages_last_exceeds_but_still_included(
+    manager: InMemoryConversationManager,
+):
+    """Multiple messages where the last one exceeds the budget on its own."""
+    sid = await manager.create_session()
+    await manager.add_message(sid, ChatMessage(role="user", content="a" * 20))
+    await manager.add_message(sid, ChatMessage(role="user", content="b" * 20))
+    # 400 chars -> 100 tokens, budget is 10
+    await manager.add_message(sid, ChatMessage(role="user", content="c" * 400))
+
+    messages = await manager.get_messages(sid, max_tokens=10)
+    assert len(messages) == 1
+    assert messages[0].content == "c" * 400
+
+
+async def test_get_messages_budget_allows_several(
+    manager: InMemoryConversationManager,
+):
+    """Budget large enough for multiple messages includes them all."""
+    sid = await manager.create_session()
+    # Each 20 chars -> 5 tokens
+    await manager.add_message(sid, ChatMessage(role="user", content="a" * 20))
+    await manager.add_message(sid, ChatMessage(role="user", content="b" * 20))
+    await manager.add_message(sid, ChatMessage(role="user", content="c" * 20))
+
+    # Budget of 15 tokens fits all three (5 + 5 + 5 = 15)
+    messages = await manager.get_messages(sid, max_tokens=15)
+    assert len(messages) == 3
+
+
+async def test_get_messages_single_message_exceeds_budget(
+    manager: InMemoryConversationManager,
+):
+    """A single message that exceeds the budget is returned anyway."""
+    sid = await manager.create_session()
+    await manager.add_message(sid, ChatMessage(role="user", content="z" * 1000))
+
+    messages = await manager.get_messages(sid, max_tokens=1)
+    assert len(messages) == 1
+    assert messages[0].content == "z" * 1000
+
+
 async def test_satisfies_protocol():
     """InMemoryConversationManager satisfies the ConversationManager protocol."""
     assert isinstance(InMemoryConversationManager(), ConversationManager)
