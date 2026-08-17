@@ -11,7 +11,9 @@ from __future__ import annotations
 import asyncio
 import json
 import logging
+import random
 import ssl
+import time
 import urllib.error
 import urllib.request
 from typing import AsyncIterator
@@ -19,6 +21,9 @@ from typing import AsyncIterator
 from loom_ai.models import ChatMessage, ChatResponse
 
 logger = logging.getLogger(__name__)
+
+_RETRY_MAX = 3  # 3 retries → 4 total attempts
+_RETRY_BACKOFF_CAP = 10.0  # seconds — max delay between retries
 
 
 class HttpLLMBackend:
@@ -58,6 +63,7 @@ class HttpLLMBackend:
         self._provider_name = provider_name
         self._ssl_ctx = ssl.create_default_context()
         self._ssl_ctx.minimum_version = ssl.TLSVersion.TLSv1_2
+        self._rng = random.Random()  # noqa: S311
 
     # ── internal helpers ─────────────────────────────────────────────
 
@@ -102,6 +108,11 @@ class HttpLLMBackend:
         )
 
     @staticmethod
+    def _is_retryable_status(code: int) -> bool:
+        """Return *True* for HTTP status codes that warrant a retry."""
+        return code == 429 or code >= 500
+
+    @staticmethod
     def _parse_response(data: dict, model: str, provider: str) -> ChatResponse:
         choices = data.get("choices", [])
         content = ""
@@ -138,28 +149,63 @@ class HttpLLMBackend:
         req = self._build_request(messages, resolved, temperature, max_tokens)
 
         def _do_request() -> ChatResponse:
-            try:
-                with urllib.request.urlopen(  # noqa: S310  # NOSONAR — URL is from constructor config, not user input
-                    req, timeout=self._timeout, context=self._ssl_ctx
-                ) as resp:
-                    body = resp.read().decode("utf-8")
-                    data = json.loads(body)
-                    return self._parse_response(data, resolved, self._provider_name)
-            except urllib.error.HTTPError as exc:
-                error_body = exc.read().decode("utf-8", errors="replace")[:1000]
-                logger.warning(
-                    "LLM API error %d from %s: %s",
-                    exc.code,
-                    self._base_url,
-                    error_body,
-                )
+            last_exc: Exception | None = None
+            for attempt in range(_RETRY_MAX + 1):
+                try:
+                    with urllib.request.urlopen(  # noqa: S310  # NOSONAR — URL is from constructor config, not user input
+                        req, timeout=self._timeout, context=self._ssl_ctx
+                    ) as resp:
+                        body = resp.read().decode("utf-8")
+                        data = json.loads(body)
+                        return self._parse_response(data, resolved, self._provider_name)
+                except urllib.error.HTTPError as exc:
+                    error_body = exc.read().decode("utf-8", errors="replace")[:1000]
+                    if not self._is_retryable_status(exc.code):
+                        logger.warning(
+                            "LLM API error %d from %s: %s",
+                            exc.code,
+                            self._base_url,
+                            error_body,
+                        )
+                        raise RuntimeError(
+                            f"LLM API error {exc.code} from {self._base_url}"
+                        ) from exc
+                    logger.warning(
+                        "LLM API error %d from %s (attempt %d/%d): %s",
+                        exc.code,
+                        self._base_url,
+                        attempt + 1,
+                        _RETRY_MAX + 1,
+                        error_body,
+                    )
+                    last_exc = exc
+                except urllib.error.URLError as exc:
+                    logger.warning(
+                        "LLM API connection error to %s (attempt %d/%d): %s",
+                        self._base_url,
+                        attempt + 1,
+                        _RETRY_MAX + 1,
+                        exc.reason,
+                    )
+                    last_exc = exc
+
+                if attempt < _RETRY_MAX:
+                    delay = min(
+                        2**attempt + self._rng.uniform(0, 1),
+                        _RETRY_BACKOFF_CAP,
+                    )
+                    time.sleep(delay)
+
+            # All retries exhausted — raise with original exception as cause
+            if isinstance(last_exc, urllib.error.HTTPError):
                 raise RuntimeError(
-                    f"LLM API error {exc.code} from {self._base_url}"
-                ) from exc
-            except urllib.error.URLError as exc:
+                    f"LLM API error {last_exc.code} from {self._base_url}"
+                ) from last_exc
+            if isinstance(last_exc, urllib.error.URLError):
                 raise RuntimeError(
-                    f"LLM API connection error to {self._base_url}: {exc.reason}"
-                ) from exc
+                    f"LLM API connection error to {self._base_url}: {last_exc.reason}"
+                ) from last_exc
+            raise RuntimeError(f"LLM API error: {last_exc}") from last_exc
 
         return await asyncio.get_running_loop().run_in_executor(None, _do_request)
 
@@ -187,55 +233,130 @@ class HttpLLMBackend:
 
         def _stream_reader() -> None:
             try:
-                with urllib.request.urlopen(  # noqa: S310  # NOSONAR — URL is from constructor config, not user input
-                    req, timeout=self._timeout, context=self._ssl_ctx
-                ) as resp:
-                    for raw_line in resp:
-                        line = raw_line.decode("utf-8", errors="replace").rstrip("\n\r")
+                # ── Retry loop for connection establishment ──────────
+                last_exc: Exception | None = None
+                resp = None
+                for attempt in range(_RETRY_MAX + 1):
+                    try:
+                        resp = urllib.request.urlopen(  # noqa: S310  # NOSONAR — URL is from constructor config, not user input
+                            req, timeout=self._timeout, context=self._ssl_ctx
+                        )
+                        break
+                    except urllib.error.HTTPError as exc:
+                        error_body = exc.read().decode("utf-8", errors="replace")[:1000]
+                        if not self._is_retryable_status(exc.code):
+                            logger.warning(
+                                "LLM streaming error %d from %s: %s",
+                                exc.code,
+                                self._base_url,
+                                error_body,
+                            )
+                            error = RuntimeError(
+                                f"LLM streaming error {exc.code} from {self._base_url}"
+                            )
+                            error.__cause__ = exc
+                            loop.call_soon_threadsafe(queue.put_nowait, error)
+                            return
+                        logger.warning(
+                            "LLM streaming error %d from %s (attempt %d/%d): %s",
+                            exc.code,
+                            self._base_url,
+                            attempt + 1,
+                            _RETRY_MAX + 1,
+                            error_body,
+                        )
+                        last_exc = exc
+                    except urllib.error.URLError as exc:
+                        logger.warning(
+                            "LLM streaming connection error to %s (attempt %d/%d): %s",
+                            self._base_url,
+                            attempt + 1,
+                            _RETRY_MAX + 1,
+                            exc.reason,
+                        )
+                        last_exc = exc
+                    except Exception as exc:
+                        error = RuntimeError(f"LLM streaming error: {exc}")
+                        error.__cause__ = exc
+                        loop.call_soon_threadsafe(queue.put_nowait, error)
+                        return
 
-                        if not line.startswith("data: "):
-                            continue
+                    if attempt < _RETRY_MAX:
+                        delay = min(
+                            2**attempt + self._rng.uniform(0, 1),
+                            _RETRY_BACKOFF_CAP,
+                        )
+                        time.sleep(delay)
 
-                        payload = line[6:]  # strip "data: " prefix
-                        if payload.strip() == "[DONE]":
-                            break
+                if resp is None:
+                    # All retries exhausted
+                    if isinstance(last_exc, urllib.error.HTTPError):
+                        error = RuntimeError(
+                            f"LLM streaming error {last_exc.code} from {self._base_url}"
+                        )
+                    elif isinstance(last_exc, urllib.error.URLError):
+                        error = RuntimeError(
+                            f"LLM streaming connection error to "
+                            f"{self._base_url}: {last_exc.reason}"
+                        )
+                    else:
+                        error = RuntimeError(f"LLM streaming error: {last_exc}")
+                    error.__cause__ = last_exc
+                    loop.call_soon_threadsafe(queue.put_nowait, error)
+                    return
 
-                        try:
-                            chunk = json.loads(payload)
-                        except json.JSONDecodeError:
-                            continue
+                # ── Read SSE chunks from established connection ─────
+                try:
+                    with resp:
+                        for raw_line in resp:
+                            line = raw_line.decode("utf-8", errors="replace").rstrip(
+                                "\n\r"
+                            )
 
-                        choices = chunk.get("choices", [])
-                        if not choices:
-                            continue
+                            if not line.startswith("data: "):
+                                continue
 
-                        delta = choices[0].get("delta", {})
-                        content = delta.get("content")
-                        if content:
-                            loop.call_soon_threadsafe(queue.put_nowait, content)
-            except urllib.error.HTTPError as exc:
-                error_body = exc.read().decode("utf-8", errors="replace")[:1000]
-                logger.warning(
-                    "LLM streaming error %d from %s: %s",
-                    exc.code,
-                    self._base_url,
-                    error_body,
-                )
-                error = RuntimeError(
-                    f"LLM streaming error {exc.code} from {self._base_url}"
-                )
-                error.__cause__ = exc
-                loop.call_soon_threadsafe(queue.put_nowait, error)
-            except urllib.error.URLError as exc:
-                error = RuntimeError(
-                    f"LLM streaming connection error to {self._base_url}: {exc.reason}"
-                )
-                error.__cause__ = exc
-                loop.call_soon_threadsafe(queue.put_nowait, error)
-            except Exception as exc:
-                error = RuntimeError(f"LLM streaming error: {exc}")
-                error.__cause__ = exc
-                loop.call_soon_threadsafe(queue.put_nowait, error)
+                            payload = line[6:]  # strip "data: " prefix
+                            if payload.strip() == "[DONE]":
+                                break
+
+                            try:
+                                chunk = json.loads(payload)
+                            except json.JSONDecodeError:
+                                continue
+
+                            choices = chunk.get("choices", [])
+                            if not choices:
+                                continue
+
+                            delta = choices[0].get("delta", {})
+                            content = delta.get("content")
+                            if content:
+                                loop.call_soon_threadsafe(queue.put_nowait, content)
+                except urllib.error.HTTPError as exc:
+                    error_body = exc.read().decode("utf-8", errors="replace")[:1000]
+                    logger.warning(
+                        "LLM streaming error %d from %s: %s",
+                        exc.code,
+                        self._base_url,
+                        error_body,
+                    )
+                    error = RuntimeError(
+                        f"LLM streaming error {exc.code} from {self._base_url}"
+                    )
+                    error.__cause__ = exc
+                    loop.call_soon_threadsafe(queue.put_nowait, error)
+                except urllib.error.URLError as exc:
+                    error = RuntimeError(
+                        f"LLM streaming connection error to "
+                        f"{self._base_url}: {exc.reason}"
+                    )
+                    error.__cause__ = exc
+                    loop.call_soon_threadsafe(queue.put_nowait, error)
+                except Exception as exc:
+                    error = RuntimeError(f"LLM streaming error: {exc}")
+                    error.__cause__ = exc
+                    loop.call_soon_threadsafe(queue.put_nowait, error)
             finally:
                 loop.call_soon_threadsafe(queue.put_nowait, None)
 
