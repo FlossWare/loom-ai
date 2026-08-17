@@ -46,8 +46,7 @@ jobs:
 
       - name: Install dependencies
         run: |
-          pip install --only-binary :all: -r requirements-ci.txt
-          pip install --no-deps -e .
+          pip install --only-binary :all: -c requirements-ci.txt -e ".[dev,server]"
 
       - name: Lint with ruff
         id: ruff

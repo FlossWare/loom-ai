@@ -30,8 +30,7 @@ jobs:
 
       - name: Install dev dependencies and run tests
         run: |
-          pip install --only-binary :all: -r requirements-ci.txt
-          pip install --no-deps -e .
+          pip install --only-binary :all: -c requirements-ci.txt -e ".[dev,server]"
           python -m pytest tests/ -v --tb=short
 
       - name: Lint check
