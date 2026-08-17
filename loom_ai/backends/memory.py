@@ -634,6 +634,10 @@ class MemoryGraphBackend:
                 f"Target node '{edge.target}' does not exist.  "
                 f"Add it with add_node() first."
             )
+        if edge.id in self._edges:
+            old_edge = self._edges[edge.id]
+            self._adjacency.get(old_edge.source, set()).discard(edge.id)
+            self._adjacency.get(old_edge.target, set()).discard(edge.id)
         self._edges[edge.id] = edge
         self._adjacency.setdefault(edge.source, set()).add(edge.id)
         self._adjacency.setdefault(edge.target, set()).add(edge.id)

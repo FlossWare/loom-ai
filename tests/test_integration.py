@@ -175,6 +175,32 @@ async def test_graph_with_storage_workflow(config):
     assert neighbors[0].id == "gn-arch"
 
 
+async def test_graph_add_edge_cleans_stale_adjacency(config):
+    """Reusing an edge ID with different endpoints must not leave stale adjacency."""
+    from loom_ai import GraphEdge, GraphNode
+
+    a = GraphNode(id="a", label="A", properties={})
+    b = GraphNode(id="b", label="B", properties={})
+    c = GraphNode(id="c", label="C", properties={})
+    for n in (a, b, c):
+        await config.graph.add_node(n)
+
+    edge = GraphEdge(id="e1", source="a", target="b", label="link")
+    await config.graph.add_edge(edge)
+    assert len(await config.graph.get_neighbors("a")) == 1
+    assert (await config.graph.get_neighbors("a"))[0].id == "b"
+
+    updated = GraphEdge(id="e1", source="a", target="c", label="link")
+    await config.graph.add_edge(updated)
+
+    neighbors_a = await config.graph.get_neighbors("a")
+    assert len(neighbors_a) == 1
+    assert neighbors_a[0].id == "c"
+
+    neighbors_b = await config.graph.get_neighbors("b")
+    assert len(neighbors_b) == 0
+
+
 async def test_multi_backend_roundtrip(config):
     """Verify data flows correctly across storage, embedding, and search."""
     # Store multiple documents with chunks
