@@ -227,6 +227,41 @@ async def test_delete_nonexistent_relationship():
     assert await g.delete_relationship("missing") is False
 
 
+async def test_replace_relationship_cleans_old_adjacency():
+    """Reusing an edge ID with new source/target removes stale adjacency."""
+    g = InMemoryKnowledgeGraph()
+    for label in "ABCD":
+        await g.add_entity(
+            KnowledgeEntity(id=f"e-{label}", label=label, entity_type="n")
+        )
+
+    # Original edge: A -> B
+    await g.add_relationship(
+        KnowledgeRelationship(
+            id="r-1", source_id="e-A", target_id="e-B", relation_type="x"
+        )
+    )
+    assert len(await g.get_relationships("e-A", direction="outgoing")) == 1
+    assert len(await g.get_relationships("e-B", direction="incoming")) == 1
+
+    # Replace same ID with C -> D
+    await g.add_relationship(
+        KnowledgeRelationship(
+            id="r-1", source_id="e-C", target_id="e-D", relation_type="x"
+        )
+    )
+
+    # A must no longer have outgoing r-1
+    assert len(await g.get_relationships("e-A", direction="outgoing")) == 0
+    # B must no longer have incoming r-1
+    assert len(await g.get_relationships("e-B", direction="incoming")) == 0
+    # C -> D should be present
+    assert len(await g.get_relationships("e-C", direction="outgoing")) == 1
+    assert len(await g.get_relationships("e-D", direction="incoming")) == 1
+    # Only one relationship total
+    assert g.relationship_count == 1
+
+
 # ── Claim operations ─────────────────────────────────────────────────────
 
 
