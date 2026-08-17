@@ -174,7 +174,7 @@ class StructuredOutputBackend:
         messages: list[ChatMessage],
         *,
         schema: dict | None = None,
-        _tools: list[dict] | None = None,
+        tools: list[dict] | None = None,
         response_format: str = "text",
         max_retries: int = 3,
         **kwargs: Any,
@@ -188,6 +188,8 @@ class StructuredOutputBackend:
         and retries are attempted (up to *max_retries*) with a fix
         prompt appended to the conversation.
         """
+        _ = tools  # accepted for protocol compliance; not used here
+
         working_messages = list(messages)
 
         # Prepend a JSON instruction when response_format="json"
