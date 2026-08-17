@@ -343,22 +343,24 @@ class PostgresqlSearchBackend:
         source: str = "",
     ) -> bool:
         async with self._pool.acquire() as conn:
-            try:
-                await conn.execute(
-                    """
-                    INSERT INTO search_index
-                        (chunk_id, content, vector, document_title, source)
-                    VALUES ($1, $2, $3, $4, $5)
-                    """,
-                    chunk.id,
-                    chunk.content,
-                    json.dumps(vector) if vector else None,
-                    document_title,
-                    source,
-                )
-                return True
-            except asyncpg.UniqueViolationError:
-                return False
+            await conn.execute(
+                """
+                INSERT INTO search_index
+                    (chunk_id, content, vector, document_title, source)
+                VALUES ($1, $2, $3, $4, $5)
+                ON CONFLICT (chunk_id) DO UPDATE SET
+                    content = EXCLUDED.content,
+                    vector = EXCLUDED.vector,
+                    document_title = EXCLUDED.document_title,
+                    source = EXCLUDED.source
+                """,
+                chunk.id,
+                chunk.content,
+                json.dumps(vector) if vector else None,
+                document_title,
+                source,
+            )
+            return True
 
     async def text_search(self, query: str, *, limit: int = 10) -> list[SearchResult]:
         async with self._pool.acquire() as conn:
