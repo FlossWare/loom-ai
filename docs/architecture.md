@@ -36,13 +36,13 @@ synthesis), `ExecutionEngine` (DAG-based task scheduling), and higher-level
 coordination such as adaptive routing and fleet management.  These components
 depend on the contract layer but never on a specific backend.
 
-**Contract layer** -- 78 `@runtime_checkable` Protocol classes across
+**Contract layer** -- 81 `@runtime_checkable` Protocol classes across
 `protocols.py` and `contracts_phase1.py` through `contracts_phase9.py` plus
-`contracts_api.py`.  Nearly all methods are `async` (exceptions include
+`contracts_api.py` and `contracts_execution.py`.  Nearly all methods are `async` (exceptions include
 `IdempotentStore.is_idempotent`).  The only imports are from the
 standard library (`typing`, `dataclasses`).
 
-**Backend layer** -- 36 pluggable modules in `loom_ai/backends/` that satisfy
+**Backend layer** -- 37 pluggable modules in `loom_ai/backends/` that satisfy
 contracts via structural subtyping.  Each module can depend on an external
 library (asyncpg, redis, etc.) but the dependency is optional and loaded
 lazily.
@@ -66,7 +66,7 @@ loom_ai/backends/memory.py    <-- in-memory implementations
 loom_ai/backends/postgresql.py
 loom_ai/backends/redis_queue.py
 loom_ai/backends/http_llm.py
-...                           <-- 36 backend modules total
+...                           <-- 37 backend modules total
 ```
 
 Contracts use `typing.Protocol` with `@runtime_checkable`:
@@ -436,7 +436,7 @@ intentionally does not -- `enqueue` appends duplicates by design.
 
 ## Contract Phases
 
-The 78 protocol contracts are organized into phases reflecting the order they
+The 81 protocol contracts are organized into phases reflecting the order they
 were designed:
 
 | Phase | File | Count | Focus |
@@ -452,6 +452,7 @@ were designed:
 | 7 | `contracts_phase7.py` | 4 | Provider/capability/policy registries, catalog sync |
 | 8 | `contracts_phase8.py` | 9 | Tournaments, consensus strategies, evaluation |
 | 9 | `contracts_phase9.py` | 10 | Context compression, prompt cache, runtimes, health |
+| Execution | `contracts_execution.py` | 3 | Execution steps, pipelines, observers |
 
 Phases are additive -- later phases never modify earlier contracts.  Each phase
 has a corresponding `models_phaseN.py` with its data models.

@@ -1,6 +1,6 @@
 # Canonical Contract Inventory
 
-loom-ai defines **78 `@runtime_checkable` Protocol contracts** that form
+loom-ai defines **81 `@runtime_checkable` Protocol contracts** that form
 the public API surface for backend implementations. All protocols use
 structural subtyping -- implementations do **not** need to import or
 inherit from these classes.
@@ -201,12 +201,23 @@ REST API request lifecycle, error handling, and middleware.
 | `ErrorHandler` | `contracts_api` | Centralized error handling and formatting | stable | -- |
 | `Middleware` | `contracts_api` | Pre/post request hooks | stable | -- |
 
+## Execution (3 protocols)
+
+Execution steps, pipelines, and observers for sequential step execution
+with lifecycle hooks.
+
+| Protocol | Source | Purpose | Stability | Backends |
+|----------|--------|---------|-----------|----------|
+| `ExecutionStep` | `contracts_execution` | Single unit of work in an execution pipeline | stable | -- |
+| `ExecutionPipeline` | `contracts_execution` | Sequential step runner with cancellation and deadlines | stable | `SequentialExecutionPipeline` |
+| `ExecutionObserver` | `contracts_execution` | Lifecycle observer for pipeline step events | stable | -- |
+
 ---
 
 ## Summary by stability
 
 | Stability | Count |
 |-----------|-------|
-| stable | 35 |
+| stable | 38 |
 | experimental | 43 |
-| **Total** | **78** |
+| **Total** | **81** |
