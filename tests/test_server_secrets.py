@@ -35,8 +35,10 @@ def _make_app(monkeypatch, *, api_key: str | None = None, secrets: dict | None =
     from loom_ai.config import LoomConfig
     from loom_ai.server import create_app
 
+    import asyncio
+
     secrets_backend = EnvSecretsBackend(overrides=secrets or {})
-    cfg = LoomConfig.from_env()
+    cfg = asyncio.run(LoomConfig.from_env())
     # Swap in our pre-loaded secrets backend
     cfg = LoomConfig(
         storage=cfg.storage,
