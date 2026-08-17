@@ -46,27 +46,32 @@ def _chunk_json(content: str) -> str:
 # ---------------------------------------------------------------------------
 
 
-async def test_chat_stream_propagates_http_error():
+@patch("time.sleep")
+async def test_chat_stream_propagates_http_error(_mock_sleep):
     """HTTPError during streaming must raise RuntimeError to the caller."""
     backend = _make_backend()
     msgs = [ChatMessage(role="user", content="hello")]
 
-    exc = urllib.error.HTTPError(
-        url="http://localhost:9999/chat/completions",
-        code=500,
-        msg="Internal Server Error",
-        hdrs=MagicMock(),
-        fp=io.BytesIO(b"server error body"),
-    )
+    errors = [
+        urllib.error.HTTPError(
+            url="http://localhost:9999/chat/completions",
+            code=500,
+            msg="Internal Server Error",
+            hdrs=MagicMock(),
+            fp=io.BytesIO(b"server error body"),
+        )
+        for _ in range(4)  # initial + 3 retries
+    ]
 
-    with patch("urllib.request.urlopen", side_effect=exc):
+    with patch("urllib.request.urlopen", side_effect=errors):
         chunks = []
         with pytest.raises(RuntimeError, match="LLM streaming error 500"):
             async for chunk in backend.chat_stream(msgs):
                 chunks.append(chunk)
 
 
-async def test_chat_stream_propagates_url_error():
+@patch("time.sleep")
+async def test_chat_stream_propagates_url_error(_mock_sleep):
     """URLError during streaming must raise RuntimeError to the caller."""
     backend = _make_backend()
     msgs = [ChatMessage(role="user", content="hello")]
