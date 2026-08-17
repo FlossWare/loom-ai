@@ -213,16 +213,46 @@ class LoomConfigValidator:
     def environment(self) -> Environment:
         return self._environment
 
+    def _validate_field(
+        self,
+        spec: FieldSpec,
+        raw: str | None,
+        env_defaults: dict[str, str],
+        errors: list[ValidationError],
+        resolved: dict[str, str],
+    ) -> None:
+        if raw is None:
+            if spec.required:
+                errors.append(ValidationError(
+                    field=spec.name, message="required but not set",
+                ))
+            else:
+                fallback = env_defaults.get(spec.name, spec.default)
+                if fallback is not None:
+                    resolved[spec.name] = fallback
+            return
+
+        if spec.choices and raw not in spec.choices:
+            errors.append(ValidationError(
+                field=spec.name,
+                message=f"invalid value {raw!r}; valid options: {', '.join(spec.choices)}",
+                value=raw,
+            ))
+            return
+
+        if spec.value_type is int:
+            _, err = _parse_int(raw, spec.name)
+            if err is not None:
+                errors.append(err)
+                return
+
+        resolved[spec.name] = raw
+
     def validate(
         self,
         env: dict[str, str] | None = None,
     ) -> ValidationResult:
-        """Validate configuration from *env* (defaults to ``os.environ``).
-
-        Returns a :class:`ValidationResult` with resolved values, errors
-        for invalid settings, and warnings for environment-inappropriate
-        choices.
-        """
+        """Validate configuration from *env* (defaults to ``os.environ``)."""
         source = env if env is not None else dict(os.environ)
         errors: list[ValidationError] = []
         warnings: list[str] = []
@@ -231,39 +261,9 @@ class LoomConfigValidator:
         env_defaults = _ENV_DEFAULTS.get(self._environment, {})
 
         for spec in self._fields:
-            raw = source.get(spec.name)
-
-            if raw is None:
-                if spec.required:
-                    errors.append(ValidationError(
-                        field=spec.name,
-                        message="required but not set",
-                    ))
-                    continue
-
-                fallback = env_defaults.get(spec.name, spec.default)
-                if fallback is not None:
-                    resolved[spec.name] = fallback
-                continue
-
-            if spec.choices and raw not in spec.choices:
-                errors.append(ValidationError(
-                    field=spec.name,
-                    message=(
-                        f"invalid value {raw!r}; "
-                        f"valid options: {', '.join(spec.choices)}"
-                    ),
-                    value=raw,
-                ))
-                continue
-
-            if spec.value_type is int:
-                parsed, err = _parse_int(raw, spec.name)
-                if err is not None:
-                    errors.append(err)
-                    continue
-
-            resolved[spec.name] = raw
+            self._validate_field(
+                spec, source.get(spec.name), env_defaults, errors, resolved,
+            )
 
         self._check_dependencies(resolved, source, errors)
         self._check_environment_warnings(resolved, warnings)

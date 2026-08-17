@@ -42,7 +42,7 @@ jobs:
           cache: pip
 
       - name: Install core dependencies
-        run: pip install -e ".[dev]"
+        run: pip install -e ".[dev]"  # NOSONAR — editable install requires source build; version ranges intentional for library CI
 
       - name: Run core tests
         run: >-
@@ -75,7 +75,7 @@ jobs:
           cache: pip
 
       - name: Install dependencies
-        run: pip install -e ".[dev,postgresql]"
+        run: pip install -e ".[dev,postgresql]"  # NOSONAR — editable install requires source build; version ranges intentional for library CI
 
       - name: Run postgresql tests
         run: python -m pytest tests/ -x -q -m postgresql
@@ -99,7 +99,7 @@ jobs:
           cache: pip
 
       - name: Install dependencies
-        run: pip install -e ".[dev,redis]"
+        run: pip install -e ".[dev,redis]"  # NOSONAR — editable install requires source build; version ranges intentional for library CI
 
       - name: Run redis tests
         run: python -m pytest tests/ -x -q -m redis
@@ -123,7 +123,7 @@ jobs:
           cache: pip
 
       - name: Install dependencies
-        run: pip install -e ".[dev,orientdb]"
+        run: pip install -e ".[dev,orientdb]"  # NOSONAR — editable install requires source build; version ranges intentional for library CI
 
       - name: Run orientdb tests
         run: python -m pytest tests/ -x -q -m orientdb
@@ -147,7 +147,7 @@ jobs:
           cache: pip
 
       - name: Install dependencies
-        run: pip install -e ".[dev,openai]"
+        run: pip install -e ".[dev,openai]"  # NOSONAR — editable install requires source build; version ranges intentional for library CI
 
       - name: Run openai tests
         run: python -m pytest tests/ -x -q -m openai
@@ -171,7 +171,7 @@ jobs:
           cache: pip
 
       - name: Install dependencies
-        run: pip install -e ".[dev,litellm]"
+        run: pip install -e ".[dev,litellm]"  # NOSONAR — editable install requires source build; version ranges intentional for library CI
 
       - name: Run litellm tests
         run: python -m pytest tests/ -x -q -m litellm
@@ -195,7 +195,7 @@ jobs:
           cache: pip
 
       - name: Install dependencies
-        run: pip install -e ".[dev,server]"
+        run: pip install -e ".[dev,server]"  # NOSONAR — editable install requires source build; version ranges intentional for library CI
 
       - name: Run server tests
         run: python -m pytest tests/ -x -q -m server
