@@ -222,14 +222,18 @@ class SearchBackend(Protocol):
         chunk: Chunk,
         vector: list[float] | None = None,
         *,
-        document_title: str = "",
-        source: str = "",
+        document_title: str | None = None,
+        source: str | None = None,
     ) -> bool:
         """Index a chunk.  Idempotent by chunk id (upsert semantics).
 
         Returns ``True`` if new data was written, ``False`` if the chunk
         was already indexed with identical content.  Re-indexing with
         updated content replaces the previous entry.
+
+        When *document_title* or *source* is ``None`` (the default), the
+        previously stored value is preserved.  Pass an explicit empty
+        string to clear the metadata.
         """
         ...
 
