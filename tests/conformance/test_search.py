@@ -83,6 +83,73 @@ async def test_delete_by_document(search_backend):
     assert results == []
 
 
+async def test_reindex_with_empty_title_clears_metadata(search_backend):
+    """Re-indexing with an empty title must replace the old title (#251)."""
+    chunk = Chunk(
+        id="stale-1",
+        document_id="doc-stale",
+        content="stale metadata test",
+        chunk_index=0,
+    )
+
+    # First index: title is "A"
+    await search_backend.index(chunk, document_title="A")
+    results = await search_backend.text_search("stale metadata test")
+    assert len(results) == 1
+    assert results[0].document_title == "A"
+
+    # Re-index with empty title: must clear the title
+    changed = await search_backend.index(chunk, document_title="")
+    assert changed is True
+    results = await search_backend.text_search("stale metadata test")
+    assert len(results) == 1
+    assert results[0].document_title == ""
+
+
+async def test_reindex_with_empty_source_clears_metadata(search_backend):
+    """Re-indexing with an empty source must replace the old source (#251)."""
+    chunk = Chunk(
+        id="stale-src-1",
+        document_id="doc-stale-src",
+        content="stale source test",
+        chunk_index=0,
+    )
+
+    await search_backend.index(chunk, source="https://example.com")
+    results = await search_backend.text_search("stale source test")
+    assert len(results) == 1
+    assert results[0].source == "https://example.com"
+
+    changed = await search_backend.index(chunk, source="")
+    assert changed is True
+    results = await search_backend.text_search("stale source test")
+    assert len(results) == 1
+    assert results[0].source == ""
+
+
+async def test_reindex_none_preserves_metadata(search_backend):
+    """Re-indexing without title/source (None) preserves old values (#251)."""
+    chunk = Chunk(
+        id="preserve-1",
+        document_id="doc-preserve",
+        content="preserve metadata test",
+        chunk_index=0,
+    )
+
+    await search_backend.index(chunk, document_title="Keep Me", source="keep.html")
+    results = await search_backend.text_search("preserve metadata test")
+    assert len(results) == 1
+    assert results[0].document_title == "Keep Me"
+    assert results[0].source == "keep.html"
+
+    # Re-index without specifying title/source -- old values must persist
+    await search_backend.index(chunk)
+    results = await search_backend.text_search("preserve metadata test")
+    assert len(results) == 1
+    assert results[0].document_title == "Keep Me"
+    assert results[0].source == "keep.html"
+
+
 async def test_hybrid_search(search_backend):
     """Hybrid search combines text and semantic results."""
     chunk = Chunk(

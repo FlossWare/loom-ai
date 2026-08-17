@@ -339,8 +339,8 @@ class PostgresqlSearchBackend:
         chunk: Chunk,
         vector: list[float] | None = None,
         *,
-        document_title: str = "",
-        source: str = "",
+        document_title: str | None = None,
+        source: str | None = None,
     ) -> bool:
         async with self._pool.acquire() as conn:
             await conn.execute(
@@ -357,8 +357,8 @@ class PostgresqlSearchBackend:
                 chunk.id,
                 chunk.content,
                 json.dumps(vector) if vector else None,
-                document_title,
-                source,
+                document_title or "",
+                source or "",
             )
             return True
 

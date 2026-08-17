@@ -401,8 +401,8 @@ class MemorySearchBackend:
         chunk: Chunk,
         vector: list[float] | None = None,
         *,
-        document_title: str = "",
-        source: str = "",
+        document_title: str | None = None,
+        source: str | None = None,
     ) -> bool:
         # async required by SearchBackend protocol contract
         await asyncio.sleep(0)
@@ -414,16 +414,19 @@ class MemorySearchBackend:
         else:
             if self._chunks[chunk.id].content != chunk.content:
                 changed = True
-            if self._titles.get(chunk.id, "") != document_title:
+            if (
+                document_title is not None
+                and self._titles.get(chunk.id, "") != document_title
+            ):
                 changed = True
-            if self._sources.get(chunk.id, "") != source:
+            if source is not None and self._sources.get(chunk.id, "") != source:
                 changed = True
             if vector is not None and self._vectors.get(chunk.id) != vector:
                 changed = True
         self._chunks[chunk.id] = chunk
-        if document_title:
+        if document_title is not None:
             self._titles[chunk.id] = document_title
-        if source:
+        if source is not None:
             self._sources[chunk.id] = source
         if vector is not None:
             self._vectors[chunk.id] = vector
