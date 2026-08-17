@@ -54,6 +54,21 @@ def test_health_response_shape(monkeypatch):
         assert isinstance(body["backends"][key], str)
 
 
+def test_ready_response_shape(monkeypatch):
+    client = _make_client(monkeypatch)
+    resp = client.get("/ready")
+    assert resp.status_code == 200
+    body = resp.json()
+    assert body["status"] in ("ready", "not_ready")
+    assert isinstance(body["checks"], dict)
+    for name, check in body["checks"].items():
+        assert isinstance(check["healthy"], bool)
+        if not check["healthy"]:
+            assert isinstance(check["error"], str)
+        else:
+            assert check.get("error") is None
+
+
 def test_knowledge_stats_response_shape(monkeypatch):
     client = _make_client(monkeypatch)
     resp = client.get("/knowledge/stats")
@@ -340,5 +355,6 @@ def test_openapi_schema_has_response_models(monkeypatch):
     # Verify schemas reference the named models
     schemas = schema.get("components", {}).get("schemas", {})
     assert "HealthResponse" in schemas
+    assert "ReadinessResponse" in schemas
     assert "StoreDocumentResponse" in schemas
     assert "KnowledgeStatsResponse" in schemas
