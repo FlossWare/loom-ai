@@ -185,6 +185,7 @@ class RateLimiter:
         self._configs: dict[str, int] = {}  # provider -> rpm
         self._tokens: dict[str, float] = {}
         self._last_refill: dict[str, float] = {}
+        self._reset_at: dict[str, float] = {}
 
     def configure(self, provider: str, *, rpm: int) -> None:
         """Set or update the rate limit for *provider*."""
@@ -196,6 +197,16 @@ class RateLimiter:
     def _refill(self, provider: str) -> None:
         """Refill tokens based on elapsed time."""
         now = time.time()
+
+        # While a provider-imposed reset window is active, keep bucket drained.
+        if provider in self._reset_at:
+            if now < self._reset_at[provider]:
+                self._tokens[provider] = 0.0
+                return
+            # Reset window has passed -- resume normal refill.
+            del self._reset_at[provider]
+            self._last_refill[provider] = now
+
         rpm = self._rpm(provider)
         if provider not in self._last_refill:
             self._tokens[provider] = float(rpm)
@@ -238,9 +249,10 @@ class RateLimiter:
                 self._tokens[provider] = 0.0
                 if reset_at is not None:
                     try:
-                        self._last_refill[provider] = float(reset_at)
+                        self._reset_at[provider] = float(reset_at)
                     except (ValueError, TypeError):
                         pass
+                self._last_refill[provider] = time.time()
 
 
 # ---------------------------------------------------------------------------

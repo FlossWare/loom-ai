@@ -200,6 +200,73 @@ class TestRateLimiter:
         # Should not raise, and bucket should still work
         assert rl.acquire("p") is True
 
+    def test_bucket_drains_correctly_when_remaining_zero(self):
+        """Bucket is fully drained when the provider reports remaining=0."""
+        rl = RateLimiter(default_rpm=60)
+        with patch("loom_ai.backends.provider_health.time") as mock_time:
+            mock_time.time.return_value = 1000.0
+            rl.acquire("p")  # initialize bucket
+
+            # Provider says remaining=0, reset in 60 seconds
+            rl.update_from_headers(
+                "p",
+                {
+                    "X-RateLimit-Remaining": "0",
+                    "X-RateLimit-Reset": "1060.0",
+                },
+            )
+
+            # Bucket must be empty -- acquire must fail
+            assert rl.acquire("p") is False
+
+    def test_bucket_does_not_refill_before_reset_time(self):
+        """Tokens stay at zero until the provider-specified reset time."""
+        rl = RateLimiter(default_rpm=60)
+        with patch("loom_ai.backends.provider_health.time") as mock_time:
+            mock_time.time.return_value = 1000.0
+            rl.acquire("p")  # initialize
+
+            rl.update_from_headers(
+                "p",
+                {
+                    "X-RateLimit-Remaining": "0",
+                    "X-RateLimit-Reset": "1060.0",
+                },
+            )
+
+            # Advance 30 seconds -- still before reset_at (1060)
+            mock_time.time.return_value = 1030.0
+            assert rl.acquire("p") is False
+
+            # Advance to 1 second before reset_at
+            mock_time.time.return_value = 1059.0
+            assert rl.acquire("p") is False
+
+    def test_bucket_refills_normally_after_reset_time_passes(self):
+        """After the reset time passes, normal token refill resumes."""
+        rl = RateLimiter(default_rpm=60)
+        with patch("loom_ai.backends.provider_health.time") as mock_time:
+            mock_time.time.return_value = 1000.0
+            rl.acquire("p")  # initialize
+
+            rl.update_from_headers(
+                "p",
+                {
+                    "X-RateLimit-Remaining": "0",
+                    "X-RateLimit-Reset": "1060.0",
+                },
+            )
+
+            # Advance past reset_at -- the guard clears and
+            # _last_refill is set to now, but elapsed is 0 so no
+            # tokens are added on this call.
+            mock_time.time.return_value = 1061.0
+            assert rl.acquire("p") is False
+
+            # One more second elapses -- 60 rpm = 1 token/sec refill
+            mock_time.time.return_value = 1062.0
+            assert rl.acquire("p") is True
+
 
 # ── ResilientProvider ────────────────────────────────────────────────────
 
