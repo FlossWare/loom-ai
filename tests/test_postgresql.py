@@ -651,15 +651,14 @@ class TestPostgresqlSearchIndex:
         chunk = Chunk(id="c1", document_id="d1", content="text", chunk_index=0)
         assert await backend.index(chunk, [0.1, 0.2], document_title="T") is True
 
-    async def test_index_duplicate(self, pool_conn):
+    async def test_index_upsert(self, pool_conn):
         pool, conn = pool_conn
-
-        # Simulate asyncpg.UniqueViolationError.  Since asyncpg may or
-        # may not be installed, create a matching exception class.
-        import asyncpg as _asyncpg
-
-        conn.execute = AsyncMock(side_effect=_asyncpg.UniqueViolationError(""))
+        conn.execute = AsyncMock()
         backend = PostgresqlSearchBackend(pool)
 
         chunk = Chunk(id="c1", document_id="d1", content="text", chunk_index=0)
-        assert await backend.index(chunk) is False
+        # First index succeeds.
+        assert await backend.index(chunk, document_title="T1") is True
+        # Re-index with updated content also succeeds (upsert).
+        assert await backend.index(chunk, document_title="T2") is True
+        assert conn.execute.await_count == 2
