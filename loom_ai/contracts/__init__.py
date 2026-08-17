@@ -1,7 +1,7 @@
 """Consolidated re-export facade for all loom-ai protocol contracts.
 
 This module is the **stable public import path** for every
-``@runtime_checkable`` Protocol in the framework.  All 78 contracts are
+``@runtime_checkable`` Protocol in the framework.  All 81 contracts are
 re-exported here so that consumers can write::
 
     from loom_ai.contracts import StorageBackend, WorkflowEngine, ...
@@ -23,6 +23,13 @@ from loom_ai.contracts_api import (
     ErrorHandler,
     Middleware,
     RequestLifecycle,
+)
+
+# ── Execution protocols (contracts_execution.py) ─────────────────────
+from loom_ai.contracts_execution import (
+    ExecutionObserver,
+    ExecutionPipeline,
+    ExecutionStep,
 )
 
 # ── Phase 1: Structured output, conversation, memory, routing, ──────
@@ -245,4 +252,8 @@ __all__ = [
     "ErrorHandler",
     "Middleware",
     "RequestLifecycle",
+    # Execution -- 3
+    "ExecutionObserver",
+    "ExecutionPipeline",
+    "ExecutionStep",
 ]

@@ -1,7 +1,7 @@
 """Tests for the consolidated contract surface.
 
 Verifies that:
-- All 78 protocols are importable from ``loom_ai.contracts``
+- All 81 protocols are importable from ``loom_ai.contracts``
 - Every exported protocol is ``@runtime_checkable``
 - The count matches expectations
 - No naming collisions exist in the consolidated namespace
@@ -123,13 +123,18 @@ EXPECTED_PROTOCOLS: dict[str, list[str]] = {
         "Middleware",
         "RequestLifecycle",
     ],
+    "loom_ai.contracts_execution": [
+        "ExecutionObserver",
+        "ExecutionPipeline",
+        "ExecutionStep",
+    ],
 }
 
 ALL_PROTOCOL_NAMES: list[str] = sorted(
     name for names in EXPECTED_PROTOCOLS.values() for name in names
 )
 
-EXPECTED_COUNT = 78
+EXPECTED_COUNT = 81
 
 
 # ---------------------------------------------------------------------------

@@ -24,7 +24,7 @@ Quick start::
         llm=my_http_llm,
     )
 
-For the full set of 78 protocol contracts, use the consolidated
+For the full set of 81 protocol contracts, use the consolidated
 facade::
 
     from loom_ai.contracts import StorageBackend, WorkflowEngine, ...
