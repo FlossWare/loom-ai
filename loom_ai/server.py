@@ -192,6 +192,10 @@ try:
 
     # ── Sub-models for nested response data ──────────────────────────
 
+    class BackendCheckResult(BaseModel):
+        healthy: bool
+        error: str | None = None
+
     class DocumentOut(BaseModel):
         id: str
         title: str
@@ -266,6 +270,10 @@ try:
     class HealthResponse(BaseModel):
         status: str
         backends: HealthBackends
+
+    class ReadinessResponse(BaseModel):
+        status: str
+        checks: dict[str, BackendCheckResult]
 
     class KnowledgeStatsResponse(BaseModel):
         documents: int
@@ -949,7 +957,7 @@ def create_app(config: LoomConfig) -> FastAPI:
         }
         return {"status": "healthy", "backends": backends}
 
-    @app.get("/ready")
+    @app.get("/ready", response_model=ReadinessResponse)
     async def ready():
         checks: dict = {
             "storage": await _check_backend(
