@@ -133,7 +133,9 @@ def test_ready_includes_optional_backends_when_enabled(monkeypatch):
     from loom_ai.config import LoomConfig
     from loom_ai.server import create_app
 
-    app = create_app(LoomConfig.from_env())
+    import asyncio
+
+    app = create_app(asyncio.run(LoomConfig.from_env()))
     client = TestClient(app)
     body = client.get("/ready").json()
     assert "graph" in body["checks"]

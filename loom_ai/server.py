@@ -61,7 +61,7 @@ import hmac
 import logging
 import os
 import time
-from typing import TYPE_CHECKING
+from typing import TYPE_CHECKING, Any
 
 from loom_ai import __version__
 
@@ -184,6 +184,202 @@ try:
     class RequeueRequest(BaseModel):
         items: list[RequeueItemIn]
 
+    # ------------------------------------------------------------------
+    # Pydantic response models -- used as ``response_model`` on each
+    # FastAPI endpoint so the OpenAPI schema accurately describes every
+    # response and FastAPI strips any unexpected fields before returning.
+    # ------------------------------------------------------------------
+
+    # ── Sub-models for nested response data ──────────────────────────
+
+    class DocumentOut(BaseModel):
+        id: str
+        title: str
+        content: str
+        url: str = ""
+        category: str = ""
+        metadata: dict = Field(default_factory=dict)
+        created_at: str = ""
+
+    class ChunkOut(BaseModel):
+        id: str
+        document_id: str
+        content: str
+        chunk_index: int
+        content_hash: str = ""
+
+    class SearchResultOut(BaseModel):
+        chunk_id: str
+        content: str
+        score: float
+        document_title: str = ""
+        source: str = ""
+
+    class ChatResponseOut(BaseModel):
+        content: str
+        model: str = ""
+        provider: str = ""
+        usage: dict = Field(default_factory=dict)
+
+    class ToolDefinitionOut(BaseModel):
+        name: str
+        description: str
+        input_schema: dict = Field(default_factory=dict)
+
+    class ToolResultOut(BaseModel):
+        tool_name: str
+        output: Any = None
+        error: str | None = None
+        duration_ms: float | None = None
+
+    class ResourceDefinitionOut(BaseModel):
+        uri: str
+        name: str
+        description: str = ""
+        mime_type: str | None = None
+
+    class GraphNodeOut(BaseModel):
+        id: str
+        label: str
+        properties: dict = Field(default_factory=dict)
+
+    class QueueItemOut(BaseModel):
+        id: str
+        payload: dict = Field(default_factory=dict)
+        enqueued_at: float = 0.0
+        worker_id: str | None = None
+
+    # ── Top-level response models ────────────────────────────────────
+
+    class HealthBackends(BaseModel):
+        storage: str
+        queue: str
+        secrets: str
+        embedding: str
+        search: str
+        graph: str
+        llm: str
+        consensus: str
+        tools: str
+        resources: str
+
+    class HealthResponse(BaseModel):
+        status: str
+        backends: HealthBackends
+
+    class KnowledgeStatsResponse(BaseModel):
+        documents: int
+        chunks: int
+        embeddings: int
+
+    class ListDocumentsResponse(BaseModel):
+        documents: list[DocumentOut]
+        limit: int
+        offset: int
+
+    class StoreDocumentResponse(BaseModel):
+        id: str
+        stored: bool
+
+    class PendingChunksResponse(BaseModel):
+        chunks: list[ChunkOut]
+        count: int
+
+    class StoreChunksResponse(BaseModel):
+        stored: int
+        total: int
+
+    class StoreEmbeddingsResponse(BaseModel):
+        stored: int
+        total: int
+
+    class TextSearchResponse(BaseModel):
+        results: list[SearchResultOut]
+        query: str
+
+    class SemanticSearchResponse(BaseModel):
+        results: list[SearchResultOut]
+
+    class HybridSearchResponse(BaseModel):
+        results: list[SearchResultOut]
+
+    class ListSecretsResponse(BaseModel):
+        secrets: list[str]
+
+    class SecretMetadataResponse(BaseModel):
+        name: str
+        exists: bool
+
+    class GetSecretResponse(BaseModel):
+        name: str
+        value: str
+
+    class ListModelsResponse(BaseModel):
+        models: list[str]
+        count: int
+
+    class GatherResponse(BaseModel):
+        responses: list[ChatResponseOut]
+        count: int
+        failed_models: list[str]
+        models_queried: list[str]
+
+    class SynthesizeResponse(BaseModel):
+        synthesis: ChatResponseOut
+        worker_responses: list[ChatResponseOut]
+        failed_models: list[str]
+        arbiter_attempted: bool
+        arbiter_error: str | None
+
+    class ListToolsResponse(BaseModel):
+        tools: list[ToolDefinitionOut]
+        count: int
+
+    class CallToolResponse(BaseModel):
+        tool_name: str
+        output: Any = None
+        error: str | None = None
+        duration_ms: float | None = None
+
+    class ListResourcesResponse(BaseModel):
+        resources: list[ResourceDefinitionOut]
+        count: int
+
+    class ReadResourceResponse(BaseModel):
+        uri: str
+        content: str
+        mime_type: str
+        encoding: str
+
+    class IdResponse(BaseModel):
+        id: str
+
+    class NodeResponse(BaseModel):
+        id: str
+        label: str
+        properties: dict = Field(default_factory=dict)
+
+    class NeighborsResponse(BaseModel):
+        neighbors: list[GraphNodeOut]
+
+    class QueueStatusResponse(BaseModel):
+        pending: int
+        processing: int
+        dead_letter: int
+
+    class EnqueueResponse(BaseModel):
+        enqueued: int
+
+    class FetchResponse(BaseModel):
+        items: list[QueueItemOut]
+        count: int
+
+    class CompleteResponse(BaseModel):
+        completed: bool
+
+    class RequeueResponse(BaseModel):
+        requeued: int
+
 except ImportError:  # pydantic not installed (server extra not required)
     pass
 
@@ -238,14 +434,14 @@ def _mount_storage_routes(app: FastAPI, config: LoomConfig, auth_deps: list) -> 
 
     router = APIRouter(prefix="/knowledge", tags=["knowledge"], dependencies=auth_deps)
 
-    @router.get("/stats")
+    @router.get("/stats", response_model=KnowledgeStatsResponse)
     async def knowledge_stats():
         docs = await config.storage.count_documents()
         chunks = await config.storage.count_chunks()
         embeddings = await config.storage.count_embeddings()
         return {"documents": docs, "chunks": chunks, "embeddings": embeddings}
 
-    @router.get("/documents")
+    @router.get("/documents", response_model=ListDocumentsResponse)
     async def list_documents(limit: int = 20, offset: int = 0):
         docs = await config.storage.list_documents(limit=limit, offset=offset)
         return {
@@ -254,7 +450,7 @@ def _mount_storage_routes(app: FastAPI, config: LoomConfig, auth_deps: list) -> 
             "offset": offset,
         }
 
-    @router.post("/documents")
+    @router.post("/documents", response_model=StoreDocumentResponse)
     async def store_document(body: StoreDocumentRequest):
         from loom_ai.models import Document
 
@@ -269,12 +465,12 @@ def _mount_storage_routes(app: FastAPI, config: LoomConfig, auth_deps: list) -> 
         doc_id = await config.storage.store_document(doc)
         return {"id": doc_id, "stored": True}
 
-    @router.get("/chunks/pending")
+    @router.get("/chunks/pending", response_model=PendingChunksResponse)
     async def pending_chunks(limit: int = 50, after_id: str | None = None):
         chunks = await config.storage.get_pending_chunks(limit, after_id=after_id)
         return {"chunks": [c.__dict__ for c in chunks], "count": len(chunks)}
 
-    @router.post("/chunks/store")
+    @router.post("/chunks/store", response_model=StoreChunksResponse)
     async def store_chunks(body: StoreChunksRequest):
         from loom_ai.models import Chunk
 
@@ -293,7 +489,7 @@ def _mount_storage_routes(app: FastAPI, config: LoomConfig, auth_deps: list) -> 
         stored = await config.storage.store_chunks(body.document_id, chunks)
         return {"stored": stored, "total": len(chunks)}
 
-    @router.post("/chunks/store-embeddings")
+    @router.post("/chunks/store-embeddings", response_model=StoreEmbeddingsResponse)
     async def store_embeddings(body: StoreEmbeddingsRequest):
         from loom_ai.models import Embedding
 
@@ -321,11 +517,11 @@ def _mount_queue_routes(app: FastAPI, config: LoomConfig, auth_deps: list) -> No
 
     router = APIRouter(prefix="/pipeline", tags=["pipeline"], dependencies=auth_deps)
 
-    @router.get("/queues/{queue_name}/status")
+    @router.get("/queues/{queue_name}/status", response_model=QueueStatusResponse)
     async def queue_status(queue_name: str):
         return await config.queue.status(queue_name)
 
-    @router.post("/queues/{queue_name}/enqueue")
+    @router.post("/queues/{queue_name}/enqueue", response_model=EnqueueResponse)
     async def queue_enqueue(queue_name: str, body: EnqueueRequest):
         from loom_ai.models import QueueItem
 
@@ -341,17 +537,17 @@ def _mount_queue_routes(app: FastAPI, config: LoomConfig, auth_deps: list) -> No
         count = await config.queue.enqueue(queue_name, items)
         return {"enqueued": count}
 
-    @router.post("/queues/{queue_name}/fetch")
+    @router.post("/queues/{queue_name}/fetch", response_model=FetchResponse)
     async def queue_fetch(queue_name: str, body: FetchRequest):
         items = await config.queue.fetch(queue_name, body.count, body.worker_id)
         return {"items": [i.__dict__ for i in items], "count": len(items)}
 
-    @router.post("/queues/{queue_name}/complete")
+    @router.post("/queues/{queue_name}/complete", response_model=CompleteResponse)
     async def queue_complete(queue_name: str, body: CompleteRequest):
         ok = await config.queue.complete(queue_name, body.id)
         return {"completed": ok}
 
-    @router.post("/queues/{queue_name}/requeue")
+    @router.post("/queues/{queue_name}/requeue", response_model=RequeueResponse)
     async def queue_requeue(queue_name: str, body: RequeueRequest):
         from loom_ai.models import QueueItem
 
@@ -367,17 +563,17 @@ def _mount_search_routes(app: FastAPI, config: LoomConfig, auth_deps: list) -> N
 
     router = APIRouter(prefix="/search", tags=["search"], dependencies=auth_deps)
 
-    @router.get("/text")
+    @router.get("/text", response_model=TextSearchResponse)
     async def text_search(q: str, limit: int = 10):
         results = await config.search.text_search(q, limit=limit)
         return {"results": [r.__dict__ for r in results], "query": q}
 
-    @router.post("/semantic")
+    @router.post("/semantic", response_model=SemanticSearchResponse)
     async def semantic_search(body: SemanticSearchRequest):
         results = await config.search.semantic_search(body.vector, limit=body.limit)
         return {"results": [r.__dict__ for r in results]}
 
-    @router.post("/hybrid")
+    @router.post("/hybrid", response_model=HybridSearchResponse)
     async def hybrid_search(body: HybridSearchRequest):
         results = await config.search.hybrid_search(
             body.query,
@@ -411,14 +607,18 @@ def _mount_secrets_routes(app: FastAPI, config: LoomConfig, auth_deps: list) -> 
     logger = logging.getLogger("loom_ai.server")
     router = APIRouter(prefix="/secrets", tags=["secrets"], dependencies=auth_deps)
 
-    @router.get("/")
+    @router.get("/", response_model=ListSecretsResponse)
     async def list_secrets():
         """Return secret names without exposing values."""
         logger.debug("secrets.list requested")
         names = await config.secrets.list_names()
         return {"secrets": names}
 
-    @router.get("/{name}", responses=_NOT_FOUND_RESPONSES)
+    @router.get(
+        "/{name}",
+        response_model=SecretMetadataResponse,
+        responses=_NOT_FOUND_RESPONSES,
+    )
     async def get_secret_metadata(name: str):
         """Check whether a secret exists. Never returns the value."""
         value = await config.secrets.get(name)
@@ -428,7 +628,11 @@ def _mount_secrets_routes(app: FastAPI, config: LoomConfig, auth_deps: list) -> 
             raise HTTPException(status_code=404, detail="Secret not found")
         return {"name": name, "exists": True}
 
-    @router.post("/{name}/reveal", responses=_NOT_FOUND_RESPONSES)
+    @router.post(
+        "/{name}/reveal",
+        response_model=GetSecretResponse,
+        responses=_NOT_FOUND_RESPONSES,
+    )
     async def reveal_secret(
         name: str,
         x_secret_access_reason: str | None = Header(None),
@@ -439,14 +643,11 @@ def _mount_secrets_routes(app: FastAPI, config: LoomConfig, auth_deps: list) -> 
         audit-logged with the supplied reason.
         """
         if not x_secret_access_reason:
-            logger.warning(
-                "secrets.reveal DENIED name=%s reason=missing_header", name
-            )
+            logger.warning("secrets.reveal DENIED name=%s reason=missing_header", name)
             raise HTTPException(
                 status_code=400,
                 detail="X-Secret-Access-Reason header is required",
             )
-
         value = await config.secrets.get(name)
         if value is None:
             logger.info(
@@ -471,12 +672,12 @@ def _mount_llm_routes(app: FastAPI, config: LoomConfig, auth_deps: list) -> None
 
     router = APIRouter(prefix="/llm", tags=["llm"], dependencies=auth_deps)
 
-    @router.get("/models")
+    @router.get("/models", response_model=ListModelsResponse)
     async def llm_models():
         models = await config.llm.list_models()
         return {"models": models, "count": len(models)}
 
-    @router.post("/chat")
+    @router.post("/chat", response_model=ChatResponseOut)
     async def llm_chat(body: LLMChatRequest):
         from loom_ai.models import ChatMessage
 
@@ -497,7 +698,7 @@ def _mount_consensus_routes(app: FastAPI, config: LoomConfig, auth_deps: list) -
 
     router = APIRouter(prefix="/consensus", tags=["consensus"], dependencies=auth_deps)
 
-    @router.post("/gather")
+    @router.post("/gather", response_model=GatherResponse)
     async def consensus_gather(body: ConsensusGatherRequest):
         from loom_ai.models import ChatMessage
 
@@ -512,7 +713,7 @@ def _mount_consensus_routes(app: FastAPI, config: LoomConfig, auth_deps: list) -
             "models_queried": body.models,
         }
 
-    @router.post("/synthesize")
+    @router.post("/synthesize", response_model=SynthesizeResponse)
     async def consensus_synthesize(body: ConsensusSynthesizeRequest):
         result = await config.consensus.synthesize(
             body.prompt,
@@ -538,12 +739,12 @@ def _mount_tools_routes(app: FastAPI, config: LoomConfig, auth_deps: list) -> No
 
     router = APIRouter(prefix="/tools", tags=["tools"], dependencies=auth_deps)
 
-    @router.get("/")
+    @router.get("/", response_model=ListToolsResponse)
     async def list_tools():
         tools = await config.tools.list_tools()
         return {"tools": [t.__dict__ for t in tools], "count": len(tools)}
 
-    @router.post("/call")
+    @router.post("/call", response_model=CallToolResponse)
     async def call_tool(body: ToolCallRequest):
         result = await config.tools.call_tool(body.name, body.arguments)
         return result.__dict__
@@ -556,7 +757,7 @@ def _mount_resources_routes(app: FastAPI, config: LoomConfig, auth_deps: list) -
 
     router = APIRouter(prefix="/resources", tags=["resources"], dependencies=auth_deps)
 
-    @router.get("/")
+    @router.get("/", response_model=ListResourcesResponse)
     async def list_resources():
         resources = await config.resources.list_resources()
         return {
@@ -564,7 +765,11 @@ def _mount_resources_routes(app: FastAPI, config: LoomConfig, auth_deps: list) -
             "count": len(resources),
         }
 
-    @router.get("/read", responses=_NOT_FOUND_RESPONSES)
+    @router.get(
+        "/read",
+        response_model=ReadResourceResponse,
+        responses=_NOT_FOUND_RESPONSES,
+    )
     async def read_resource(uri: str):
         try:
             content = await config.resources.read_resource(uri)
@@ -593,7 +798,7 @@ def _mount_graph_routes(app: FastAPI, config: LoomConfig, auth_deps: list) -> No
 
     router = APIRouter(prefix="/graph", tags=["graph"], dependencies=auth_deps)
 
-    @router.post("/nodes")
+    @router.post("/nodes", response_model=IdResponse)
     async def add_node(body: AddNodeRequest):
         from loom_ai.models import GraphNode
 
@@ -605,19 +810,23 @@ def _mount_graph_routes(app: FastAPI, config: LoomConfig, auth_deps: list) -> No
         node_id = await config.graph.add_node(node)
         return {"id": node_id}
 
-    @router.get("/nodes/{node_id}", responses=_NOT_FOUND_RESPONSES)
+    @router.get(
+        "/nodes/{node_id}",
+        response_model=NodeResponse,
+        responses=_NOT_FOUND_RESPONSES,
+    )
     async def get_node(node_id: str):
         node = await config.graph.get_node(node_id)
         if node is None:
             raise HTTPException(status_code=404, detail="Node not found")
         return node.__dict__
 
-    @router.get("/nodes/{node_id}/neighbors")
+    @router.get("/nodes/{node_id}/neighbors", response_model=NeighborsResponse)
     async def get_neighbors(node_id: str, edge_label: str | None = None):
         neighbors = await config.graph.get_neighbors(node_id, edge_label=edge_label)
         return {"neighbors": [n.__dict__ for n in neighbors]}
 
-    @router.post("/edges")
+    @router.post("/edges", response_model=IdResponse)
     async def add_edge(body: AddEdgeRequest):
         from loom_ai.models import GraphEdge
 
@@ -639,10 +848,32 @@ def _mount_graph_routes(app: FastAPI, config: LoomConfig, auth_deps: list) -> No
 # ---------------------------------------------------------------------------
 
 
+def _sanitize_validation_errors(errors: list[dict]) -> list[dict]:
+    """Strip ``input`` and ``ctx`` values from validation error details.
+
+    FastAPI echoes back the caller's input in validation errors.  When the
+    input contains secret material the echo could leak it in the response.
+    The ``ctx`` key may contain raw exception objects that are not JSON
+    serialisable and can leak internal implementation details.  This helper
+    keeps only ``type``, ``loc``, ``msg``, and ``url`` -- enough for the
+    caller to understand what went wrong without revealing submitted values
+    or internal state.
+    """
+    _KEEP = {"type", "loc", "msg", "url"}
+    sanitized = []
+    for err in errors:
+        clean = {k: v for k, v in err.items() if k in _KEEP}
+        sanitized.append(clean)
+    return sanitized
+
+
 def create_app(config: LoomConfig) -> FastAPI:
     """Build a FastAPI application wiring only the active backends."""
     try:
         from fastapi import Depends, FastAPI, Security
+        from fastapi.exceptions import RequestValidationError
+        from starlette.requests import Request
+        from starlette.responses import JSONResponse
     except ImportError as exc:
         raise ImportError(
             "FastAPI server requires 'fastapi' and 'uvicorn'.  "
@@ -677,7 +908,30 @@ def create_app(config: LoomConfig) -> FastAPI:
 
     app.state.loom = config
 
-    @app.get("/health")
+    # ── Exception handlers ───────────────────────────────────────────
+
+    @app.exception_handler(RequestValidationError)
+    async def _validation_error_handler(
+        request: Request, exc: RequestValidationError
+    ) -> JSONResponse:
+        """Return 422 with field-level detail but strip submitted input
+        values so that secrets or credentials are never echoed back."""
+        return JSONResponse(
+            status_code=422,
+            content={"detail": _sanitize_validation_errors(exc.errors())},
+        )
+
+    @app.exception_handler(Exception)
+    async def _generic_error_handler(request: Request, exc: Exception) -> JSONResponse:
+        """Catch-all for unhandled errors.  Returns a generic 500 without
+        leaking stack traces or internal implementation details."""
+        logger.exception("Unhandled error on %s %s", request.method, request.url.path)
+        return JSONResponse(
+            status_code=500,
+            content={"detail": "Internal server error"},
+        )
+
+    @app.get("/health", response_model=HealthResponse)
     async def health():
         backends = {
             "storage": type(config.storage).__name__,
@@ -699,20 +953,14 @@ def create_app(config: LoomConfig) -> FastAPI:
             "storage": await _check_backend(
                 "storage", config.storage.count_documents()
             ),
-            "queue": await _check_backend(
-                "queue", config.queue.list_queues()
-            ),
-            "secrets": await _check_backend(
-                "secrets", config.secrets.list_names()
-            ),
+            "queue": await _check_backend("queue", config.queue.list_queues()),
+            "secrets": await _check_backend("secrets", config.secrets.list_names()),
             "search": await _check_backend(
                 "search", config.search.text_search("", limit=1)
             ),
         }
         if config.llm is not None:
-            checks["llm"] = await _check_backend(
-                "llm", config.llm.list_models()
-            )
+            checks["llm"] = await _check_backend("llm", config.llm.list_models())
         if config.graph is not None:
             checks["graph"] = await _check_backend(
                 "graph", config.graph.get_node("__readiness_probe__")
