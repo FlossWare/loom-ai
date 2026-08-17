@@ -26,18 +26,19 @@ jobs:
           python-version: '3.12'
 
       - name: Install build tools
-        run: pip install hatchling build twine
+        run: pip install hatchling==1.32.0 build==1.5.0 twine==7.0.0 --only-binary :all:
 
       - name: Install dev dependencies and run tests
         run: |
-          pip install -e ".[dev,server]"
+          pip install --only-binary :all: -r requirements-ci.txt
+          pip install --no-deps -e .
           python -m pytest tests/ -v --tb=short
 
       - name: Lint check
         run: ruff check loom_ai/
 
       - name: Setup .gitconfig for version bumps
-        uses: oleksiyrudenko/gha-git-credentials@latest
+        uses: oleksiyrudenko/gha-git-credentials@8bb1fe6d543b2233ef1856cd3b0181f5abbd4d6a # v2.1.2
         with:
           global: true
           name: 'Version Bump'

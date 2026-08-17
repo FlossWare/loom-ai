@@ -57,6 +57,7 @@ class HttpLLMBackend:
         self._timeout = timeout
         self._provider_name = provider_name
         self._ssl_ctx = ssl.create_default_context()
+        self._ssl_ctx.minimum_version = ssl.TLSVersion.TLSv1_2
 
     # ── internal helpers ─────────────────────────────────────────────
 

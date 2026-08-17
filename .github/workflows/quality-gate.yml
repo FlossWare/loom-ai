@@ -46,7 +46,8 @@ jobs:
 
       - name: Install dependencies
         run: |
-          pip install -e ".[dev,server]"
+          pip install --only-binary :all: -r requirements-ci.txt
+          pip install --no-deps -e .
 
       - name: Lint with ruff
         id: ruff
@@ -75,12 +76,13 @@ jobs:
         id: imports
         run: |
           python -c "
+          import asyncio
           from loom_ai import LoomConfig, Document, Chunk, ChatMessage
           from loom_ai.protocols import StorageBackend, QueueBackend, LLMBackend
           from loom_ai.backends.memory import MemoryStorageBackend, MemoryQueueBackend
           from loom_ai.backends.env_secrets import EnvSecretsBackend
           from loom_ai.backends.http_llm import HttpLLMBackend
-          cfg = LoomConfig.from_env()
+          cfg = asyncio.run(LoomConfig.from_env())
           assert isinstance(cfg.storage, StorageBackend)
           assert isinstance(cfg.queue, QueueBackend)
           print('All imports and protocol checks passed')
