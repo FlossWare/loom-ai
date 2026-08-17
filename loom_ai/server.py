@@ -784,7 +784,7 @@ def _mount_resources_routes(app: FastAPI, config: LoomConfig, auth_deps: list) -
         try:
             content = await config.resources.read_resource(uri)
         except KeyError:
-            raise HTTPException(status_code=404, detail=f"Resource not found: {uri!r}")
+            raise HTTPException(status_code=404, detail="Resource not found")
 
         if isinstance(content.content, bytes):
             return {
