@@ -15,13 +15,11 @@ import pytest
 from loom_ai.models import Chunk, Document, Embedding
 from loom_ai.models_phase1 import RetrievalResult
 
-# Guard: skip the whole module if asyncpg is not importable at test
-# time (e.g. CI without the postgresql extra).  The import guard in
-# the backend module itself handles the runtime case.
-pytest.importorskip(
-    "loom_ai.backends.postgresql",
-    reason="PostgreSQL backend not importable (asyncpg may be missing)",
-)
+# Guard: skip the whole module when asyncpg is not installed (e.g. CI
+# without the postgresql extra).  We check for asyncpg directly because
+# loom_ai.backends.postgresql catches the missing import internally and
+# still loads — which would let the tests run and then fail.
+pytest.importorskip("asyncpg", reason="asyncpg not installed")
 
 from loom_ai.backends.postgresql import (  # noqa: E402
     PostgresqlKnowledgeStore,
