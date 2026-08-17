@@ -284,7 +284,6 @@ async def test_status_counts(queue):
     await queue.enqueue("tasks", [QueueItem(id="a"), QueueItem(id="b")])
     await queue.fetch("tasks", 1, "w1")
     st = await queue.status("tasks")
-    assert st["queue"] == "tasks"
     assert st["pending"] == 1
     assert st["processing"] == 1
     assert st["dead_letter"] == 0

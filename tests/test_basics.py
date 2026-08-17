@@ -65,7 +65,7 @@ async def test_memory_queue_roundtrip():
     await cfg.queue.enqueue("test-queue", [item])
 
     status = await cfg.queue.status("test-queue")
-    assert status["queued"] == 1
+    assert status["pending"] == 1
 
     fetched = await cfg.queue.fetch("test-queue", 1, "worker-1")
     assert len(fetched) == 1
@@ -73,7 +73,7 @@ async def test_memory_queue_roundtrip():
 
     await cfg.queue.complete("test-queue", "q-1")
     status = await cfg.queue.status("test-queue")
-    assert status["queued"] == 0
+    assert status["pending"] == 0
 
 
 async def test_env_secrets():

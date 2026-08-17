@@ -77,17 +77,18 @@ async def test_empty_queue_returns_empty_list(queue_backend):
 
 
 async def test_queue_status(queue_backend):
-    """Status reports queued and processing counts."""
+    """Status reports pending, processing, and dead_letter counts."""
     items = [QueueItem(id=f"st-{i}", payload={}) for i in range(3)]
     await queue_backend.enqueue("status-q", items)
 
     status = await queue_backend.status("status-q")
-    assert status["queued"] == 3
+    assert status["pending"] == 3
     assert status["processing"] == 0
+    assert status["dead_letter"] == 0
 
     await queue_backend.fetch("status-q", 2, "w")
     status = await queue_backend.status("status-q")
-    assert status["queued"] == 1
+    assert status["pending"] == 1
     assert status["processing"] == 2
 
 

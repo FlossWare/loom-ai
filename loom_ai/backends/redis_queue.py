@@ -253,7 +253,6 @@ class RedisQueueBackend:
             processing = self._redis.zcard(self._processing_key(queue_name))
             dlq_len = self._redis.llen(self._dlq_key(queue_name))
             return {
-                "queue": queue_name,
                 "pending": pending,
                 "processing": processing,
                 "dead_letter": dlq_len,

@@ -101,7 +101,7 @@ async def test_queue_processing_workflow(config):
 
     # 4. Queue is now empty
     status = await config.queue.status("processing")
-    assert status["queued"] == 0
+    assert status["pending"] == 0
     assert status["processing"] == 0
 
 
