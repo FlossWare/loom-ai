@@ -51,7 +51,7 @@ class FailingRunner:
 
 async def test_linear_chain():
     """A -> B -> C executes in strict sequential order."""
-    cfg = LoomConfig.from_env()
+    cfg = await LoomConfig.from_env()
     runner = RecordingRunner()
     engine = ExecutionEngine(cfg, runner=runner)
     plan = ExecutionPlan(
@@ -69,7 +69,7 @@ async def test_linear_chain():
 
 async def test_parallel_independent_tasks():
     """Tasks with no dependencies all run in a single wave."""
-    cfg = LoomConfig.from_env()
+    cfg = await LoomConfig.from_env()
     runner = RecordingRunner()
     engine = ExecutionEngine(cfg, runner=runner)
     plan = ExecutionPlan(
@@ -87,7 +87,7 @@ async def test_parallel_independent_tasks():
 
 async def test_diamond_dependency():
     """A -> (B, C) -> D executes in three waves."""
-    cfg = LoomConfig.from_env()
+    cfg = await LoomConfig.from_env()
     runner = RecordingRunner()
     engine = ExecutionEngine(cfg, runner=runner)
     plan = ExecutionPlan(
@@ -114,7 +114,7 @@ async def test_diamond_dependency():
 
 async def test_failed_task_cancels_dependents():
     """A failing task cancels downstream dependents but not independent tasks."""
-    cfg = LoomConfig.from_env()
+    cfg = await LoomConfig.from_env()
     engine = ExecutionEngine(cfg, runner=FailingRunner())
     plan = ExecutionPlan(
         id="fail-cascade",
@@ -134,7 +134,7 @@ async def test_failed_task_cancels_dependents():
 
 async def test_failed_task_with_retry():
     """A task that fails on first attempt succeeds on retry."""
-    cfg = LoomConfig.from_env()
+    cfg = await LoomConfig.from_env()
     runner = RecordingRunner(fail_on_first={"flaky"})
     engine = ExecutionEngine(cfg, runner=runner)
     plan = ExecutionPlan(
@@ -157,7 +157,7 @@ async def test_failed_task_with_retry():
 
 async def test_retry_does_not_release_dependent_until_dependency_completes():
     """Cancelled work remains cancelled until every dependency completes."""
-    cfg = LoomConfig.from_env()
+    cfg = await LoomConfig.from_env()
     runner = RecordingRunner(fail_on_first={"flaky"})
     engine = ExecutionEngine(cfg, runner=runner)
     plan = ExecutionPlan(
@@ -182,7 +182,7 @@ async def test_retry_does_not_release_dependent_until_dependency_completes():
 
 async def test_retry_no_remaining_retries():
     """retry_failed returns plan unchanged when no retries left."""
-    cfg = LoomConfig.from_env()
+    cfg = await LoomConfig.from_env()
     engine = ExecutionEngine(cfg, runner=FailingRunner())
     plan = ExecutionPlan(
         id="no-retries",
@@ -196,7 +196,7 @@ async def test_retry_no_remaining_retries():
 
 async def test_task_timeout():
     """A slow task is marked FAILED when it exceeds its timeout."""
-    cfg = LoomConfig.from_env()
+    cfg = await LoomConfig.from_env()
     engine = ExecutionEngine(cfg, runner=SlowRunner())
     plan = ExecutionPlan(
         id="timeout",
@@ -210,7 +210,7 @@ async def test_task_timeout():
 
 async def test_cyclic_dependency_raises():
     """A cycle in the dependency graph raises CyclicDependencyError."""
-    cfg = LoomConfig.from_env()
+    cfg = await LoomConfig.from_env()
     engine = ExecutionEngine(cfg)
     plan = ExecutionPlan(
         id="cycle",
@@ -225,7 +225,7 @@ async def test_cyclic_dependency_raises():
 
 async def test_unknown_dependency_raises():
     """A dependency on a non-existent task raises an error."""
-    cfg = LoomConfig.from_env()
+    cfg = await LoomConfig.from_env()
     engine = ExecutionEngine(cfg)
     plan = ExecutionPlan(
         id="unknown-dep",
@@ -237,7 +237,7 @@ async def test_unknown_dependency_raises():
 
 async def test_observer_receives_transitions():
     """The observer callback fires for every status transition."""
-    cfg = LoomConfig.from_env()
+    cfg = await LoomConfig.from_env()
     transitions: list[tuple[str, TaskStatus, TaskStatus]] = []
 
     def on_transition(task, old, new):
@@ -252,7 +252,7 @@ async def test_observer_receives_transitions():
 
 async def test_empty_plan():
     """An empty plan executes without error."""
-    cfg = LoomConfig.from_env()
+    cfg = await LoomConfig.from_env()
     engine = ExecutionEngine(cfg)
     plan = ExecutionPlan(id="empty", tasks=[])
     result = await engine.execute_plan(plan)
@@ -261,7 +261,7 @@ async def test_empty_plan():
 
 async def test_single_task():
     """A plan with one task completes normally."""
-    cfg = LoomConfig.from_env()
+    cfg = await LoomConfig.from_env()
     engine = ExecutionEngine(cfg)
     plan = ExecutionPlan(
         id="single",
@@ -277,7 +277,7 @@ async def test_single_task():
 
 async def test_execute_task_rejects_non_pending():
     """execute_task raises ValueError for non-PENDING tasks."""
-    cfg = LoomConfig.from_env()
+    cfg = await LoomConfig.from_env()
     engine = ExecutionEngine(cfg)
     task = Task(id="done", name="Done", status=TaskStatus.COMPLETED)
     with pytest.raises(ValueError, match="Cannot execute task"):
@@ -286,7 +286,7 @@ async def test_execute_task_rejects_non_pending():
 
 async def test_task_preserves_order():
     """Returned plan preserves original task ordering."""
-    cfg = LoomConfig.from_env()
+    cfg = await LoomConfig.from_env()
     engine = ExecutionEngine(cfg)
     plan = ExecutionPlan(
         id="order",

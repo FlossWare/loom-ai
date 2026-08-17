@@ -45,10 +45,11 @@ Usage:
     python -m loom_ai.server
 
     # Or programmatically:
+    import asyncio
     from loom_ai import LoomConfig
     from loom_ai.server import create_app
 
-    cfg = LoomConfig.from_env()
+    cfg = asyncio.run(LoomConfig.from_env())
     app = create_app(cfg)
 """
 
@@ -747,6 +748,8 @@ def create_app(config: LoomConfig) -> FastAPI:
 
 def main() -> None:
     """Entry point: python -m loom_ai.server"""
+    import asyncio
+
     try:
         import uvicorn
     except ImportError as exc:
@@ -757,7 +760,7 @@ def main() -> None:
 
     from loom_ai.config import LoomConfig
 
-    config = LoomConfig.from_env()
+    config = asyncio.run(LoomConfig.from_env())
     app = create_app(config)
     host = os.environ.get("LOOM_HOST", "127.0.0.1")
     raw_port = os.environ.get("LOOM_PORT", "5000")
