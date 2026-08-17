@@ -33,6 +33,11 @@ See ``docs/contracts.md`` for the canonical contract inventory.
 """
 
 from loom_ai.config import LoomConfig
+from loom_ai.config_validator import (
+    Environment,
+    LoomConfigValidator,
+    validate_env,
+)
 from loom_ai.consensus import ConsensusEngine, ConsensusResult
 from loom_ai.contracts_execution import (
     ExecutionObserver,
@@ -142,6 +147,10 @@ __all__ = [
     "StorageBackend",
     "TaskRunner",
     "ToolProvider",
+    # Configuration validation
+    "Environment",
+    "LoomConfigValidator",
+    "validate_env",
     # Most-used advanced contracts
     "ConversationManager",
     "EvaluationHarness",
