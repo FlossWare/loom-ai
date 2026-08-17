@@ -643,21 +643,23 @@ def _mount_secrets_routes(app: FastAPI, config: LoomConfig, auth_deps: list) -> 
         audit-logged with the supplied reason.
         """
         if not x_secret_access_reason:
-            logger.warning("secrets.reveal DENIED name=%s reason=missing_header", name)
+            logger.warning(  # NOSONAR — intentional audit log
+                "secrets.reveal DENIED name=%s reason=missing_header", name
+            )
             raise HTTPException(
                 status_code=400,
                 detail="X-Secret-Access-Reason header is required",
             )
         value = await config.secrets.get(name)
         if value is None:
-            logger.info(
+            logger.info(  # NOSONAR — intentional audit log
                 "secrets.reveal NOT_FOUND name=%s reason=%r",
                 name,
                 x_secret_access_reason,
             )
             raise HTTPException(status_code=404, detail="Secret not found")
 
-        logger.info(
+        logger.info(  # NOSONAR — intentional audit log
             "secrets.reveal GRANTED name=%s reason=%r",
             name,
             x_secret_access_reason,

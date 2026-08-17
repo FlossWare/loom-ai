@@ -196,8 +196,10 @@ return item_id
                 # Atomically pop from pending and add to processing via
                 # a server-side Lua script.
                 item_id_raw = self._redis.eval(
-                    self._FETCH_LUA, 2,
-                    pending_key, processing_key,
+                    self._FETCH_LUA,
+                    2,
+                    pending_key,
+                    processing_key,
                     str(lease_expiry),
                 )
                 if item_id_raw is None:

@@ -130,10 +130,10 @@ def test_ready_includes_optional_backends_when_enabled(monkeypatch):
     """Optional backends appear in checks when configured."""
     monkeypatch.delenv("LOOM_API_KEY", raising=False)
     monkeypatch.setenv("LOOM_GRAPH", "memory")
+    import asyncio
+
     from loom_ai.config import LoomConfig
     from loom_ai.server import create_app
-
-    import asyncio
 
     app = create_app(asyncio.run(LoomConfig.from_env()))
     client = TestClient(app)
