@@ -30,7 +30,7 @@ litellm = ["litellm>=1.0"]
 server = ["fastapi>=0.110", "uvicorn[standard]>=0.29"]
 observability = ["structlog>=24.0"]
 all = ["flossware-loom-ai[postgresql,redis,orientdb,openai,litellm,server,observability]"]
-dev = ["pytest>=7.0", "pytest-asyncio>=0.23", "pytest-benchmark>=4.0", "ruff>=0.4", "httpx>=0.24", "httpx2>=0.1", "pip-audit>=2.7", "pre-commit>=3.7"]
+dev = ["pytest>=7.0", "pytest-asyncio>=0.23", "pytest-benchmark>=4.0", "ruff>=0.4", "httpx>=0.24", "httpx2>=0.1", "pip-audit>=2.7", "pre-commit>=3.7", "hypothesis>=6.0"]
 loadtest = ["locust>=2.20"]
 
 [tool.hatch.build.targets.wheel]
