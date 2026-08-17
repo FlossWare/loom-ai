@@ -88,6 +88,27 @@ class MockRedis:
     def llen(self, name):
         return len(self._lists.get(name, []))
 
+    def eval(self, script, numkeys, *args):
+        """Simulate the fetch Lua script atomically.
+
+        Supports the ``_FETCH_LUA`` script used by
+        :class:`RedisQueueBackend` to pop from a pending sorted set and
+        add to a processing sorted set in one step.
+        """
+        keys = list(args[:numkeys])
+        argv = list(args[numkeys:])
+
+        pending_key = keys[0]
+        processing_key = keys[1]
+        lease_expiry = float(argv[0])
+
+        result = self.zpopmin(pending_key, 1)
+        if not result:
+            return None
+        item_id, _score = result[0]
+        self.zadd(processing_key, {item_id: lease_expiry})
+        return item_id
+
 
 class MockPipeline:
     """Mock Redis pipeline that collects commands and executes them."""
@@ -198,6 +219,58 @@ async def test_fetch_priority_order(queue):
     fetched = await queue.fetch("tasks", 2, "w1")
     assert fetched[0].id == "high"
     assert fetched[1].id == "low"
+
+
+async def test_fetch_atomic_pop_and_lease(queue, mock_redis):
+    """Item must never exist in neither pending nor processing.
+
+    After fetch, the item must be removed from pending and present in
+    processing -- the Lua script guarantees these happen atomically.
+    """
+    await queue.enqueue("tasks", [QueueItem(id="atom1")])
+
+    pending_key = queue._pending_key("tasks")
+    processing_key = queue._processing_key("tasks")
+
+    assert mock_redis.zcard(pending_key) == 1
+    assert mock_redis.zcard(processing_key) == 0
+
+    fetched = await queue.fetch("tasks", 1, "w1")
+
+    assert len(fetched) == 1
+    assert fetched[0].id == "atom1"
+    # Item moved from pending to processing
+    assert mock_redis.zcard(pending_key) == 0
+    assert mock_redis.zcard(processing_key) == 1
+    assert "atom1" in mock_redis._sorted_sets[processing_key]
+
+
+async def test_fetch_uses_eval_for_atomicity(queue, mock_redis):
+    """Verify that fetch calls eval (Lua script) instead of separate
+    zpopmin + zadd, ensuring crash-safe item transfer."""
+    calls: list[str] = []
+    original_eval = mock_redis.eval
+    original_zpopmin = mock_redis.zpopmin
+
+    def tracking_eval(*args, **kwargs):
+        calls.append("eval")
+        return original_eval(*args, **kwargs)
+
+    def tracking_zpopmin(*args, **kwargs):
+        calls.append("zpopmin")
+        return original_zpopmin(*args, **kwargs)
+
+    mock_redis.eval = tracking_eval
+    mock_redis.zpopmin = tracking_zpopmin
+
+    await queue.enqueue("tasks", [QueueItem(id="t1")])
+    await queue.fetch("tasks", 1, "w1")
+
+    # fetch must use eval (which internally calls zpopmin), not a
+    # direct zpopmin at the top level.
+    assert "eval" in calls
+    # zpopmin is called *inside* eval, but never directly by fetch
+    assert calls[0] == "eval"
 
 
 # -- Complete -----------------------------------------------------------------

@@ -56,6 +56,23 @@ class RedisQueueBackend:
         Prefix for all Redis keys (default ``"loom:queue:"``).
     """
 
+    # Lua script executed atomically by Redis to pop from the pending sorted
+    # set and add to the processing sorted set in a single operation.  This
+    # prevents item loss if a crash occurs between the two steps.
+    _FETCH_LUA = """
+local pending_key = KEYS[1]
+local processing_key = KEYS[2]
+local lease_expiry = tonumber(ARGV[1])
+
+local result = redis.call('zpopmin', pending_key, 1)
+if #result == 0 then
+    return nil
+end
+local item_id = result[1]
+redis.call('zadd', processing_key, lease_expiry, item_id)
+return item_id
+"""
+
     def __init__(
         self,
         redis_client: object,
@@ -146,26 +163,35 @@ class RedisQueueBackend:
 
         Reclaims any items whose leases have expired before attempting to
         fetch new ones.  Returns a list of ``QueueItem`` instances.
+
+        The pop-from-pending + add-to-processing step is executed as an
+        atomic Lua script so that no item can be lost if the process
+        crashes between the two operations.
         """
         await self._reclaim_expired(queue_name)
 
         def _sync() -> list[QueueItem]:
+            pending_key = self._pending_key(queue_name)
+            processing_key = self._processing_key(queue_name)
             fetched: list[QueueItem] = []
             for _ in range(count):
-                result = self._redis.zpopmin(self._pending_key(queue_name))
-                if not result:
+                lease_expiry = time.time() + self._lease_timeout
+
+                # Atomically pop from pending and add to processing via
+                # a server-side Lua script.
+                item_id_raw = self._redis.eval(
+                    self._FETCH_LUA, 2,
+                    pending_key, processing_key,
+                    str(lease_expiry),
+                )
+                if item_id_raw is None:
                     break
-                item_id_raw, _score = result[0]
                 item_id = (
                     item_id_raw.decode()
                     if isinstance(item_id_raw, bytes)
                     else str(item_id_raw)
                 )
 
-                lease_expiry = time.time() + self._lease_timeout
-                self._redis.zadd(
-                    self._processing_key(queue_name), {item_id: lease_expiry}
-                )
                 self._redis.hset(
                     self._item_key(queue_name, item_id),
                     mapping={"worker_id": worker_id, "status": "processing"},
