@@ -31,11 +31,11 @@ def _make_app(monkeypatch, *, api_key: str | None = None, secrets: dict | None =
     if api_key is not None:
         monkeypatch.setenv("LOOM_API_KEY", api_key)
 
+    import asyncio
+
     from loom_ai.backends.env_secrets import EnvSecretsBackend
     from loom_ai.config import LoomConfig
     from loom_ai.server import create_app
-
-    import asyncio
 
     secrets_backend = EnvSecretsBackend(overrides=secrets or {})
     cfg = asyncio.run(LoomConfig.from_env())
@@ -187,9 +187,7 @@ def test_reveal_logs_not_found(monkeypatch, caplog):
             "/secrets/NOPE/reveal",
             headers={"X-Secret-Access-Reason": "lookup"},
         )
-    assert any(
-        "secrets.reveal NOT_FOUND" in r.message for r in caplog.records
-    )
+    assert any("secrets.reveal NOT_FOUND" in r.message for r in caplog.records)
 
 
 # ---------------------------------------------------------------------------

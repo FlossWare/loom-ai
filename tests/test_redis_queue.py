@@ -459,14 +459,8 @@ def test_config_imports_from_redis_queue_module():
 
     source = textwrap.dedent(inspect.getsource(LoomConfig._build_queue))
     tree = ast.parse(source)
-    imports = [
-        node
-        for node in ast.walk(tree)
-        if isinstance(node, ast.ImportFrom)
-    ]
-    redis_import = [
-        imp for imp in imports if imp.module and "redis" in imp.module
-    ]
+    imports = [node for node in ast.walk(tree) if isinstance(node, ast.ImportFrom)]
+    redis_import = [imp for imp in imports if imp.module and "redis" in imp.module]
     assert len(redis_import) == 1
     assert redis_import[0].module == "loom_ai.backends.redis_queue"
 
@@ -500,7 +494,5 @@ def test_from_env_uses_default_url(monkeypatch):
     with patch("loom_ai.backends.redis_queue._redis_lib", mock_redis_mod):
         backend = RedisQueueBackend.from_env()
 
-    mock_redis_mod.Redis.from_url.assert_called_once_with(
-        "redis://localhost:6379/0"
-    )
+    mock_redis_mod.Redis.from_url.assert_called_once_with("redis://localhost:6379/0")
     assert isinstance(backend, RedisQueueBackend)
