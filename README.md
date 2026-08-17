@@ -56,18 +56,22 @@ pip install flossware-loom-ai[all]         # everything
 ## Quick Start
 
 ```python
+import asyncio
 from loom_ai import LoomConfig, Document
 
-cfg = LoomConfig.from_env()
-await cfg.storage.store_document(
-    Document(id="doc-1", title="Example", content="Hello world")
-)
+async def main():
+    cfg = await LoomConfig.from_env()
+    await cfg.storage.store_document(
+        Document(id="doc-1", title="Example", content="Hello world")
+    )
 
-result = await cfg.consensus.synthesize(
-    "Explain distributed systems",
-    models=["gemini-3.5-flash", "llama-3.3-70b", "mistral-small"],
-)
-print(result.synthesis.content)
+    result = await cfg.consensus.synthesize(
+        "Explain distributed systems",
+        models=["gemini-3.5-flash", "llama-3.3-70b", "mistral-small"],
+    )
+    print(result.synthesis.content)
+
+asyncio.run(main())
 ```
 
 ## Protocol Contracts
@@ -131,23 +135,27 @@ See `examples/demo.py` for a runnable walkthrough using in-memory backends.
 ## Multi-Model Consensus
 
 ```python
+import asyncio
 from loom_ai import ChatMessage, LoomConfig
 
-cfg = LoomConfig.from_env()
+async def main():
+    cfg = await LoomConfig.from_env()
 
-result = await cfg.consensus.synthesize(
-    "Check this code for bugs",
-    models=["gemini-3.5-flash", "llama-3.3-70b", "codestral"],
-    arbiter_model="gemini-3.5-flash",
-    tool_name="review",
-    arbiter_temperature=0.3,
-)
-print(result.synthesis.content)
+    result = await cfg.consensus.synthesize(
+        "Check this code for bugs",
+        models=["gemini-3.5-flash", "llama-3.3-70b", "codestral"],
+        arbiter_model="gemini-3.5-flash",
+        tool_name="review",
+        arbiter_temperature=0.3,
+    )
+    print(result.synthesis.content)
 
-responses, failed = await cfg.consensus.gather(
-    [ChatMessage(role="user", content="Check this code for bugs")],
-    models=["gemini-3.5-flash", "llama-3.3-70b", "codestral"],
-)
+    responses, failed = await cfg.consensus.gather(
+        [ChatMessage(role="user", content="Check this code for bugs")],
+        models=["gemini-3.5-flash", "llama-3.3-70b", "codestral"],
+    )
+
+asyncio.run(main())
 ```
 
 The arbiter uses the same configured deadline/retry policy as worker calls and returns successful worker responses when synthesis cannot be completed.
