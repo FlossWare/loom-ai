@@ -165,7 +165,7 @@ class TestDefaults:
         v = LoomConfigValidator(Environment.DEV)
         d = v.defaults_for()
         assert d["LOOM_STORAGE"] == "memory"
-        assert d["LOOM_PORT"] == "8000"
+        assert d["LOOM_PORT"] == "5000"
 
     def test_defaults_for_prod(self):
         v = LoomConfigValidator(Environment.DEV)
@@ -226,19 +226,23 @@ class TestTypeValidation:
 
 class TestDependencies:
     def test_dotenv_empty_file_path_rejected(self):
-        result = validate_env(env={
-            "LOOM_SECRETS": "dotenv",
-            "LOOM_SECRETS_FILE": "",
-        })
+        result = validate_env(
+            env={
+                "LOOM_SECRETS": "dotenv",
+                "LOOM_SECRETS_FILE": "",
+            }
+        )
         errors = [e for e in result.errors if e.field == "LOOM_SECRETS_FILE"]
         assert len(errors) == 1
         assert "non-empty" in errors[0].message
 
     def test_dotenv_with_file_path_accepted(self):
-        result = validate_env(env={
-            "LOOM_SECRETS": "dotenv",
-            "LOOM_SECRETS_FILE": "/tmp/.env",
-        })
+        result = validate_env(
+            env={
+                "LOOM_SECRETS": "dotenv",
+                "LOOM_SECRETS_FILE": "/tmp/.env",
+            }
+        )
         errors = [e for e in result.errors if e.field == "LOOM_SECRETS_FILE"]
         assert errors == []
 
@@ -376,21 +380,33 @@ class TestLoomConfigValidator:
     def test_all_fields_covered(self):
         names = {f.name for f in ALL_FIELDS}
         expected = {
-            "LOOM_STORAGE", "LOOM_QUEUE", "LOOM_SECRETS", "LOOM_EMBEDDING",
-            "LOOM_SEARCH", "LOOM_GRAPH", "LOOM_TOOLS", "LOOM_RESOURCES",
-            "LOOM_LLM_BASE_URL", "LOOM_LLM_API_KEY", "LOOM_LLM_MODEL",
+            "LOOM_STORAGE",
+            "LOOM_QUEUE",
+            "LOOM_SECRETS",
+            "LOOM_EMBEDDING",
+            "LOOM_SEARCH",
+            "LOOM_GRAPH",
+            "LOOM_TOOLS",
+            "LOOM_RESOURCES",
+            "LOOM_LLM_BASE_URL",
+            "LOOM_LLM_API_KEY",
+            "LOOM_LLM_MODEL",
             "LOOM_LLM_PROVIDER",
-            "LOOM_SECRETS_FILE", "LOOM_SECRETS_PREFIX",
-            "LOOM_PORT", "LOOM_API_KEY",
+            "LOOM_SECRETS_FILE",
+            "LOOM_SECRETS_PREFIX",
+            "LOOM_PORT",
+            "LOOM_API_KEY",
         }
         assert names == expected
 
     def test_multiple_errors_reported(self):
-        result = validate_env(env={
-            "LOOM_STORAGE": "bad",
-            "LOOM_QUEUE": "bad",
-            "LOOM_PORT": "abc",
-        })
+        result = validate_env(
+            env={
+                "LOOM_STORAGE": "bad",
+                "LOOM_QUEUE": "bad",
+                "LOOM_PORT": "abc",
+            }
+        )
         assert not result.valid
         assert len(result.errors) >= 3
 
