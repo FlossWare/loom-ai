@@ -2,7 +2,13 @@
 
 import asyncio
 
-from fastapi.testclient import TestClient
+import pytest
+
+# Guard: skip the whole module when fastapi is not installed (e.g. backend
+# matrix jobs that only install postgresql/redis/etc extras without server).
+pytest.importorskip("fastapi", reason="fastapi not installed (server extra)")
+
+from fastapi.testclient import TestClient  # noqa: E402
 
 
 def _make_app(monkeypatch, api_key=None):

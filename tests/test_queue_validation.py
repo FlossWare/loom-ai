@@ -9,10 +9,16 @@ from __future__ import annotations
 
 import asyncio
 
-from fastapi.testclient import TestClient
+import pytest
 
-from loom_ai.config import LoomConfig
-from loom_ai.server import create_app
+# Guard: skip the whole module when fastapi is not installed (e.g. backend
+# matrix jobs that only install postgresql/redis/etc extras without server).
+pytest.importorskip("fastapi", reason="fastapi not installed (server extra)")
+
+from fastapi.testclient import TestClient  # noqa: E402
+
+from loom_ai.config import LoomConfig  # noqa: E402
+from loom_ai.server import create_app  # noqa: E402
 
 
 def _make_client(monkeypatch) -> TestClient:

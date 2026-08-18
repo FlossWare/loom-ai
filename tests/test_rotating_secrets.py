@@ -16,7 +16,6 @@ import pytest
 from loom_ai.backends.env_secrets import EnvSecretsBackend
 from loom_ai.backends.rotating_secrets import RotatingSecretsBackend
 
-
 # ---------------------------------------------------------------------------
 # Helpers
 # ---------------------------------------------------------------------------

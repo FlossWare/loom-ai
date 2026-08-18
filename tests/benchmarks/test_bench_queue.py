@@ -13,10 +13,7 @@ SIZES = [10, 100, 1000]
 
 
 def _make_items(n: int) -> list[QueueItem]:
-    return [
-        QueueItem(id=f"item-{i}", payload={"task": f"work-{i}"})
-        for i in range(n)
-    ]
+    return [QueueItem(id=f"item-{i}", payload={"task": f"work-{i}"}) for i in range(n)]
 
 
 @pytest.mark.parametrize("size", SIZES)

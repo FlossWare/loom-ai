@@ -37,6 +37,15 @@ except ImportError:
     _HAS_REDIS = False
 
 
+def _require_redis() -> None:
+    """Raise a helpful error when the redis package is not installed."""
+    if not _HAS_REDIS:
+        raise ImportError(
+            "Redis queue requires the 'redis' package.  "
+            "Install with: pip install flossware-loom-ai[redis]"
+        )
+
+
 class RedisQueueBackend:
     """Redis-backed durable task queue.
 
@@ -54,7 +63,7 @@ class RedisQueueBackend:
     backoff_base:
         Base seconds for exponential backoff (default 2.0).
     key_prefix:
-        Prefix for all Redis keys (default ``"loom:queue:"``).
+        Prefix for all Redis keys (default ``\"loom:queue:\"``).
     """
 
     # Lua script executed atomically by Redis to pop from the pending sorted
@@ -100,6 +109,7 @@ return item_id
         LOOM_REDIS_URL : str
             Redis connection URL (default ``redis://localhost:6379/0``).
         """
+        _require_redis()
         url = os.environ.get("LOOM_REDIS_URL", "redis://localhost:6379/0")
         client = _redis_lib.Redis.from_url(url)  # type: ignore[union-attr]
         return cls(client)

@@ -48,9 +48,7 @@ def test_text_search(benchmark, size):
     loop = asyncio.new_event_loop()
     backend = MemorySearchBackend()
     for i in range(size):
-        loop.run_until_complete(
-            backend.index(_make_chunk(i), _make_vector(i))
-        )
+        loop.run_until_complete(backend.index(_make_chunk(i), _make_vector(i)))
 
     def run():
         loop.run_until_complete(backend.text_search("fox", limit=10))
@@ -64,15 +62,11 @@ def test_semantic_search(benchmark, size):
     loop = asyncio.new_event_loop()
     backend = MemorySearchBackend()
     for i in range(size):
-        loop.run_until_complete(
-            backend.index(_make_chunk(i), _make_vector(i))
-        )
+        loop.run_until_complete(backend.index(_make_chunk(i), _make_vector(i)))
     query_vector = _make_vector(size // 2)
 
     def run():
-        loop.run_until_complete(
-            backend.semantic_search(query_vector, limit=10)
-        )
+        loop.run_until_complete(backend.semantic_search(query_vector, limit=10))
 
     benchmark(run)
     loop.close()

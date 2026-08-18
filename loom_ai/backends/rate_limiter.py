@@ -86,9 +86,7 @@ class RateLimiter:
         provider_limits: dict[str, ProviderLimits] | None = None,
     ) -> None:
         self._default_limits = default_limits or ProviderLimits()
-        self._provider_limits: dict[str, ProviderLimits] = dict(
-            provider_limits or {}
-        )
+        self._provider_limits: dict[str, ProviderLimits] = dict(provider_limits or {})
         self._request_buckets: dict[str, _BucketState] = {}
         self._token_buckets: dict[str, _BucketState] = {}
 
@@ -166,9 +164,7 @@ class RateLimiter:
             bucket.refill(time.monotonic())
             bucket.tokens = max(0.0, bucket.tokens - tokens)
 
-    async def update_from_headers(
-        self, provider: str, info: RateLimitInfo
-    ) -> None:
+    async def update_from_headers(self, provider: str, info: RateLimitInfo) -> None:
         """Adjust the request bucket based on server-reported limits."""
         if info.remaining is not None:
             bucket = self._get_request_bucket(provider)

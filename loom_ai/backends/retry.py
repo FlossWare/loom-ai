@@ -105,7 +105,9 @@ async def _record_outcome(
 ) -> None:
     if resilience is not None:
         elapsed_ms = (time.monotonic() - t0) * 1000
-        await resilience.record_outcome(provider, success=success, latency_ms=elapsed_ms)
+        await resilience.record_outcome(
+            provider, success=success, latency_ms=elapsed_ms
+        )
 
 
 def async_retry(
