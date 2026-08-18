@@ -7,7 +7,9 @@ persistent graph storage with the OrientDB multi-model database.
 
 from __future__ import annotations
 
+import asyncio
 import os
+import re
 from typing import TYPE_CHECKING
 
 try:
@@ -25,6 +27,20 @@ if TYPE_CHECKING:
         KnowledgeRelationship,
         SubgraphResult,
     )
+
+_SAFE_RID = re.compile(r"^#\d+:\d+$")
+
+
+def _escape(value: str) -> str:
+    """Escape single quotes for OrientDB SQL string literals."""
+    return value.replace("\\", "\\\\").replace("'", "\\'")
+
+
+def _validate_rid(rid: str) -> str:
+    """Validate an OrientDB record ID (#cluster:position)."""
+    if not _SAFE_RID.match(rid):
+        raise ValueError(f"Invalid OrientDB record ID: {rid!r}")
+    return rid
 
 
 class OrientDBGraphBackend:
@@ -49,26 +65,38 @@ class OrientDBGraphBackend:
         if self._client.db_exists(db_name):
             self._client.db_open(db_name, user, password)
 
+    async def close(self) -> None:
+        """Close the underlying OrientDB connection."""
+        await asyncio.to_thread(self._client.shutdown)
+
     @classmethod
     async def from_env(cls) -> OrientDBGraphBackend:
         """Build from environment variables."""
-        return cls(
-            host=os.environ.get("ORIENTDB_HOST", "localhost"),
-            port=int(os.environ.get("ORIENTDB_PORT", "2424")),
-            user=os.environ.get("ORIENTDB_USER", "root"),
-            password=os.environ.get("ORIENTDB_PASSWORD", ""),
-            db_name=os.environ.get("ORIENTDB_DB", "loom_ai"),
+        return await asyncio.to_thread(
+            lambda: cls(
+                host=os.environ.get("ORIENTDB_HOST", "localhost"),
+                port=int(os.environ.get("ORIENTDB_PORT", "2424")),
+                user=os.environ.get("ORIENTDB_USER", "root"),
+                password=os.environ.get("ORIENTDB_PASSWORD", ""),
+                db_name=os.environ.get("ORIENTDB_DB", "loom_ai"),
+            )
         )
 
     async def add_entity(self, entity: KnowledgeEntity) -> str:
-        cmd = f"INSERT INTO KnowledgeEntity SET label = '{entity.label}', entity_type = '{entity.entity_type}'"
-        result = self._client.command(cmd)
+        label = _escape(entity.label)
+        etype = _escape(entity.entity_type)
+        cmd = f"INSERT INTO KnowledgeEntity SET label = '{label}', entity_type = '{etype}'"
+        result = await asyncio.to_thread(self._client.command, cmd)
         rid = str(result[0]._rid) if result else entity.id or ""
         entity.id = rid
         return rid
 
     async def get_entity(self, entity_id: str) -> KnowledgeEntity | None:
-        results = self._client.command(f"SELECT FROM KnowledgeEntity WHERE @rid = {entity_id}")
+        _validate_rid(entity_id)
+        results = await asyncio.to_thread(
+            self._client.command,
+            f"SELECT FROM KnowledgeEntity WHERE @rid = {entity_id}",
+        )
         if not results:
             return None
         from loom_ai.models_phase4 import KnowledgeEntity as KE
@@ -81,21 +109,27 @@ class OrientDBGraphBackend:
         )
 
     async def add_relationship(self, relationship: KnowledgeRelationship) -> str:
+        _validate_rid(relationship.source_id)
+        _validate_rid(relationship.target_id)
+        rtype = _escape(relationship.relation_type)
         cmd = (
             f"CREATE EDGE KnowledgeRelationship FROM {relationship.source_id} "
-            f"TO {relationship.target_id} SET relation_type = '{relationship.relation_type}'"
+            f"TO {relationship.target_id} SET relation_type = '{rtype}'"
         )
-        result = self._client.command(cmd)
+        result = await asyncio.to_thread(self._client.command, cmd)
         rid = str(result[0]._rid) if result else relationship.id or ""
         relationship.id = rid
         return rid
 
     async def add_claim(self, claim: Claim) -> str:
+        subject = _escape(claim.subject_id)
+        predicate = _escape(claim.predicate)
+        value = _escape(claim.value)
         cmd = (
-            f"INSERT INTO Claim SET subject_id = '{claim.subject_id}', "
-            f"predicate = '{claim.predicate}', value = '{claim.value}'"
+            f"INSERT INTO Claim SET subject_id = '{subject}', "
+            f"predicate = '{predicate}', value = '{value}'"
         )
-        result = self._client.command(cmd)
+        result = await asyncio.to_thread(self._client.command, cmd)
         rid = str(result[0]._rid) if result else claim.id or ""
         claim.id = rid
         return rid
@@ -109,11 +143,13 @@ class OrientDBGraphBackend:
     ) -> list[KnowledgeEntity]:
         from loom_ai.models_phase4 import KnowledgeEntity as KE
 
-        where = f"WHERE label LIKE '%{query}%'"
+        escaped_q = _escape(query)
+        where = f"WHERE label LIKE '%{escaped_q}%'"
         if entity_type:
-            where += f" AND entity_type = '{entity_type}'"
-        results = self._client.command(
-            f"SELECT FROM KnowledgeEntity {where} LIMIT {limit}"
+            where += f" AND entity_type = '{_escape(entity_type)}'"
+        results = await asyncio.to_thread(
+            self._client.command,
+            f"SELECT FROM KnowledgeEntity {where} LIMIT {limit}",
         )
         return [
             KE(id=str(r._rid), label=r.label, entity_type=r.entity_type)

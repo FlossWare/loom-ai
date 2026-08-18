@@ -76,8 +76,8 @@ class SimpleModelRouter:
         old_entry = self._providers.get(name)
         if old_entry is not None:
             for old_model in old_entry.models:
-                if old_model not in models:
-                    plist = self._model_providers.get(old_model, [])
+                if old_model not in models and old_model in self._model_providers:
+                    plist = self._model_providers[old_model]
                     if name in plist:
                         plist.remove(name)
 

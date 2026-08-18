@@ -51,6 +51,8 @@ class OpenAIEmbeddingBackend:
             input=text,
             dimensions=self._dimensions,
         )
+        if not resp.data:
+            raise RuntimeError("Embedding API returned no data")
         return resp.data[0].embedding
 
     async def embed_batch(self, texts: list[str]) -> list[list[float]]:

@@ -43,11 +43,17 @@ class LiteLLMEmbeddingBackend:
         return cls()
 
     async def embed_single(self, text: str) -> list[float]:
-        resp = await litellm.aembedding(model=self._model, input=[text])
+        resp = await litellm.aembedding(
+            model=self._model, input=[text], dimensions=self._dimensions,
+        )
+        if not resp.data:
+            raise RuntimeError("Embedding API returned no data")
         return resp.data[0]["embedding"]
 
     async def embed_batch(self, texts: list[str]) -> list[list[float]]:
-        resp = await litellm.aembedding(model=self._model, input=texts)
+        resp = await litellm.aembedding(
+            model=self._model, input=texts, dimensions=self._dimensions,
+        )
         return [item["embedding"] for item in resp.data]
 
     @property
