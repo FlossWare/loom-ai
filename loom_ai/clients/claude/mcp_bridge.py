@@ -195,45 +195,48 @@ def _respond_error(
     })
 
 
+def _dispatch(msg: dict) -> bool:
+    """Handle one JSON-RPC message. Returns False to stop the loop."""
+    method = msg.get("method", "")
+    msg_id = msg.get("id")
+    params = msg.get("params", {})
+
+    if method == "initialize":
+        _respond(msg_id, {
+            "protocolVersion": "2024-11-05",
+            "capabilities": {
+                "tools": {"listChanged": False},
+            },
+            "serverInfo": {
+                "name": "loom-ai",
+                "version": "1.0.0",
+            },
+        })
+    elif method == "notifications/initialized":
+        pass
+    elif method == "tools/list":
+        _respond(msg_id, {"tools": _TOOLS})
+    elif method == "tools/call":
+        tool_name = params.get("name", "")
+        tool_args = params.get("arguments", {})
+        content = _handle_tool_call(tool_name, tool_args)
+        _respond(msg_id, {"content": content})
+    elif method == "shutdown":
+        _respond(msg_id, {})
+        return False
+    elif msg_id is not None:
+        _respond_error(
+            msg_id, -32601,
+            f"Method not found: {method}",
+        )
+    return True
+
+
 def main() -> None:
     while True:
         msg = _read_message()
-        if msg is None:
+        if msg is None or not _dispatch(msg):
             break
-
-        method = msg.get("method", "")
-        msg_id = msg.get("id")
-        params = msg.get("params", {})
-
-        if method == "initialize":
-            _respond(msg_id, {
-                "protocolVersion": "2024-11-05",
-                "capabilities": {
-                    "tools": {"listChanged": False},
-                },
-                "serverInfo": {
-                    "name": "loom-ai",
-                    "version": "1.0.0",
-                },
-            })
-        elif method == "notifications/initialized":
-            pass
-        elif method == "tools/list":
-            _respond(msg_id, {"tools": _TOOLS})
-        elif method == "tools/call":
-            tool_name = params.get("name", "")
-            tool_args = params.get("arguments", {})
-            content = _handle_tool_call(tool_name, tool_args)
-            _respond(msg_id, {"content": content})
-        elif method == "shutdown":
-            _respond(msg_id, {})
-            break
-        else:
-            if msg_id is not None:
-                _respond_error(
-                    msg_id, -32601,
-                    f"Method not found: {method}",
-                )
 
 
 if __name__ == "__main__":
