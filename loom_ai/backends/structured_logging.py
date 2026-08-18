@@ -129,9 +129,9 @@ class StructuredLoggingObservability:
             extra={"_structured_extra": entry},
         )
 
-    async def start_span(
+    async def start_span(  # NOSONAR — async required by ObservabilityBackend protocol
         self, name: str, *, parent: str | None = None
-    ) -> str:  # NOSONAR — async required by ObservabilityBackend protocol
+    ) -> str:
         """Begin a tracing span and return its span id."""
         span_id = uuid.uuid4().hex
         self._spans[span_id] = {
@@ -156,9 +156,9 @@ class StructuredLoggingObservability:
         )
         return span_id
 
-    async def end_span(
+    async def end_span(  # NOSONAR — async required by ObservabilityBackend protocol
         self, span_id: str, *, status: str = "ok"
-    ) -> None:  # NOSONAR — async required by ObservabilityBackend protocol
+    ) -> None:
         """Close a tracing span."""
         if span_id not in self._spans:
             raise KeyError(f"Unknown span id: {span_id}")

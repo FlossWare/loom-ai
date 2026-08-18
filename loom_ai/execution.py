@@ -126,7 +126,8 @@ class ExecutionEngine:
             return self._transition(task, TaskStatus.RUNNING, TaskStatus.COMPLETED)
         except asyncio.CancelledError:
             task = replace(task, error="task cancelled")
-            return self._transition(task, TaskStatus.RUNNING, TaskStatus.FAILED)
+            self._transition(task, TaskStatus.RUNNING, TaskStatus.FAILED)
+            raise
         except asyncio.TimeoutError:
             msg = f"Task {task.id!r} timed out after {task.timeout_seconds}s"
             task = replace(task, error=msg)

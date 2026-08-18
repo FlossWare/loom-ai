@@ -167,6 +167,10 @@ def async_retry(
 
                     if attempt < policy.max_retries:
                         await asyncio.sleep(policy.delay(attempt))
+                        if resilience is not None and not await resilience.should_allow(provider):
+                            raise CircuitOpenError(
+                                f"Circuit breaker open for provider {provider!r}"
+                            )
 
             await _record_outcome(resilience, provider, t0, success=False)
 

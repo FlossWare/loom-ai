@@ -134,6 +134,11 @@ class InMemoryKnowledgeGraph:
 
     async def add_relationship(self, relationship: KnowledgeRelationship) -> str:
         """Persist a relationship and return its id."""
+        if relationship.source_id not in self._entities:
+            raise ValueError(f"Source entity {relationship.source_id!r} does not exist")
+        if relationship.target_id not in self._entities:
+            raise ValueError(f"Target entity {relationship.target_id!r} does not exist")
+
         rid = relationship.id or str(uuid.uuid4())
         relationship.id = rid
 
