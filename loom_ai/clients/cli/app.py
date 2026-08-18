@@ -33,9 +33,13 @@ import json
 import os
 import pathlib
 import sys
-from typing import Any
+from typing import Any, Union
 
+from loom_ai.clients import get_client
 from loom_ai.clients.client import ClientConfig, LoomClient
+from loom_ai.clients.local_client import LocalClient
+
+AnyClient = Union[LocalClient, LoomClient]
 
 
 def _make_parser() -> argparse.ArgumentParser:
@@ -126,20 +130,24 @@ def _make_parser() -> argparse.ArgumentParser:
     return parser
 
 
-def _build_client(args: argparse.Namespace) -> LoomClient:
-    config = ClientConfig.from_env()
-    if args.url:
-        config.base_url = args.url
-    if args.api_key:
-        config.api_key = args.api_key
-    return LoomClient(config)
+async def _build_client(
+    args: argparse.Namespace,
+) -> AnyClient:
+    if args.url or args.api_key:
+        config = ClientConfig.from_env()
+        if args.url:
+            config.base_url = args.url
+        if args.api_key:
+            config.api_key = args.api_key
+        return LoomClient(config)
+    return await get_client()
 
 
 def _print_json(data: Any) -> None:
     print(json.dumps(data, indent=2))
 
 
-async def _cmd_chat(client: LoomClient, args: argparse.Namespace) -> None:
+async def _cmd_chat(client: AnyClient, args: argparse.Namespace) -> None:
     message = args.message
     if not message:
         if sys.stdin.isatty():
@@ -180,7 +188,7 @@ async def _cmd_chat(client: LoomClient, args: argparse.Namespace) -> None:
             print(resp.get("content", resp.get("response", "")))
 
 
-async def _cmd_consensus(client: LoomClient, args: argparse.Namespace) -> None:
+async def _cmd_consensus(client: AnyClient, args: argparse.Namespace) -> None:
     models = [m.strip() for m in args.models.split(",")]
     resp = await client.consensus_synthesize(
         args.prompt,
@@ -199,23 +207,23 @@ async def _cmd_consensus(client: LoomClient, args: argparse.Namespace) -> None:
             print(f"\nFailed models: {', '.join(failed)}", file=sys.stderr)
 
 
-async def _cmd_models(client: LoomClient) -> None:
+async def _cmd_models(client: AnyClient) -> None:
     models = await client.list_models()
     for m in models:
         print(m)
 
 
-async def _cmd_health(client: LoomClient) -> None:
+async def _cmd_health(client: AnyClient) -> None:
     resp = await client.health()
     _print_json(resp)
 
 
-async def _cmd_ready(client: LoomClient) -> None:
+async def _cmd_ready(client: AnyClient) -> None:
     resp = await client.ready()
     _print_json(resp)
 
 
-async def _cmd_search(client: LoomClient, args: argparse.Namespace) -> None:
+async def _cmd_search(client: AnyClient, args: argparse.Namespace) -> None:
     resp = await client.search_text(args.query, limit=args.limit)
     results = resp.get("results", [])
     if not results:
@@ -230,7 +238,7 @@ async def _cmd_search(client: LoomClient, args: argparse.Namespace) -> None:
         print()
 
 
-async def _cmd_docs(client: LoomClient, args: argparse.Namespace) -> None:
+async def _cmd_docs(client: AnyClient, args: argparse.Namespace) -> None:
     if args.docs_command == "store":
         content = args.content
         if args.file:
@@ -256,7 +264,7 @@ async def _cmd_docs(client: LoomClient, args: argparse.Namespace) -> None:
         print("Usage: loom docs {store|list|stats}", file=sys.stderr)
 
 
-async def _cmd_secrets(client: LoomClient, args: argparse.Namespace) -> None:
+async def _cmd_secrets(client: AnyClient, args: argparse.Namespace) -> None:
     if args.secrets_command == "list":
         names = await client.list_secrets()
         for name in names:
@@ -268,7 +276,7 @@ async def _cmd_secrets(client: LoomClient, args: argparse.Namespace) -> None:
         print("Usage: loom secrets {list|get}", file=sys.stderr)
 
 
-async def _cmd_graph(client: LoomClient, args: argparse.Namespace) -> None:
+async def _cmd_graph(client: AnyClient, args: argparse.Namespace) -> None:
     if args.graph_command == "add-node":
         resp = await client.add_node(args.label, node_id=args.id)
         _print_json(resp)
@@ -282,7 +290,7 @@ async def _cmd_graph(client: LoomClient, args: argparse.Namespace) -> None:
         print("Usage: loom graph {add-node|get-node|neighbors}", file=sys.stderr)
 
 
-async def _repl(client: LoomClient) -> None:
+async def _repl(client: AnyClient) -> None:
     """Interactive chat REPL."""
     model = os.environ.get("LOOM_MODEL", "")
 
@@ -386,7 +394,7 @@ async def _repl(client: LoomClient) -> None:
 
 
 async def _async_main(args: argparse.Namespace) -> None:
-    client = _build_client(args)
+    client = await _build_client(args)
 
     if args.command == "chat":
         await _cmd_chat(client, args)

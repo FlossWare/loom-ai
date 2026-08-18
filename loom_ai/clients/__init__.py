@@ -13,6 +13,21 @@ An OpenAI-compatible proxy layer is planned for a future release.
 
 from __future__ import annotations
 
-from loom_ai.clients.client import LoomClient
+import os
 
-__all__ = ["LoomClient"]
+from loom_ai.clients.client import LoomClient
+from loom_ai.clients.local_client import LocalClient
+
+__all__ = ["LocalClient", "LoomClient", "get_client"]
+
+
+async def get_client() -> LocalClient | LoomClient:
+    """Auto-detect and return the appropriate client.
+
+    Returns :class:`LoomClient` when ``LOOM_URL`` or ``LOOM_HOST`` is set
+    (remote server mode), otherwise returns :class:`LocalClient` with
+    embedded backends (local mode).
+    """
+    if os.environ.get("LOOM_URL") or os.environ.get("LOOM_HOST"):
+        return LoomClient.from_env()
+    return await LocalClient.create()
