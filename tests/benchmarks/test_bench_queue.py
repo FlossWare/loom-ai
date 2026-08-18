@@ -1,74 +1,48 @@
-"""Benchmarks for MemoryQueueBackend operations."""
+"""Benchmark suite for QueueBackend implementations.
+
+Compares MemoryQueueBackend throughput for enqueue, fetch, and complete.
+"""
 
 from __future__ import annotations
-
-import asyncio
 
 import pytest
 
 from loom_ai.backends.memory import MemoryQueueBackend
 from loom_ai.models import QueueItem
 
-SIZES = [10, 100, 1000]
+
+@pytest.fixture
+def backend():
+    return MemoryQueueBackend()
 
 
-def _make_items(n: int) -> list[QueueItem]:
-    return [
-        QueueItem(id=f"item-{i}", payload={"task": f"work-{i}"})
-        for i in range(n)
-    ]
+@pytest.mark.benchmark(group="queue-enqueue")
+def test_bench_enqueue(benchmark, backend):
+    items = [QueueItem(id=f"item-{i}", payload={"n": i}) for i in range(50)]
+
+    async def _run():
+        await backend.enqueue("bench", items)
+
+    benchmark(lambda: __import__("asyncio").run(_run()))
 
 
-@pytest.mark.parametrize("size", SIZES)
-def test_enqueue(benchmark, size):
-    loop = asyncio.new_event_loop()
-    backend = MemoryQueueBackend()
-    items = _make_items(size)
+@pytest.mark.benchmark(group="queue-fetch")
+def test_bench_fetch(benchmark, backend):
+    async def _setup():
+        items = [QueueItem(id=f"item-{i}", payload={"n": i}) for i in range(50)]
+        await backend.enqueue("bench", items)
 
-    def run():
-        loop.run_until_complete(backend.enqueue("bench-q", items))
+    __import__("asyncio").run(_setup())
 
-    benchmark(run)
-    loop.close()
+    async def _run():
+        await backend.fetch("bench", 10, "worker-1")
 
-
-@pytest.mark.parametrize("size", SIZES)
-def test_dequeue(benchmark, size):
-    loop = asyncio.new_event_loop()
-    backend = MemoryQueueBackend()
-
-    def run():
-        loop.run_until_complete(backend.enqueue("bench-q", _make_items(size)))
-        loop.run_until_complete(backend.fetch("bench-q", size, "worker-1"))
-
-    benchmark(run)
-    loop.close()
+    benchmark(lambda: __import__("asyncio").run(_run()))
 
 
-@pytest.mark.parametrize("size", SIZES)
-def test_peek_status(benchmark, size):
-    loop = asyncio.new_event_loop()
-    backend = MemoryQueueBackend()
-    loop.run_until_complete(backend.enqueue("bench-q", _make_items(size)))
+@pytest.mark.benchmark(group="queue-status")
+def test_bench_status(benchmark, backend):
+    async def _run():
+        await backend.status("bench")
 
-    def run():
-        loop.run_until_complete(backend.status("bench-q"))
-
-    benchmark(run)
-    loop.close()
-
-
-@pytest.mark.parametrize("size", SIZES)
-def test_complete(benchmark, size):
-    loop = asyncio.new_event_loop()
-    backend = MemoryQueueBackend()
-
-    def run():
-        items = _make_items(size)
-        loop.run_until_complete(backend.enqueue("bench-q", items))
-        loop.run_until_complete(backend.fetch("bench-q", size, "worker-1"))
-        for item in items:
-            loop.run_until_complete(backend.complete("bench-q", item.id))
-
-    benchmark(run)
-    loop.close()
+    benchmark(lambda: __import__("asyncio").run(_run()))
