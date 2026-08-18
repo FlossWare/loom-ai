@@ -61,6 +61,7 @@ import hmac
 import logging
 import os
 import time
+import uuid
 from typing import TYPE_CHECKING, Any
 
 from loom_ai import __version__
@@ -463,7 +464,7 @@ def _mount_storage_routes(app: FastAPI, config: LoomConfig, auth_deps: list) -> 
         from loom_ai.models import Document
 
         doc = Document(
-            id=body.id or f"doc-{int(time.time() * 1000)}",
+            id=body.id or f"doc-{uuid.uuid4().hex[:12]}",
             title=body.title,
             content=body.content,
             url=body.url,
@@ -533,10 +534,9 @@ def _mount_queue_routes(app: FastAPI, config: LoomConfig, auth_deps: list) -> No
     async def queue_enqueue(queue_name: str, body: EnqueueRequest):
         from loom_ai.models import QueueItem
 
-        ts = int(time.time() * 1000)
         items = [
             QueueItem(
-                id=item.id or f"q-{ts}-{i}",
+                id=item.id or f"q-{uuid.uuid4().hex[:12]}",
                 payload=item.payload,
                 enqueued_at=time.time(),
             )
@@ -813,7 +813,7 @@ def _mount_graph_routes(app: FastAPI, config: LoomConfig, auth_deps: list) -> No
         from loom_ai.models import GraphNode
 
         node = GraphNode(
-            id=body.id or f"node-{int(time.time() * 1000)}",
+            id=body.id or f"node-{uuid.uuid4().hex[:12]}",
             label=body.label,
             properties=body.properties,
         )
@@ -841,7 +841,7 @@ def _mount_graph_routes(app: FastAPI, config: LoomConfig, auth_deps: list) -> No
         from loom_ai.models import GraphEdge
 
         edge = GraphEdge(
-            id=body.id or f"edge-{int(time.time() * 1000)}",
+            id=body.id or f"edge-{uuid.uuid4().hex[:12]}",
             source=body.source,
             target=body.target,
             label=body.label,
