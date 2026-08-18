@@ -28,13 +28,17 @@ class ClientConfig:
 
     @classmethod
     def from_env(cls) -> ClientConfig:
+        try:
+            timeout = int(os.environ.get("LOOM_TIMEOUT", "60"))
+        except ValueError:
+            timeout = 60
         return cls(
             base_url=os.environ.get(
                 "LOOM_URL",
                 f"http://{os.environ.get('LOOM_HOST', '127.0.0.1')}:{os.environ.get('LOOM_PORT', '5000')}",
             ),
             api_key=os.environ.get("LOOM_API_KEY", ""),
-            timeout=int(os.environ.get("LOOM_TIMEOUT", "60")),
+            timeout=timeout,
         )
 
 
@@ -95,7 +99,7 @@ class LoomClient:
                 with urllib.request.urlopen(req, timeout=self._config.timeout) as resp:
                     return json.loads(resp.read())
             except urllib.error.HTTPError as exc:
-                error_body = exc.read().decode(errors="replace")
+                error_body = exc.read(1024 * 64).decode(errors="replace")
                 logger.error("HTTP %d from %s: %s", exc.code, url, error_body)
                 raise RuntimeError(f"loom-ai API error {exc.code}: {error_body}") from exc
 
@@ -163,6 +167,7 @@ class LoomClient:
         req = urllib.request.Request(url, data=data, headers=self._headers(), method="POST")
 
         queue: asyncio.Queue[str | None] = asyncio.Queue()
+        loop = asyncio.get_running_loop()
 
         def _stream() -> None:
             try:
@@ -177,15 +182,15 @@ class LoomClient:
                                 chunk = json.loads(payload)
                                 delta = chunk.get("choices", [{}])[0].get("delta", {}).get("content", "")
                                 if delta:
-                                    queue.put_nowait(delta)
+                                    loop.call_soon_threadsafe(queue.put_nowait, delta)
                             except json.JSONDecodeError:
                                 continue
             except Exception as exc:
                 logger.error("Stream error: %s", exc)
             finally:
-                queue.put_nowait(None)
+                loop.call_soon_threadsafe(queue.put_nowait, None)
 
-        asyncio.get_event_loop().run_in_executor(None, _stream)
+        loop.run_in_executor(None, _stream)
 
         while True:
             token = await queue.get()
