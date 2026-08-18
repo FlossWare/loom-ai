@@ -108,14 +108,34 @@ class LoomClient:
 
         def _do() -> dict[str, Any]:
             try:
-                with urllib.request.urlopen(req, timeout=self._config.timeout) as resp:
-                    return json.loads(resp.read())
+                with urllib.request.urlopen(
+                    req, timeout=self._config.timeout
+                ) as resp:
+                    raw = resp.read()
+                    if not raw:
+                        return {}
+                    return json.loads(raw)
             except urllib.error.HTTPError as exc:
-                error_body = exc.read(1024 * 64).decode(errors="replace")
-                logger.error("HTTP %d from %s: %s", exc.code, url, error_body)
+                error_body = exc.read(
+                    1024 * 64
+                ).decode(errors="replace")
+                logger.error(
+                    "HTTP %d from %s: %s",
+                    exc.code, url, error_body,
+                )
                 raise RuntimeError(
                     f"loom-ai API error {exc.code}: "
                     f"{error_body}"
+                ) from exc
+            except urllib.error.URLError as exc:
+                raise RuntimeError(
+                    f"loom-ai connection failed: "
+                    f"{exc.reason}"
+                ) from exc
+            except json.JSONDecodeError as exc:
+                raise RuntimeError(
+                    f"loom-ai returned invalid JSON: "
+                    f"{exc}"
                 ) from exc
 
         return await asyncio.to_thread(_do)

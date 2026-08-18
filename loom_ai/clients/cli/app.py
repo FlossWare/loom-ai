@@ -164,7 +164,7 @@ async def _cmd_chat(client: LoomClient, args: argparse.Namespace) -> None:
             ):
                 print(token, end="", flush=True)
             print()
-        except RuntimeError as exc:
+        except (RuntimeError, OSError) as exc:
             print(f"\nStream error: {exc}", file=sys.stderr)
             sys.exit(1)
     else:
