@@ -50,20 +50,9 @@ class OrientDBGraphBackend:
     structural subtyping.
     """
 
-    def __init__(
-        self,
-        *,
-        host: str = "localhost",
-        port: int = 2424,
-        user: str = "root",
-        password: str = "",
-        db_name: str = "loom_ai",
-    ) -> None:
-        self._client = pyorient.OrientDB(host, port)
-        self._client.connect(user, password)
+    def __init__(self, *, client: pyorient.OrientDB, db_name: str) -> None:
+        self._client = client
         self._db_name = db_name
-        if self._client.db_exists(db_name):
-            self._client.db_open(db_name, user, password)
 
     async def close(self) -> None:
         """Close the underlying OrientDB connection."""
@@ -71,16 +60,20 @@ class OrientDBGraphBackend:
 
     @classmethod
     async def from_env(cls) -> OrientDBGraphBackend:
-        """Build from environment variables."""
-        return await asyncio.to_thread(
-            lambda: cls(
-                host=os.environ.get("ORIENTDB_HOST", "localhost"),
-                port=int(os.environ.get("ORIENTDB_PORT", "2424")),
-                user=os.environ.get("ORIENTDB_USER", "root"),
-                password=os.environ.get("ORIENTDB_PASSWORD", ""),
-                db_name=os.environ.get("ORIENTDB_DB", "loom_ai"),
-            )
-        )
+        """Build from environment variables (all blocking I/O runs in a thread)."""
+        def _connect() -> OrientDBGraphBackend:
+            host = os.environ.get("ORIENTDB_HOST", "localhost")
+            port = int(os.environ.get("ORIENTDB_PORT", "2424"))
+            user = os.environ.get("ORIENTDB_USER", "root")
+            password = os.environ.get("ORIENTDB_PASSWORD", "")
+            db_name = os.environ.get("ORIENTDB_DB", "loom_ai")
+            client = pyorient.OrientDB(host, port)
+            client.connect(user, password)
+            if client.db_exists(db_name):
+                client.db_open(db_name, user, password)
+            return cls(client=client, db_name=db_name)
+
+        return await asyncio.to_thread(_connect)
 
     async def add_entity(self, entity: KnowledgeEntity) -> str:
         label = _escape(entity.label)
