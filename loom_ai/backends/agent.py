@@ -91,7 +91,7 @@ class InMemoryAgentLoop:
         output_data: dict[str, Any] = {}
         turn_status = "completed"
 
-        agent_ops = self._operations.get(agent_id, [])
+        agent_ops = list(self._operations.get(agent_id, [])) + list(self._global_operations)
         for op in agent_ops:
             if op.operation_type == "tool_call" and self._tool_provider is not None:
                 tool_name = op.config.get("tool_name", op.name)

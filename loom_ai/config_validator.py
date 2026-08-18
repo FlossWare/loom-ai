@@ -127,7 +127,7 @@ _SECRETS_FIELDS: tuple[FieldSpec, ...] = (
 )
 
 _SERVER_FIELDS: tuple[FieldSpec, ...] = (
-    FieldSpec(name="LOOM_PORT", value_type=int, default="8000"),
+    FieldSpec(name="LOOM_PORT", value_type=int, default="5000"),
     FieldSpec(name="LOOM_API_KEY", value_type=str),
 )
 
