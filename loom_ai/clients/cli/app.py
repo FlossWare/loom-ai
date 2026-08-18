@@ -147,7 +147,7 @@ def _print_json(data: Any) -> None:
     print(json.dumps(data, indent=2))
 
 
-async def _cmd_chat(client: AnyClient, args: argparse.Namespace) -> None:
+def _read_message(args: argparse.Namespace) -> str:
     message = args.message
     if not message:
         if sys.stdin.isatty():
@@ -156,12 +156,22 @@ async def _cmd_chat(client: AnyClient, args: argparse.Namespace) -> None:
         if not message:
             print("Error: empty message", file=sys.stderr)
             sys.exit(1)
+    return message
 
+
+def _build_messages(
+    message: str, system: str | None
+) -> list[dict[str, str]]:
     messages: list[dict[str, str]] = []
-    if args.system:
-        messages.append({"role": "system", "content": args.system})
+    if system:
+        messages.append({"role": "system", "content": system})
     messages.append({"role": "user", "content": message})
+    return messages
 
+
+async def _cmd_chat(client: AnyClient, args: argparse.Namespace) -> None:
+    message = _read_message(args)
+    messages = _build_messages(message, args.system)
     model = args.model or os.environ.get("LOOM_MODEL") or None
 
     if args.stream:
@@ -290,6 +300,72 @@ async def _cmd_graph(client: AnyClient, args: argparse.Namespace) -> None:
         print("Usage: loom graph {add-node|get-node|neighbors}", file=sys.stderr)
 
 
+async def _repl_models(client: AnyClient, current: str) -> None:
+    try:
+        models = await client.list_models()
+        for m in models:
+            marker = " *" if m == current else ""
+            print(f"  {m}{marker}")
+    except Exception as exc:
+        print(f"Error: {exc}", file=sys.stderr)
+
+
+async def _repl_consensus(client: AnyClient) -> None:
+    try:
+        prompt = (
+            await asyncio.to_thread(input, "prompt> ")
+        ).strip()
+        model_str = (
+            await asyncio.to_thread(
+                input, "models (comma-separated)> "
+            )
+        ).strip()
+        if prompt and model_str:
+            models = [
+                m.strip() for m in model_str.split(",")
+            ]
+            print("Gathering consensus...", file=sys.stderr)
+            resp = await client.consensus_synthesize(
+                prompt, models,
+            )
+            synthesis = resp.get("synthesis", {})
+            print(f"\n{synthesis.get('content', '')}")
+            failed = resp.get("failed_models", [])
+            if failed:
+                print(
+                    f"\nFailed: {', '.join(failed)}",
+                    file=sys.stderr,
+                )
+    except (EOFError, KeyboardInterrupt):
+        print()
+
+
+async def _repl_chat(
+    client: AnyClient,
+    line: str,
+    history: list[dict[str, str]],
+    system_prompt: str,
+    model: str,
+) -> None:
+    messages = _build_messages(line, system_prompt or None)
+    for msg in history:
+        messages.insert(-1, msg)
+    try:
+        resp = await client.chat(
+            messages, model=model or None, temperature=0.7,
+        )
+        content = resp.get(
+            "content", resp.get("response", ""),
+        )
+        print(f"\nloom> {content}\n")
+        history.append({"role": "user", "content": line})
+        history.append(
+            {"role": "assistant", "content": content},
+        )
+    except Exception as exc:
+        print(f"Error: {exc}", file=sys.stderr)
+
+
 async def _repl(client: AnyClient) -> None:
     """Interactive chat REPL."""
     model = os.environ.get("LOOM_MODEL", "")
@@ -321,7 +397,9 @@ async def _repl(client: AnyClient) -> None:
 
     while True:
         try:
-            line = (await asyncio.to_thread(input, "you> ")).strip()
+            line = (
+                await asyncio.to_thread(input, "you> ")
+            ).strip()
         except (EOFError, KeyboardInterrupt):
             print()
             break
@@ -329,68 +407,25 @@ async def _repl(client: AnyClient) -> None:
         if not line:
             continue
 
-        if line == "/quit" or line == "/exit":
+        if line in ("/quit", "/exit"):
             break
         elif line == "/clear":
             history.clear()
             print("Conversation cleared.")
-            continue
         elif line == "/models":
-            try:
-                models = await client.list_models()
-                for m in models:
-                    marker = " *" if m == model else ""
-                    print(f"  {m}{marker}")
-            except Exception as exc:
-                print(f"Error: {exc}", file=sys.stderr)
-            continue
+            await _repl_models(client, model)
         elif line.startswith("/model "):
             model = line[7:].strip()
             print(f"Model set to: {model}")
-            continue
         elif line.startswith("/system "):
             system_prompt = line[8:].strip()
             print("System prompt set.")
-            continue
         elif line == "/consensus":
-            try:
-                prompt = (await asyncio.to_thread(input, "prompt> ")).strip()
-                model_str = (
-                    await asyncio.to_thread(
-                        input, "models (comma-separated)> "
-                    )
-                ).strip()
-                if prompt and model_str:
-                    models = [m.strip() for m in model_str.split(",")]
-                    print("Gathering consensus...", file=sys.stderr)
-                    resp = await client.consensus_synthesize(prompt, models)
-                    synthesis = resp.get("synthesis", {})
-                    print(f"\n{synthesis.get('content', '')}")
-                    failed = resp.get("failed_models", [])
-                    if failed:
-                        print(f"\nFailed: {', '.join(failed)}", file=sys.stderr)
-            except (EOFError, KeyboardInterrupt):
-                print()
-            continue
-
-        messages: list[dict[str, str]] = []
-        if system_prompt:
-            messages.append({"role": "system", "content": system_prompt})
-        messages.extend(history)
-        messages.append({"role": "user", "content": line})
-
-        try:
-            resp = await client.chat(
-                messages,
-                model=model or None,
-                temperature=0.7,
+            await _repl_consensus(client)
+        else:
+            await _repl_chat(
+                client, line, history, system_prompt, model,
             )
-            content = resp.get("content", resp.get("response", ""))
-            print(f"\nloom> {content}\n")
-            history.append({"role": "user", "content": line})
-            history.append({"role": "assistant", "content": content})
-        except Exception as exc:
-            print(f"Error: {exc}", file=sys.stderr)
 
 
 async def _async_main(args: argparse.Namespace) -> None:

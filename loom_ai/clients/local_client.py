@@ -25,6 +25,8 @@ from loom_ai.models import (
     QueueItem,
 )
 
+_NO_GRAPH = "Graph backend not configured"
+
 
 def _asdict(obj: object) -> dict[str, Any]:
     if dataclasses.is_dataclass(obj) and not isinstance(obj, type):
@@ -59,7 +61,9 @@ class LocalClient:
 
     # ── Health ───────────────────────────────────────────────────
 
-    async def health(self) -> dict[str, Any]:
+    async def health(  # NOSONAR — async for API parity
+        self,
+    ) -> dict[str, Any]:
         return {
             "status": "healthy",
             "mode": "local",
@@ -258,7 +262,7 @@ class LocalClient:
     async def list_secrets(self) -> list[str]:
         return await self._cfg.secrets.list_names()
 
-    async def get_secret(
+    async def get_secret(  # NOSONAR — reason param required by client API parity
         self, name: str, *, reason: str = "client request"
     ) -> str:
         value = await self._cfg.secrets.get(name)
@@ -292,7 +296,7 @@ class LocalClient:
         properties: dict | None = None,
     ) -> dict[str, Any]:
         if not self._cfg.graph:
-            raise RuntimeError("Graph backend not configured")
+            raise RuntimeError(_NO_GRAPH)
         node = GraphNode(
             id=node_id or uuid.uuid4().hex,
             label=label,
@@ -305,7 +309,7 @@ class LocalClient:
         self, node_id: str
     ) -> dict[str, Any]:
         if not self._cfg.graph:
-            raise RuntimeError("Graph backend not configured")
+            raise RuntimeError(_NO_GRAPH)
         node = await self._cfg.graph.get_node(node_id)
         if node is None:
             return {"error": "not found"}
@@ -318,7 +322,7 @@ class LocalClient:
         edge_label: str | None = None,
     ) -> dict[str, Any]:
         if not self._cfg.graph:
-            raise RuntimeError("Graph backend not configured")
+            raise RuntimeError(_NO_GRAPH)
         nodes = await self._cfg.graph.get_neighbors(
             node_id, edge_label=edge_label,
         )
@@ -334,7 +338,7 @@ class LocalClient:
         properties: dict | None = None,
     ) -> dict[str, Any]:
         if not self._cfg.graph:
-            raise RuntimeError("Graph backend not configured")
+            raise RuntimeError(_NO_GRAPH)
         edge = GraphEdge(
             id=edge_id or uuid.uuid4().hex,
             source=source,
