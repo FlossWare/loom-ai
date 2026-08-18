@@ -17,6 +17,7 @@ from __future__ import annotations
 
 import json
 import os
+import shlex
 import sys
 
 
@@ -54,9 +55,9 @@ def generate_env(
 ) -> str:
     """Generate shell export statements for Crush environment."""
     lines = [
-        f'export CRUSH_LLM_BASE_URL="{loom_url}/llm"',
-        f'export CRUSH_LLM_API_KEY="{api_key}"',
-        f'export CRUSH_CONSENSUS_URL="{loom_url}/consensus"',
+        f"export CRUSH_LLM_BASE_URL={shlex.quote(f'{loom_url}/llm')}",
+        f"export CRUSH_LLM_API_KEY={shlex.quote(api_key)}",
+        f"export CRUSH_CONSENSUS_URL={shlex.quote(f'{loom_url}/consensus')}",
     ]
     return "\n".join(lines)
 

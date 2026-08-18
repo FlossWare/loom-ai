@@ -22,6 +22,7 @@ from __future__ import annotations
 
 import json
 import os
+import shlex
 import sys
 from pathlib import Path
 
@@ -51,9 +52,9 @@ def generate_env(
 ) -> str:
     """Generate shell export statements for OpenCode."""
     lines = [
-        f'export OPENAI_BASE_URL="{loom_url}/llm"',
-        f'export OPENAI_API_KEY="{api_key or "loom-ai"}"',
-        f'export OPENCODE_MODEL="{model}"',
+        f"export OPENAI_BASE_URL={shlex.quote(f'{loom_url}/llm')}",
+        f"export OPENAI_API_KEY={shlex.quote(api_key or 'loom-ai')}",
+        f"export OPENCODE_MODEL={shlex.quote(model)}",
     ]
     return "\n".join(lines)
 

@@ -37,6 +37,7 @@ from __future__ import annotations
 
 import json
 import os
+import shlex
 import sys
 
 
@@ -47,8 +48,8 @@ def generate_env(
 ) -> str:
     """Generate shell exports for Aider."""
     return "\n".join([
-        f'export OPENAI_API_BASE="{loom_url}/llm"',
-        f'export OPENAI_API_KEY="{api_key or "loom-ai"}"',
+        f"export OPENAI_API_BASE={shlex.quote(f'{loom_url}/llm')}",
+        f"export OPENAI_API_KEY={shlex.quote(api_key or 'loom-ai')}",
     ])
 
 
@@ -59,9 +60,9 @@ def generate_cmd(
 ) -> str:
     """Generate aider command line."""
     return (
-        f"aider --openai-api-base {loom_url}/llm "
-        f"--openai-api-key {api_key or 'loom-ai'} "
-        f"--model openai/{model}"
+        f"aider --openai-api-base {shlex.quote(f'{loom_url}/llm')} "
+        f"--openai-api-key {shlex.quote(api_key or 'loom-ai')} "
+        f"--model {shlex.quote(f'openai/{model}')}"
     )
 
 

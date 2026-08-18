@@ -55,7 +55,10 @@ def generate_full_config(
     """Generate a minimal Continue config.json with loom-ai as the model."""
     return {
         "models": [generate_model_config(loom_url, api_key, model)],
-        "tabAutocompleteModel": generate_model_config(loom_url, api_key, model, title="loom-ai-autocomplete"),
+        "tabAutocompleteModel": generate_model_config(
+            loom_url, api_key, model,
+            title="loom-ai-autocomplete",
+        ),
     }
 
 

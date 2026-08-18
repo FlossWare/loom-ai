@@ -30,12 +30,11 @@ from __future__ import annotations
 import argparse
 import asyncio
 import json
+import os
 import sys
 from typing import Any
 
 from loom_ai.clients.client import ClientConfig, LoomClient
-
-_DEFAULT_MODEL = ""
 
 
 def _make_parser() -> argparse.ArgumentParser:
@@ -60,14 +59,20 @@ def _make_parser() -> argparse.ArgumentParser:
     chat_p.add_argument("--max-tokens", type=int, default=None)
     chat_p.add_argument("-s", "--system", default=None, help="System prompt")
     chat_p.add_argument("--stream", action="store_true", help="Stream response")
-    chat_p.add_argument("--json", action="store_true", dest="json_output", help="Output raw JSON")
+    chat_p.add_argument(
+        "--json", action="store_true", dest="json_output",
+        help="Output raw JSON",
+    )
 
     # consensus
     cons_p = sub.add_parser("consensus", help="Multi-model consensus")
     cons_p.add_argument("prompt", help="Prompt to send to all models")
     cons_p.add_argument("--models", required=True, help="Comma-separated model list")
     cons_p.add_argument("--arbiter", default=None, help="Arbiter model")
-    cons_p.add_argument("--tool", default="design", choices=["design", "review", "implement"])
+    cons_p.add_argument(
+        "--tool", default="design",
+        choices=["design", "review", "implement"],
+    )
     cons_p.add_argument("-t", "--temperature", type=float, default=0.7)
     cons_p.add_argument("--json", action="store_true", dest="json_output")
 
@@ -148,18 +153,25 @@ async def _cmd_chat(client: LoomClient, args: argparse.Namespace) -> None:
         messages.append({"role": "system", "content": args.system})
     messages.append({"role": "user", "content": message})
 
-    import os
     model = args.model or os.environ.get("LOOM_MODEL") or None
 
     if args.stream:
-        async for token in client.chat_stream(
-            messages, model=model, temperature=args.temperature, max_tokens=args.max_tokens
-        ):
-            print(token, end="", flush=True)
-        print()
+        try:
+            async for token in client.chat_stream(
+                messages, model=model,
+                temperature=args.temperature,
+                max_tokens=args.max_tokens,
+            ):
+                print(token, end="", flush=True)
+            print()
+        except RuntimeError as exc:
+            print(f"\nStream error: {exc}", file=sys.stderr)
+            sys.exit(1)
     else:
         resp = await client.chat(
-            messages, model=model, temperature=args.temperature, max_tokens=args.max_tokens
+            messages, model=model,
+            temperature=args.temperature,
+            max_tokens=args.max_tokens,
         )
         if args.json_output:
             _print_json(resp)
@@ -221,8 +233,12 @@ async def _cmd_docs(client: LoomClient, args: argparse.Namespace) -> None:
     if args.docs_command == "store":
         content = args.content
         if args.file:
-            with open(args.file) as f:
-                content = f.read()
+            try:
+                with open(args.file) as f:
+                    content = f.read()
+            except (FileNotFoundError, PermissionError) as exc:
+                print(f"Error reading file: {exc}", file=sys.stderr)
+                sys.exit(1)
         if not content:
             print("Error: provide --content or --file", file=sys.stderr)
             sys.exit(1)
@@ -266,17 +282,20 @@ async def _cmd_graph(client: LoomClient, args: argparse.Namespace) -> None:
 
 async def _repl(client: LoomClient) -> None:
     """Interactive chat REPL."""
-    import os
     model = os.environ.get("LOOM_MODEL", "")
 
     try:
         health = await client.health()
-        print(f"Connected to loom-ai ({client._base})")
+        print(f"Connected to loom-ai ({client.base_url})")
         backends = health.get("backends", {})
         llm = backends.get("llm", "none")
         print(f"LLM backend: {llm}")
     except Exception as exc:
-        print(f"Warning: could not connect to {client._base}: {exc}", file=sys.stderr)
+        print(
+            f"Warning: could not connect to "
+            f"{client.base_url}: {exc}",
+            file=sys.stderr,
+        )
 
     print("Type a message to chat, or use commands:")
     print("  /models     — list available models")
@@ -321,7 +340,7 @@ async def _repl(client: LoomClient) -> None:
             continue
         elif line.startswith("/system "):
             system_prompt = line[8:].strip()
-            print(f"System prompt set.")
+            print("System prompt set.")
             continue
         elif line == "/consensus":
             try:

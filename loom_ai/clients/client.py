@@ -11,6 +11,7 @@ import json
 import logging
 import os
 import urllib.error
+import urllib.parse
 import urllib.request
 from dataclasses import dataclass
 from typing import Any, AsyncIterator
@@ -35,7 +36,10 @@ class ClientConfig:
         return cls(
             base_url=os.environ.get(
                 "LOOM_URL",
-                f"http://{os.environ.get('LOOM_HOST', '127.0.0.1')}:{os.environ.get('LOOM_PORT', '5000')}",
+                "http://{}:{}".format(
+                    os.environ.get("LOOM_HOST", "127.0.0.1"),
+                    os.environ.get("LOOM_PORT", "5000"),
+                ),
             ),
             api_key=os.environ.get("LOOM_API_KEY", ""),
             timeout=timeout,
@@ -63,6 +67,10 @@ class LoomClient:
     def from_env(cls) -> LoomClient:
         return cls(ClientConfig.from_env())
 
+    @property
+    def base_url(self) -> str:
+        return self._base
+
     def _headers(self) -> dict[str, str]:
         headers: dict[str, str] = {
             "Content-Type": "application/json",
@@ -83,11 +91,15 @@ class LoomClient:
     ) -> dict[str, Any]:
         url = f"{self._base}{path}"
         if params:
-            qs = "&".join(f"{k}={urllib.request.quote(str(v))}" for k, v in params.items() if v is not None)
+            qs = "&".join(
+                f"{k}={urllib.parse.quote(str(v))}"
+                for k, v in params.items()
+                if v is not None
+            )
             if qs:
                 url = f"{url}?{qs}"
 
-        data = json.dumps(body).encode() if body else None
+        data = json.dumps(body).encode() if body is not None else None
         headers = self._headers()
         if extra_headers:
             headers.update(extra_headers)
@@ -101,7 +113,10 @@ class LoomClient:
             except urllib.error.HTTPError as exc:
                 error_body = exc.read(1024 * 64).decode(errors="replace")
                 logger.error("HTTP %d from %s: %s", exc.code, url, error_body)
-                raise RuntimeError(f"loom-ai API error {exc.code}: {error_body}") from exc
+                raise RuntimeError(
+                    f"loom-ai API error {exc.code}: "
+                    f"{error_body}"
+                ) from exc
 
         return await asyncio.to_thread(_do)
 
@@ -109,7 +124,9 @@ class LoomClient:
         filtered = {k: v for k, v in params.items() if v is not None}
         return await self._request("GET", path, params=filtered)
 
-    async def _post(self, path: str, body: dict | None = None, **kwargs: Any) -> dict[str, Any]:
+    async def _post(
+        self, path: str, body: dict | None = None, **kwargs: Any
+    ) -> dict[str, Any]:
         return await self._request("POST", path, body=body, **kwargs)
 
     # ── Health ───────────────────────────────────────────────────────────
@@ -164,7 +181,9 @@ class LoomClient:
 
         url = f"{self._base}/llm/chat"
         data = json.dumps(body).encode()
-        req = urllib.request.Request(url, data=data, headers=self._headers(), method="POST")
+        req = urllib.request.Request(
+            url, data=data, headers=self._headers(), method="POST"
+        )
 
         queue: asyncio.Queue[str | None] = asyncio.Queue()
         loop = asyncio.get_running_loop()
@@ -180,7 +199,12 @@ class LoomClient:
                                 break
                             try:
                                 chunk = json.loads(payload)
-                                delta = chunk.get("choices", [{}])[0].get("delta", {}).get("content", "")
+                                choice = chunk.get(
+                                    "choices", [{}]
+                                )[0]
+                                delta = choice.get(
+                                    "delta", {}
+                                ).get("content", "")
                                 if delta:
                                     loop.call_soon_threadsafe(queue.put_nowait, delta)
                             except json.JSONDecodeError:
@@ -239,8 +263,13 @@ class LoomClient:
     async def knowledge_stats(self) -> dict[str, Any]:
         return await self._get("/knowledge/stats")
 
-    async def list_documents(self, *, limit: int = 20, offset: int = 0) -> dict[str, Any]:
-        return await self._get("/knowledge/documents", limit=str(limit), offset=str(offset))
+    async def list_documents(
+        self, *, limit: int = 20, offset: int = 0
+    ) -> dict[str, Any]:
+        return await self._get(
+            "/knowledge/documents",
+            limit=str(limit), offset=str(offset),
+        )
 
     async def store_document(
         self,
@@ -291,12 +320,12 @@ class LoomClient:
 
     async def list_secrets(self) -> list[str]:
         resp = await self._get("/secrets/")
-        return resp.get("names", [])
+        return resp.get("secrets", resp.get("names", []))
 
     async def get_secret(self, name: str, *, reason: str = "client request") -> str:
         resp = await self._request(
             "POST",
-            f"/secrets/{urllib.request.quote(name)}/reveal",
+            f"/secrets/{urllib.parse.quote(name)}/reveal",
             extra_headers={"X-Secret-Access-Reason": reason},
         )
         return resp.get("value", "")
@@ -304,12 +333,13 @@ class LoomClient:
     # ── Queue / Pipeline ─────────────────────────────────────────────────
 
     async def queue_status(self, queue_name: str) -> dict[str, Any]:
-        return await self._get(f"/pipeline/queues/{urllib.request.quote(queue_name)}/status")
+        path = f"/pipeline/queues/{urllib.parse.quote(queue_name)}"
+        return await self._get(f"{path}/status")
 
     async def enqueue(self, queue_name: str, payload: dict) -> dict[str, Any]:
         return await self._post(
-            f"/pipeline/queues/{urllib.request.quote(queue_name)}/enqueue",
-            {"payload": payload},
+            f"/pipeline/queues/{urllib.parse.quote(queue_name)}/enqueue",
+            {"items": [{"payload": payload}]},
         )
 
     # ── Graph ────────────────────────────────────────────────────────────
@@ -325,13 +355,13 @@ class LoomClient:
         return await self._post("/graph/nodes", body)
 
     async def get_node(self, node_id: str) -> dict[str, Any]:
-        return await self._get(f"/graph/nodes/{urllib.request.quote(node_id)}")
+        return await self._get(f"/graph/nodes/{urllib.parse.quote(node_id)}")
 
     async def get_neighbors(
         self, node_id: str, *, edge_label: str | None = None
     ) -> dict[str, Any]:
         return await self._get(
-            f"/graph/nodes/{urllib.request.quote(node_id)}/neighbors",
+            f"/graph/nodes/{urllib.parse.quote(node_id)}/neighbors",
             edge_label=edge_label,
         )
 
@@ -357,8 +387,13 @@ class LoomClient:
         resp = await self._get("/tools/")
         return resp.get("tools", [])
 
-    async def call_tool(self, name: str, arguments: dict | None = None) -> dict[str, Any]:
-        return await self._post("/tools/call", {"name": name, "arguments": arguments or {}})
+    async def call_tool(
+        self, name: str, arguments: dict | None = None
+    ) -> dict[str, Any]:
+        return await self._post(
+            "/tools/call",
+            {"name": name, "arguments": arguments or {}},
+        )
 
     # ── Resources ────────────────────────────────────────────────────────
 

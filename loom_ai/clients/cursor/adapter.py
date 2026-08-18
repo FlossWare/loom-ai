@@ -24,6 +24,7 @@ from __future__ import annotations
 
 import json
 import os
+import shlex
 import sys
 
 
@@ -53,9 +54,9 @@ def generate_env(
 ) -> str:
     """Generate shell exports for Cursor."""
     lines = [
-        f'export OPENAI_API_KEY="{api_key or "loom-ai"}"',
-        f'export OPENAI_BASE_URL="{loom_url}/llm"',
-        f'export CURSOR_MODEL="{model}"',
+        f"export OPENAI_API_KEY={shlex.quote(api_key or 'loom-ai')}",
+        f"export OPENAI_BASE_URL={shlex.quote(f'{loom_url}/llm')}",
+        f"export CURSOR_MODEL={shlex.quote(model)}",
     ]
     return "\n".join(lines)
 

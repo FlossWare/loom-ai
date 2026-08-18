@@ -31,6 +31,7 @@ from __future__ import annotations
 
 import json
 import os
+import shlex
 import sys
 
 
@@ -63,8 +64,8 @@ def generate_env(
 ) -> str:
     """Generate shell exports for Claude Code integration."""
     lines = [
-        f'export LOOM_URL="{loom_url}"',
-        f'export LOOM_API_KEY="{api_key}"',
+        f"export LOOM_URL={shlex.quote(loom_url)}",
+        f"export LOOM_API_KEY={shlex.quote(api_key)}",
         "",
         "# Add to CLAUDE.md for Claude Code awareness:",
         "# When querying the knowledge base, use the loom-ai MCP server.",
