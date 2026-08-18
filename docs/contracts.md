@@ -42,10 +42,10 @@ tool, resource, and task execution contracts.
 | `IdempotentStore` | `protocols` | Marker for backends with idempotent write semantics | stable | `MemoryStorageBackend`, `PostgresqlStorageBackend` |
 | `StorageBackend` | `protocols` | Async persistence for documents, chunks, and embeddings | stable | `MemoryStorageBackend`, `PostgresqlStorageBackend` |
 | `QueueBackend` | `protocols` | Named task queue with enqueue/fetch/complete/requeue | stable | `MemoryQueueBackend`, `RedisQueueBackend` |
-| `SecretsBackend` | `protocols` | Async secret/API-key storage | stable | `EnvSecretsBackend`, `PostgresqlSecretsBackend` |
-| `EmbeddingBackend` | `protocols` | Provider-agnostic vector-embedding generation | stable | `NoopEmbeddingBackend`, `EmbeddingStore` |
+| `SecretsBackend` | `protocols` | Async secret/API-key storage | stable | `EnvSecretsBackend`, `PostgresqlSecretsBackend`, `RotatingSecretsBackend` |
+| `EmbeddingBackend` | `protocols` | Provider-agnostic vector-embedding generation | stable | `NoopEmbeddingBackend`, `OpenAIEmbeddingBackend`, `LiteLLMEmbeddingBackend` |
 | `SearchBackend` | `protocols` | Full-text, semantic, and hybrid search | stable | `MemorySearchBackend`, `PostgresqlSearchBackend` |
-| `GraphBackend` | `protocols` | Knowledge-graph node and edge storage | stable | `MemoryGraphBackend`, `DisabledGraphBackend` |
+| `GraphBackend` | `protocols` | Knowledge-graph node and edge storage | stable | `MemoryGraphBackend`, `DisabledGraphBackend`, `OrientDBGraphBackend` |
 | `LLMBackend` | `protocols` | Provider-agnostic chat completion interface | stable | `HttpLLMBackend` |
 | `ToolProvider` | `protocols` | MCP-shaped tool listing and invocation | stable | `MemoryToolProvider` |
 | `ResourceProvider` | `protocols` | MCP-shaped resource listing and reading | stable | `MemoryResourceProvider` |
@@ -64,7 +64,7 @@ routing, execution patterns, RAG ingestion, and knowledge pipelines.
 | `ModelRouter` | `contracts_phase1` | Provider-aware routing with fallback and cost | stable | `SimpleModelRouter`, `AdaptiveModelRouter` |
 | `ExecutionPattern` | `contracts_phase1` | Pluggable multi-model execution strategies | stable | `ConsensusPattern`, `CascadePattern`, `MapReducePattern` |
 | `ChunkingStrategy` | `contracts_phase1` | Synchronous text-chunking for RAG ingestion | stable | `TokenChunker` |
-| `KnowledgePipeline` | `contracts_phase1` | End-to-end RAG ingestion and retrieval | stable | `InMemoryKnowledgePipeline` |
+| `KnowledgePipeline` | `contracts_phase1` | End-to-end RAG ingestion and retrieval | stable | `InMemoryKnowledgePipeline`, `PostgresqlKnowledgeStore` |
 
 ## Infrastructure (8 protocols)
 
@@ -133,7 +133,7 @@ trajectory capture, executable environments, and capability taxonomy.
 
 | Protocol | Source | Purpose | Stability | Backends |
 |----------|--------|---------|-----------|----------|
-| `AgentLoop` | `contracts_phase6` | Re-entrant agent loop with pause/resume/cancel | experimental | -- |
+| `AgentLoop` | `contracts_phase6` | Re-entrant agent loop with pause/resume/cancel | experimental | `InMemoryAgentLoop` |
 | `RecipeExecutor` | `contracts_phase6` | Portable, declarative agent recipe execution | experimental | -- |
 | `ACPAdapter` | `contracts_phase6` | ACP agent interoperability and session management | experimental | -- |
 | `ContextAssembler` | `contracts_phase6` | Context construction, budgeting, and compaction | experimental | -- |

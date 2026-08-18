@@ -14,7 +14,8 @@ For installation, quick-start examples, and the full protocol table see the
 ```text
 +-------------------------------------+
 |        Application Layer            |
-|  (Agent runtimes, user code, CLI)   |
+|  (Agent runtimes, user code, CLI,   |
+|   client SDK, adapters)             |
 +-------------------------------------+
 |       Orchestration Layer           |
 |  (Consensus, routing, execution)    |
@@ -28,8 +29,11 @@ For installation, quick-start examples, and the full protocol table see the
 ```
 
 **Application layer** -- user code, agent runtimes (Goose, custom agents),
-REST clients, and CLI tools.  This layer depends on contracts and optionally
-on orchestration components like `ConsensusEngine`.
+client SDK (`LocalClient` for embedded mode, `LoomClient` for REST),
+`get_client()` auto-detection factory, CLI (`loom` command), and 7 tool
+adapters (Crush, OpenCode, Aider, Cursor, Continue.dev, Claude Code MCP
+bridge).  This layer depends on contracts and optionally on orchestration
+components like `ConsensusEngine`.
 
 **Orchestration layer** -- `ConsensusEngine` (multi-model fan-out with arbiter
 synthesis), `ExecutionEngine` (DAG-based task scheduling), and higher-level
@@ -42,7 +46,7 @@ depend on the contract layer but never on a specific backend.
 `IdempotentStore.is_idempotent`).  The only imports are from the
 standard library (`typing`, `dataclasses`).
 
-**Backend layer** -- 37 pluggable modules in `loom_ai/backends/` that satisfy
+**Backend layer** -- 45 pluggable modules in `loom_ai/backends/` that satisfy
 contracts via structural subtyping.  Each module can depend on an external
 library (asyncpg, redis, etc.) but the dependency is optional and loaded
 lazily.
@@ -66,7 +70,7 @@ loom_ai/backends/memory.py    <-- in-memory implementations
 loom_ai/backends/postgresql.py
 loom_ai/backends/redis_queue.py
 loom_ai/backends/http_llm.py
-...                           <-- 37 backend modules total
+...                           <-- 45 backend modules total
 ```
 
 Contracts use `typing.Protocol` with `@runtime_checkable`:
@@ -116,6 +120,8 @@ config     -->  protocols + backends (lazy imports)
 consensus  -->  protocols + models + prompts
 execution  -->  protocols + models + config
 server     -->  config + models (FastAPI optional dependency)
+clients    -->  protocols + models + config (LocalClient)
+             +-> server (LoomClient, REST via urllib)
 ```
 
 External projects can implement any Loom contract without depending on the
@@ -409,13 +415,14 @@ class ResourceProvider(Protocol):
 The data models (`ToolDefinition`, `ToolResult`, `ResourceDefinition`,
 `ResourceContent`) mirror MCP's JSON-Schema-shaped tool/resource descriptors.
 
-An MCP SDK adapter can bridge these contracts to a real MCP server or client.
 The core `loom_ai` package has no MCP transport dependency -- it defines the
 shape of the interaction, not the wire protocol.
 
-The shipped `MemoryToolProvider` and `MemoryResourceProvider` in
-`loom_ai/backends/memory_mcp.py` provide in-memory implementations for testing
-and local development.
+Loom ships an MCP stdio bridge at `loom_ai/clients/claude/mcp_bridge.py` that
+exposes loom-ai tools (search, store, consensus) to Claude Code over
+JSON-RPC 2.0 with Content-Length framing.  The `MemoryToolProvider` and
+`MemoryResourceProvider` in `loom_ai/backends/memory_mcp.py` provide
+in-memory implementations for testing and local development.
 
 ---
 
@@ -473,7 +480,8 @@ What Loom **is not**:
 
 - An agent framework (it provides primitives that agent runtimes use)
 - A model serving platform (it calls external APIs)
-- An MCP server or client (it defines MCP-shaped contracts only)
+- A standalone MCP transport library (it ships MCP-shaped contracts and a
+  Claude Code bridge adapter, not a general-purpose MCP SDK)
 - A training or fine-tuning system (it orchestrates pre-trained models)
 
 Loom defines the contract first and validates it against multiple

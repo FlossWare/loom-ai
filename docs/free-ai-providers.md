@@ -1,6 +1,6 @@
 # Free AI Model Providers
 
-All providers listed here offer free tiers suitable for LLM inference, embeddings, or both. Multiple accounts per provider multiply your effective rate limits when used with [LiteLLM round-robin](litellm-setup.md).
+All providers listed here offer free tiers suitable for LLM inference, embeddings, or both. Multiple accounts per provider multiply your effective rate limits when used with LiteLLM round-robin routing.
 
 ---
 
@@ -9,12 +9,12 @@ All providers listed here offer free tiers suitable for LLM inference, embedding
 ```
 Provider signup → API key → env var on LiteLLM server → litellm-config.yaml → LiteLLM proxy
                                                                                      ↑
-                                                              Crush connects here (master key only)
+                                                         loom-ai clients connect here (master key only)
 ```
 
-**Crush does NOT need provider API keys.** It authenticates to LiteLLM with a single master key (set in `litellm-config.yaml` under `general_settings.master_key`).
+**Loom-ai clients do NOT need provider API keys.** They authenticate to LiteLLM with a single master key (set in `litellm-config.yaml` under `general_settings.master_key`). This applies to all clients: CLI, Crush, OpenCode, Aider, Cursor, Continue.dev, and Claude Code.
 
-**LiteLLM needs the provider API keys** as environment variables. The `litellm-config.yaml` references them with `os.environ/VAR_NAME` syntax. The systemd service loads them from an env file (see [LiteLLM Setup](litellm-setup.md)).
+**LiteLLM needs the provider API keys** as environment variables. The `litellm-config.yaml` references them with `os.environ/VAR_NAME` syntax. The systemd service loads them from an env file.
 
 To add a new provider:
 1. Sign up and get an API key
@@ -186,7 +186,7 @@ To add a new provider:
 
 ### Multiple Accounts
 
-Most providers allow multiple accounts. Each account gets its own rate limits. Use [LiteLLM](litellm-setup.md) to round-robin across accounts automatically.
+Most providers allow multiple accounts. Each account gets its own rate limits. Use LiteLLM to round-robin across accounts automatically.
 
 Use a consistent env var naming pattern for additional accounts:
 
