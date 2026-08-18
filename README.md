@@ -47,6 +47,7 @@ This distinction is intentional: Loom can **use** an external project without in
 
 ```bash
 pip install flossware-loom-ai              # core (stdlib only)
+pip install flossware-loom-ai[cli]         # + CLI (loom command)
 pip install flossware-loom-ai[server]      # + FastAPI REST server
 pip install flossware-loom-ai[postgresql]  # + PostgreSQL/pgvector storage
 pip install flossware-loom-ai[redis]       # + Redis queues
@@ -72,6 +73,71 @@ async def main():
     print(result.synthesis.content)
 
 asyncio.run(main())
+```
+
+## Client SDK
+
+Loom ships a dual-mode client SDK with auto-detection:
+
+```python
+from loom_ai.clients import get_client
+
+client = await get_client()
+# Returns LocalClient (embedded, no server) when LOOM_URL/LOOM_HOST unset
+# Returns LoomClient (REST) when LOOM_URL or LOOM_HOST is set
+
+resp = await client.chat([{"role": "user", "content": "Hello"}])
+```
+
+### CLI
+
+```bash
+pip install flossware-loom-ai[cli]
+
+loom health                        # check status (auto-detects local/remote)
+loom chat "Hello"                  # chat with configured LLM
+loom chat "Hello" --stream         # stream response tokens
+loom models                        # list available models
+loom search "query"                # search knowledge base
+loom docs store --title T --file f # store a document
+loom docs list                     # list documents
+loom docs stats                    # knowledge base stats
+loom secrets list                  # list secret names
+loom graph add-node "person"       # add a graph node
+loom consensus "prompt" --models gemini,gpt-4o,claude
+```
+
+### Tool Adapters
+
+Each adapter generates config or env vars to point an AI coding tool at
+your loom-ai server. Set `LOOM_URL` and optionally `LOOM_API_KEY` first.
+
+```bash
+# Crush
+python -m loom_ai.clients.crush              # print config JSON
+
+# OpenCode
+python -m loom_ai.clients.opencode           # print config JSON
+python -m loom_ai.clients.opencode --env     # print shell exports
+python -m loom_ai.clients.opencode --write   # write to config file
+
+# Aider
+python -m loom_ai.clients.aider --env        # print shell exports
+python -m loom_ai.clients.aider --cmd        # print aider launch command
+eval $(python -m loom_ai.clients.aider --env) && aider
+
+# Cursor
+python -m loom_ai.clients.cursor             # print config JSON
+python -m loom_ai.clients.cursor --env       # print shell exports
+
+# Continue.dev
+python -m loom_ai.clients.continue_dev       # print config JSON
+python -m loom_ai.clients.continue_dev --write  # write to config file
+
+# Claude Code (MCP bridge)
+python -m loom_ai.clients.claude             # print MCP config JSON
+python -m loom_ai.clients.claude --env       # print shell exports
+python -m loom_ai.clients.claude.mcp_bridge  # run MCP stdio server
 ```
 
 ## Protocol Contracts
@@ -112,7 +178,7 @@ Request lifecycle, error handling, and middleware protocols.
 
 ## Backend Implementations
 
-37 pluggable backend modules in `loom_ai/backends/`:
+45 pluggable backend modules in `loom_ai/backends/`:
 
 | Backend | Purpose |
 |---------|---------|
