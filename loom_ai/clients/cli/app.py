@@ -31,6 +31,7 @@ import argparse
 import asyncio
 import json
 import os
+import pathlib
 import sys
 from typing import Any
 
@@ -234,8 +235,9 @@ async def _cmd_docs(client: LoomClient, args: argparse.Namespace) -> None:
         content = args.content
         if args.file:
             try:
-                with open(args.file) as f:
-                    content = f.read()
+                content = await asyncio.to_thread(
+                    pathlib.Path(args.file).read_text
+                )
             except (FileNotFoundError, PermissionError) as exc:
                 print(f"Error reading file: {exc}", file=sys.stderr)
                 sys.exit(1)
@@ -311,7 +313,7 @@ async def _repl(client: LoomClient) -> None:
 
     while True:
         try:
-            line = input("you> ").strip()
+            line = (await asyncio.to_thread(input, "you> ")).strip()
         except (EOFError, KeyboardInterrupt):
             print()
             break
@@ -344,8 +346,12 @@ async def _repl(client: LoomClient) -> None:
             continue
         elif line == "/consensus":
             try:
-                prompt = input("prompt> ").strip()
-                model_str = input("models (comma-separated)> ").strip()
+                prompt = (await asyncio.to_thread(input, "prompt> ")).strip()
+                model_str = (
+                    await asyncio.to_thread(
+                        input, "models (comma-separated)> "
+                    )
+                ).strip()
                 if prompt and model_str:
                     models = [m.strip() for m in model_str.split(",")]
                     print("Gathering consensus...", file=sys.stderr)
