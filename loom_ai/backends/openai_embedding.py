@@ -6,8 +6,6 @@ Wraps the OpenAI embeddings API behind the
 
 from __future__ import annotations
 
-from typing import TYPE_CHECKING
-
 try:
     import openai  # type: ignore[import-untyped]
 except ImportError as _exc:
@@ -15,9 +13,6 @@ except ImportError as _exc:
         "OpenAI embeddings require the 'openai' package.  "
         "Install with: pip install flossware-loom-ai[openai]"
     ) from _exc
-
-if TYPE_CHECKING:
-    pass
 
 
 class OpenAIEmbeddingBackend:

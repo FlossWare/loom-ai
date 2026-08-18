@@ -7,8 +7,6 @@ to 100+ embedding providers through a unified interface.
 
 from __future__ import annotations
 
-from typing import TYPE_CHECKING
-
 try:
     import litellm  # type: ignore[import-untyped]
 except ImportError as _exc:
@@ -16,9 +14,6 @@ except ImportError as _exc:
         "LiteLLM embeddings require the 'litellm' package.  "
         "Install with: pip install flossware-loom-ai[litellm]"
     ) from _exc
-
-if TYPE_CHECKING:
-    pass
 
 
 class LiteLLMEmbeddingBackend:

@@ -73,14 +73,7 @@ class SimpleModelRouter:
             models=list(models),
             priority=priority,
         )
-        old_entry = self._providers.get(name)
-        if old_entry is not None:
-            for old_model in old_entry.models:
-                if old_model not in models and old_model in self._model_providers:
-                    plist = self._model_providers[old_model]
-                    if name in plist:
-                        plist.remove(name)
-
+        self._remove_stale_mappings(name, models)
         self._providers[name] = entry
 
         for model in models:
@@ -88,12 +81,22 @@ class SimpleModelRouter:
             if name not in providers:
                 providers.append(name)
 
-            # Create default ModelInfo if none exists
             if model not in self._model_info:
                 self._model_info[model] = ModelInfo(
                     model=model,
                     provider=name,
                 )
+
+    def _remove_stale_mappings(self, name: str, new_models: list[str]) -> None:
+        """Remove model→provider mappings for models no longer served."""
+        old_entry = self._providers.get(name)
+        if old_entry is None:
+            return
+        for old_model in old_entry.models:
+            if old_model not in new_models and old_model in self._model_providers:
+                plist = self._model_providers[old_model]
+                if name in plist:
+                    plist.remove(name)
 
     async def route(self, model: str, *, fallback: bool = True) -> object:
         """Resolve *model* to an ``LLMBackend``.
