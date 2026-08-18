@@ -152,7 +152,7 @@ class LoomConfig:
                     "Redis queue requires the 'redis' package.  "
                     "Install with: pip install flossware-loom-ai[redis]"
                 ) from exc
-            return RedisQueueBackend.from_env()  # type: ignore[attr-defined]
+            return await RedisQueueBackend.from_env()  # type: ignore[attr-defined]
         raise ValueError(
             f"Unknown queue backend: {kind!r}.  Valid options: memory, redis"
         )
@@ -204,7 +204,7 @@ class LoomConfig:
                     "OpenAI embeddings require the 'openai' package.  "
                     "Install with: pip install flossware-loom-ai[openai]"
                 ) from exc
-            return OpenAIEmbeddingBackend.from_env()  # type: ignore[attr-defined]
+            return await OpenAIEmbeddingBackend.from_env()  # type: ignore[attr-defined]
         if kind == "litellm":
             try:
                 from loom_ai.backends.litellm_embedding import (
@@ -215,7 +215,7 @@ class LoomConfig:
                     "LiteLLM embeddings require the 'litellm' package.  "
                     "Install with: pip install flossware-loom-ai[litellm]"
                 ) from exc
-            return LiteLLMEmbeddingBackend.from_env()  # type: ignore[attr-defined]
+            return await LiteLLMEmbeddingBackend.from_env()  # type: ignore[attr-defined]
         raise ValueError(
             f"Unknown embedding backend: {kind!r}.  "
             f"Valid options: noop, openai, litellm"
@@ -260,7 +260,7 @@ class LoomConfig:
                     "OrientDB graph requires 'pyorient'.  "
                     "Install with: pip install flossware-loom-ai[orientdb]"
                 ) from exc
-            return OrientDBGraphBackend.from_env()  # type: ignore[attr-defined]
+            return await OrientDBGraphBackend.from_env()  # type: ignore[attr-defined]
         raise ValueError(
             f"Unknown graph backend: {kind!r}.  "
             f"Valid options: disabled, memory, orientdb"

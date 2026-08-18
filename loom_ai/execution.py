@@ -91,15 +91,19 @@ class ExecutionEngine:
     without blocking independent branches.
     """
 
+    _DEFAULT_MAX_CONCURRENCY = 10
+
     def __init__(
         self,
         config: LoomConfig,
         runner: TaskRunner | None = None,
         observer: TaskObserver | None = None,
+        max_concurrency: int = _DEFAULT_MAX_CONCURRENCY,
     ) -> None:
         self._config = config
         self._runner: TaskRunner = runner or NoopTaskRunner()
         self._observer = observer
+        self._semaphore = asyncio.Semaphore(max_concurrency)
 
     async def execute_task(self, task: Task) -> Task:
         """Run a single task through the configured runner."""
@@ -109,16 +113,20 @@ class ExecutionEngine:
             )
         task = self._transition(task, task.status, TaskStatus.RUNNING)
         try:
-            if task.timeout_seconds > 0:
-                result = await asyncio.wait_for(
-                    self._runner.run(task, self._config),
-                    timeout=task.timeout_seconds,
-                )
-            else:
-                result = await self._runner.run(task, self._config)
+            async with self._semaphore:
+                if task.timeout_seconds > 0:
+                    result = await asyncio.wait_for(
+                        self._runner.run(task, self._config),
+                        timeout=task.timeout_seconds,
+                    )
+                else:
+                    result = await self._runner.run(task, self._config)
             output = result if isinstance(result, dict) else {"result": result}
             task = replace(task, output_data=output)
             return self._transition(task, TaskStatus.RUNNING, TaskStatus.COMPLETED)
+        except asyncio.CancelledError:
+            task = replace(task, error="task cancelled")
+            return self._transition(task, TaskStatus.RUNNING, TaskStatus.FAILED)
         except asyncio.TimeoutError:
             msg = f"Task {task.id!r} timed out after {task.timeout_seconds}s"
             task = replace(task, error=msg)
