@@ -145,11 +145,11 @@ def _handle_tool_call(
 
 def _write_message(data: dict) -> None:
     """Write a JSON-RPC message with Content-Length framing."""
-    body = json.dumps(data)
+    body = json.dumps(data).encode("utf-8")
     header = f"Content-Length: {len(body)}\r\n\r\n"
-    sys.stdout.write(header)
-    sys.stdout.write(body)
-    sys.stdout.flush()
+    sys.stdout.buffer.write(header.encode("ascii"))
+    sys.stdout.buffer.write(body)
+    sys.stdout.buffer.flush()
 
 
 def _read_message() -> dict | None:
