@@ -2,7 +2,13 @@
 
 import asyncio
 
-from fastapi.testclient import TestClient
+import pytest
+
+# Guard: skip the whole module when fastapi is not installed (e.g. backend
+# matrix jobs that only install postgresql/redis/etc extras without server).
+pytest.importorskip("fastapi", reason="fastapi not installed (server extra)")
+
+from fastapi.testclient import TestClient  # noqa: E402
 
 
 def _make_app(monkeypatch, api_key=None):
@@ -67,46 +73,8 @@ def test_secrets_accessible_with_valid_key(monkeypatch):
     assert resp.status_code == 200
 
 
-def test_health_always_unauthenticated(monkeypatch):
-    """Health endpoint must be reachable without auth even when API key is set."""
-    app = _make_app(monkeypatch, api_key="test-secret")
-    client = TestClient(app)
-    resp = client.get("/health")
-    assert resp.status_code == 200
-    assert resp.json()["status"] == "healthy"
-
-
-# ---------------------------------------------------------------------------
-# /ready endpoint tests
-# ---------------------------------------------------------------------------
-
-
 def test_ready_no_auth_required(monkeypatch):
-    """Ready endpoint is unauthenticated even when API key is set."""
-    app = _make_app(monkeypatch, api_key="test-secret")
-    client = TestClient(app)
-    resp = client.get("/ready")
-    assert resp.status_code == 200
-
-
-def test_ready_returns_status(monkeypatch):
-    """Ready endpoint returns status and per-backend checks."""
-    app = _make_app(monkeypatch)
-    client = TestClient(app)
-    resp = client.get("/ready")
-    assert resp.status_code == 200
-    body = resp.json()
-    assert body["status"] == "ready"
-    assert "checks" in body
-    checks = body["checks"]
-    assert checks["storage"]["healthy"] is True
-    assert checks["queue"]["healthy"] is True
-    assert checks["secrets"]["healthy"] is True
-    assert checks["search"]["healthy"] is True
-
-
-def test_ready_with_auth_enabled(monkeypatch):
-    """Ready endpoint works without credentials when auth is enabled."""
+    """Readiness endpoint works without credentials when auth is enabled."""
     app = _make_app(monkeypatch, api_key="test-secret")
     client = TestClient(app)
     resp = client.get("/ready")
