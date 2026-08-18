@@ -119,7 +119,7 @@ class LoomClient:
                 error_body = exc.read(
                     1024 * 64
                 ).decode(errors="replace")
-                logger.error(
+                logger.exception(
                     "HTTP %d from %s: %s",
                     exc.code, url, error_body,
                 )
@@ -230,7 +230,7 @@ class LoomClient:
                             except json.JSONDecodeError:
                                 continue
             except Exception as exc:
-                logger.error("Stream error: %s", exc)
+                logger.exception("Stream error: %s", exc)
             finally:
                 loop.call_soon_threadsafe(queue.put_nowait, None)
 
