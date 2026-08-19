@@ -412,7 +412,7 @@ async function send() {
   } catch (e) {
     const isRetryable = String(e.message).includes("404") || String(e).includes("empty stream");
     if (!isRetryable) { showError(bodyEl, e); }
-    else { try { await chatPlain(payload, bodyEl); } catch (e2) { showError(bodyEl, e2); } }
+    else { try { await chatPlain(payload, bodyEl); } catch (error_) { showError(bodyEl, error_); } }
   } finally {
     sendBtn.disabled = false;
     input.focus();
