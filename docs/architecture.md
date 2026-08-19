@@ -254,6 +254,26 @@ Loom is designed to be extended by adding new backend implementations.  The
 steps below walk through adding a custom `LLMBackend` as a concrete example,
 but the same pattern applies to all 11 core protocols and the phase contracts.
 
+### At a Glance
+
+Every core protocol is a small async interface.  Implementing one means writing
+a class with the right method signatures -- no inheritance, no registration, no
+framework coupling.
+
+| Protocol | Methods | Example Use Case |
+|----------|---------|------------------|
+| `StorageBackend` | 13 | Swap PostgreSQL for MongoDB, DynamoDB, or S3 |
+| `QueueBackend` | 6 | Swap Redis for RabbitMQ, Kafka, or SQS |
+| `SecretsBackend` | 4 | Swap env vars for Vault, AWS Secrets Manager, or 1Password |
+| `EmbeddingBackend` | 4 | Swap OpenAI embeddings for Cohere, Voyage AI, or local ONNX |
+| `SearchBackend` | 5 | Swap in-memory for Elasticsearch, Meilisearch, or Typesense |
+| `GraphBackend` | 7 | Swap in-memory for Neo4j, ArangoDB, or TigerGraph |
+| `LLMBackend` | 3 | Swap HTTP for Ollama, vLLM, or a custom inference server |
+| `ToolProvider` | 2 | Wrap any tool registry (MCP, LangChain, custom) |
+| `ResourceProvider` | 2 | Expose files, databases, or APIs as resources |
+| `TaskRunner` | 1 | Custom task execution strategies |
+| `IdempotentStore` | 1 (property) | Marker for upsert-safe backends |
+
 ### Step 1: Pick the Protocol
 
 Identify the contract you want to implement.  The core contracts live in
@@ -341,6 +361,56 @@ from loom_ai.models import ChatMessage, ChatResponse
 
 But this is optional.  Structural subtyping means the contract is enforced by
 method shape, not by import graph.
+
+#### More examples
+
+The same pattern works for every protocol.  Here are two more to show how
+little code is needed.
+
+**Custom QueueBackend (e.g. RabbitMQ):**
+
+```python
+class RabbitMQQueue:
+    """Satisfies QueueBackend -- 6 methods."""
+
+    async def enqueue(self, queue_name: str, items: list) -> int: ...
+    async def fetch(self, queue_name: str, count: int, worker_id: str) -> list: ...
+    async def complete(self, queue_name: str, item_id: str) -> bool: ...
+    async def requeue(self, queue_name: str, items: list) -> int: ...
+    async def status(self, queue_name: str) -> dict: ...
+    async def list_queues(self) -> list[str]: ...
+```
+
+**Custom GraphBackend (e.g. Neo4j):**
+
+```python
+class Neo4jGraph:
+    """Satisfies GraphBackend -- 7 methods."""
+
+    async def add_node(self, node) -> str: ...
+    async def get_node(self, node_id: str): ...
+    async def add_edge(self, edge) -> str: ...
+    async def get_neighbors(self, node_id: str, *, edge_label=None) -> list: ...
+    async def traverse(self, start_id: str, *, edge_label=None, depth=1) -> list: ...
+    async def delete_node(self, node_id: str) -> bool: ...
+    async def delete_edge(self, edge_id: str) -> bool: ...
+```
+
+**Custom SecretsBackend (e.g. HashiCorp Vault):**
+
+```python
+class VaultSecrets:
+    """Satisfies SecretsBackend -- 4 methods."""
+
+    async def get(self, name: str) -> str | None: ...
+    async def set(self, name: str, value: str) -> bool: ...
+    async def list_names(self) -> list[str]: ...
+    async def delete(self, name: str) -> bool: ...
+```
+
+All three examples follow the same recipe: match the method signatures, return
+the right types, and pass the instance to ``LoomConfig``.  No decorators, no
+registration, no base classes.
 
 ### Step 3: Verify structural compatibility
 
