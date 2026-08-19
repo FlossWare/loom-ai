@@ -857,7 +857,11 @@ def _mount_router_routes(app: FastAPI, config: LoomConfig, auth_deps: list) -> N
         prefix="/router", tags=["router"], dependencies=auth_deps,
     )
 
-    @router_api.post("/select", response_model=RouterSelectResponse)
+    @router_api.post(
+        "/select",
+        response_model=RouterSelectResponse,
+        responses={400: {"description": "Invalid task type or candidates"}},
+    )
     async def router_select(body: RouterSelectRequest):
         try:
             model = await config.router.select(
