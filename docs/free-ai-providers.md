@@ -103,7 +103,7 @@ To add a new provider:
 
 - **Signup:** https://dashboard.cohere.com/
 - **Env var:** `COHERE_API_KEY`
-- **Models:** `command-r`, `command-r-plus`
+- **Models:** `command-a-03-2025`, `command-r-plus`, `command-r`
 - **LiteLLM prefix:** `cohere/`
 - **Notes:** Also offers free embedding and reranking models.
 

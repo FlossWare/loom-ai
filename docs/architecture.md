@@ -46,7 +46,7 @@ depend on the contract layer but never on a specific backend.
 `IdempotentStore.is_idempotent`).  The only imports are from the
 standard library (`typing`, `dataclasses`).
 
-**Backend layer** -- 45 pluggable modules in `loom_ai/backends/` that satisfy
+**Backend layer** -- 58 pluggable modules in `loom_ai/backends/` that satisfy
 contracts via structural subtyping.  Each module can depend on an external
 library (asyncpg, redis, etc.) but the dependency is optional and loaded
 lazily.
@@ -70,7 +70,7 @@ loom_ai/backends/memory.py    <-- in-memory implementations
 loom_ai/backends/postgresql.py
 loom_ai/backends/redis_queue.py
 loom_ai/backends/http_llm.py
-...                           <-- 45 backend modules total
+...                           <-- 58 backend modules total
 ```
 
 Contracts use `typing.Protocol` with `@runtime_checkable`:
