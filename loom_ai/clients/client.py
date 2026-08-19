@@ -189,6 +189,11 @@ class LoomClient:
         temperature: float = 0.7,
         max_tokens: int | None = None,
     ) -> AsyncIterator[str]:
+        from loom_ai.clients._stream_util import (
+            iterate_stream_queue,
+            run_stream_producer,
+        )
+
         body: dict[str, Any] = {
             "messages": messages,
             "temperature": temperature,
@@ -199,47 +204,22 @@ class LoomClient:
         if max_tokens is not None:
             body["max_tokens"] = max_tokens
 
-        url = f"{self._base}/llm/chat"
+        url = f"{self._base}/llm/chat/stream"
         data = json.dumps(body).encode()
         req = urllib.request.Request(
             url, data=data, headers=self._headers(), method="POST"
         )
-
-        queue: asyncio.Queue[str | None] = asyncio.Queue()
+        queue: asyncio.Queue[str | BaseException | None] = asyncio.Queue()
         loop = asyncio.get_running_loop()
-
-        def _stream() -> None:
-            try:
-                with urllib.request.urlopen(req, timeout=self._config.timeout) as resp:
-                    for raw_line in resp:
-                        line = raw_line.decode(errors="replace").strip()
-                        if line.startswith("data: "):
-                            payload = line[6:]
-                            if payload == "[DONE]":
-                                break
-                            try:
-                                chunk = json.loads(payload)
-                                choice = chunk.get(
-                                    "choices", [{}]
-                                )[0]
-                                delta = choice.get(
-                                    "delta", {}
-                                ).get("content", "")
-                                if delta:
-                                    loop.call_soon_threadsafe(queue.put_nowait, delta)
-                            except json.JSONDecodeError:
-                                continue
-            except Exception as exc:
-                logger.exception("Stream error: %s", exc)
-            finally:
-                loop.call_soon_threadsafe(queue.put_nowait, None)
-
-        loop.run_in_executor(None, _stream)
-
-        while True:
-            token = await queue.get()
-            if token is None:
-                break
+        loop.run_in_executor(
+            None,
+            run_stream_producer,
+            req,
+            self._config.timeout,
+            queue,
+            loop,
+        )
+        async for token in iterate_stream_queue(queue):
             yield token
 
     # ── Consensus ────────────────────────────────────────────────────────
