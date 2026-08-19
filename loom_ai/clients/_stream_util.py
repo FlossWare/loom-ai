@@ -10,6 +10,10 @@ import urllib.request
 logger = logging.getLogger(__name__)
 
 
+class StreamProtocolError(RuntimeError):
+    """Malformed SSE payload in a remote chat stream."""
+
+
 def _delta_from_chunk(chunk: dict) -> str:
     """Extract a text delta from an SSE JSON payload."""
     if "error" in chunk and not chunk.get("choices"):
@@ -27,13 +31,17 @@ def _handle_data_line(
     queue: asyncio.Queue,
     loop: asyncio.AbstractEventLoop,
 ) -> bool:
-    """Process one SSE data payload. Return False to stop the stream."""
+    """Process one SSE data payload. Return False to stop the stream.
+
+    Raises ``StreamProtocolError`` on malformed JSON (propagated by caller).
+    """
     if payload == "[DONE]":
         return False
     try:
-        delta = _delta_from_chunk(json.loads(payload))
-    except json.JSONDecodeError:
-        return True
+        chunk = json.loads(payload)
+    except json.JSONDecodeError as exc:
+        raise StreamProtocolError(f"malformed SSE JSON: {exc}") from exc
+    delta = _delta_from_chunk(chunk)
     if delta:
         loop.call_soon_threadsafe(queue.put_nowait, delta)
     return True

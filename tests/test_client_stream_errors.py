@@ -6,6 +6,7 @@ from unittest.mock import patch
 
 import pytest
 
+from loom_ai.clients._stream_util import StreamProtocolError
 from loom_ai.clients.client import ClientConfig, LoomClient
 
 
@@ -70,3 +71,25 @@ async def test_chat_stream_yields_then_raises():
             async for t in client.chat_stream([{"role": "user", "content": "hi"}]):
                 tokens.append(t)
         assert tokens == ["partial"]
+
+
+@pytest.mark.asyncio
+async def test_chat_stream_malformed_sse_json():
+    """Corrupted SSE JSON must not complete as a successful empty stream."""
+    client = LoomClient(ClientConfig(base_url="http://example.test", timeout=5))
+
+    class _Resp:
+        def __enter__(self):
+            return self
+
+        def __exit__(self, *a):
+            return False
+
+        def __iter__(self):
+            yield b"data: {not-json\n"
+            yield b"data: [DONE]\n"
+
+    with patch("urllib.request.urlopen", return_value=_Resp()):
+        with pytest.raises(StreamProtocolError, match="malformed SSE JSON"):
+            async for _ in client.chat_stream([{"role": "user", "content": "hi"}]):
+                pass
