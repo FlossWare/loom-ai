@@ -19,11 +19,8 @@ def _delta_from_chunk(chunk: dict) -> str:
     if "error" in chunk and not chunk.get("choices"):
         raise RuntimeError(str(chunk.get("error") or "stream error"))
     choice = chunk.get("choices", [{}])[0]
-    delta = choice.get("delta", {}).get("content", "")
-    if delta:
-        return str(delta)
-    raw = chunk.get("delta")
-    return str(raw) if raw else ""
+    delta = choice.get("delta", {}).get("content") or chunk.get("delta")
+    return str(delta) if delta else ""
 
 
 def _handle_data_line(
@@ -47,6 +44,14 @@ def _handle_data_line(
     return True
 
 
+def _read_sse_lines(resp, queue, loop):
+    """Process SSE lines from an HTTP response."""
+    for raw_line in resp:
+        line = raw_line.decode(errors="replace").strip()
+        if line.startswith("data: ") and not _handle_data_line(line[6:], queue, loop):
+            break
+
+
 def run_stream_producer(
     req: urllib.request.Request,
     timeout: int,
@@ -56,12 +61,7 @@ def run_stream_producer(
     """Background producer: push tokens, then exception or None sentinel."""
     try:
         with urllib.request.urlopen(req, timeout=timeout) as resp:
-            for raw_line in resp:
-                line = raw_line.decode(errors="replace").strip()
-                if not line.startswith("data: "):
-                    continue
-                if not _handle_data_line(line[6:], queue, loop):
-                    break
+            _read_sse_lines(resp, queue, loop)
     except Exception as exc:
         logger.exception("Stream error: %s", exc)
         loop.call_soon_threadsafe(queue.put_nowait, exc)

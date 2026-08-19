@@ -280,12 +280,12 @@ def _negotiate_protocol(params: dict) -> str:
     )
 
 
-def _on_initialize(msg_id: int | str | None, params: dict) -> bool:
+def _on_initialize(msg_id: int | str | None, params: dict) -> None:
     try:
         version = _negotiate_protocol(params)
     except ValueError as exc:
         _respond_error(msg_id, _INVALID_PARAMS, str(exc))
-        return True
+        return
     _respond(
         msg_id,
         {
@@ -294,15 +294,14 @@ def _on_initialize(msg_id: int | str | None, params: dict) -> bool:
             "serverInfo": {"name": "loom-ai", "version": "1.0.0"},
         },
     )
-    return True
 
 
-def _on_tools_call(msg_id: int | str | None, params: dict) -> bool:
+def _on_tools_call(msg_id: int | str | None, params: dict) -> None:
     tool_name = params.get("name", "")
     tool_args = params.get("arguments", {})
     if not isinstance(tool_name, str) or not tool_name:
         _respond_error(msg_id, _INVALID_PARAMS, "tool name required")
-        return True
+        return
     args = tool_args if isinstance(tool_args, dict) else {}
     try:
         content = _handle_tool_call(tool_name, args)
@@ -314,7 +313,15 @@ def _on_tools_call(msg_id: int | str | None, params: dict) -> bool:
     except Exception as exc:
         logger.exception("tool call failed")
         _respond_error(msg_id, _INTERNAL_ERROR, type(exc).__name__)
-    return True
+
+
+_DISPATCH_TABLE = {
+    "notifications/initialized": lambda _id, _p: None,
+    "ping": lambda msg_id, _p: _respond(msg_id, {}),
+    "tools/list": lambda msg_id, _p: _respond(msg_id, {"tools": _TOOLS}),
+    "initialize": lambda msg_id, p: _on_initialize(msg_id, p),
+    "tools/call": lambda msg_id, p: _on_tools_call(msg_id, p),
+}
 
 
 def _dispatch(msg: dict) -> bool:
@@ -325,21 +332,15 @@ def _dispatch(msg: dict) -> bool:
     if not isinstance(params, dict):
         params = {}
 
-    if method == "initialize":
-        return _on_initialize(msg_id, params)
-    if method == "notifications/initialized":
-        return True
-    if method == "tools/list":
-        _respond(msg_id, {"tools": _TOOLS})
-        return True
-    if method == "tools/call":
-        return _on_tools_call(msg_id, params)
     if method == "shutdown":
         _respond(msg_id, {})
         return False
-    if method == "ping":
-        _respond(msg_id, {})
+
+    handler = _DISPATCH_TABLE.get(method)
+    if handler is not None:
+        handler(msg_id, params)
         return True
+
     if msg_id is not None:
         _respond_error(msg_id, _METHOD_NOT_FOUND, f"Method not found: {method}")
     return True

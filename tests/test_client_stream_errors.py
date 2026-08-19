@@ -67,9 +67,13 @@ async def test_chat_stream_yields_then_raises():
 
     with patch("urllib.request.urlopen", return_value=_Resp()):
         tokens = []
-        with pytest.raises(ConnectionError, match="stream cut off"):
+
+        async def _collect():
             async for t in client.chat_stream([{"role": "user", "content": "hi"}]):
                 tokens.append(t)
+
+        with pytest.raises(ConnectionError, match="stream cut off"):
+            await _collect()
         assert tokens == ["partial"]
 
 
