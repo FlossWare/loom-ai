@@ -23,7 +23,7 @@ async def test_chat_stream_propagates_http_error():
 
 
 @pytest.mark.asyncio
-async def test_chat_stream_yields_then_raises():
+async def test_chat_stream_yields_tokens():
     client = LoomClient(ClientConfig(base_url="http://example.test", timeout=5))
 
     lines = [
