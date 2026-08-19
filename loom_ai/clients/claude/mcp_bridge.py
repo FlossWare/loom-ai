@@ -225,6 +225,9 @@ def _read_message() -> dict | None:
 
     Returns None on clean EOF. Raises ``_FramingError`` / ``_ParseError``
     for recoverable protocol problems so the main loop can emit errors.
+
+    One invocation consumes exactly one framed message or returns clean EOF.
+    Missing Content-Length after a header block is a framing error (no recurse).
     """
     buf = sys.stdin.buffer
     length: int | None = None
@@ -247,7 +250,9 @@ def _read_message() -> dict | None:
                 raise _FramingError(f"Content-Length out of range: {length}")
 
     if length is None:
-        return _read_message()
+        # One invocation must consume exactly one framed message or EOF.
+        # Header-only / missing Content-Length is a framing error, not a retry.
+        raise _FramingError("missing Content-Length header")
 
     body = buf.read(length)
     if len(body) < length:
