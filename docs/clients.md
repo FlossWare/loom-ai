@@ -60,3 +60,12 @@ at `/llm`. The loom-ai server exposes `/llm/chat` and `/llm/models`, not
 proxy or custom base-path support until an OpenAI-compatible route is added.
 
 Set `LOOM_URL` (and optionally `LOOM_API_KEY`) before generating adapter config.
+
+
+## Secrets and audit
+
+`LocalClient.get_secret(name, reason=...)` accepts ``reason`` for API parity
+with the REST reveal flow. In **local** mode the reason is only logged in-process;
+it is not a durable remote audit record. Server-side
+``POST /secrets/{name}/reveal`` requires ``X-Secret-Access-Reason`` and is
+audit-logged by the server.
