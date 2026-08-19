@@ -5,6 +5,10 @@ Run as ``python -m loom_ai.clients.claude.mcp_bridge`` or reference in
 claude_desktop_config.json as an MCP server.
 
 Protocol: JSON-RPC 2.0 over stdin/stdout with Content-Length framing.
+
+Supported MCP protocol versions: 2024-11-05, 2025-03-26.
+The server negotiates by echoing the client's version if supported,
+otherwise falling back to the latest supported version.
 """
 
 from __future__ import annotations
@@ -18,6 +22,9 @@ import urllib.parse
 import urllib.request
 
 logger = logging.getLogger(__name__)
+
+_SUPPORTED_VERSIONS = ["2024-11-05", "2025-03-26"]
+_LATEST_VERSION = _SUPPORTED_VERSIONS[-1]
 
 _LOOM_URL = os.environ.get("LOOM_URL", "http://127.0.0.1:5000").rstrip("/")
 _LOOM_KEY = os.environ.get("LOOM_API_KEY", "")
@@ -76,6 +83,21 @@ _TOOLS = [
     },
 ]
 
+_MAX_MESSAGE_SIZE = 10 * 1024 * 1024  # 10 MB
+
+_TYPE_CHECKS: dict[str, type] = {
+    "string": str,
+    "integer": int,
+    "number": (int, float),
+    "boolean": bool,
+    "array": list,
+    "object": dict,
+}
+
+
+class _ToolError(Exception):
+    """Transport or tool-execution error (distinct from successful results)."""
+
 
 def _api_request(method: str, path: str, body: dict | None = None) -> dict:
     url = f"{_LOOM_URL}{path}"
@@ -92,15 +114,44 @@ def _api_request(method: str, path: str, body: dict | None = None) -> dict:
             return json.loads(resp.read())
     except urllib.error.HTTPError as exc:
         body_text = exc.read(4096).decode(errors="replace")
-        return {"error": f"HTTP {exc.code}: {body_text}"}
+        raise _ToolError(f"HTTP {exc.code}: {body_text}") from exc
     except urllib.error.URLError as exc:
-        return {"error": f"Connection failed: {exc.reason}"}
+        raise _ToolError(f"Connection failed: {exc.reason}") from exc
     except Exception as exc:
-        return {"error": str(exc)}
+        raise _ToolError(str(exc)) from exc
 
 
-def _handle_tool_call(name: str, arguments: dict) -> list[dict]:
+def _validate_arguments(name: str, arguments: dict) -> None:
+    """Validate tool arguments against the schema in _TOOLS."""
+    if not isinstance(arguments, dict):
+        raise _ToolError("Arguments must be a key-value object")
+
+    tool_def = next((t for t in _TOOLS if t["name"] == name), None)
+    if tool_def is None:
+        raise _ToolError(f"Unknown tool: {name}")
+
+    schema = tool_def.get("inputSchema", {})
+    properties = schema.get("properties", {})
+    required = set(schema.get("required", []))
+    for req_field in required:
+        if req_field not in arguments:
+            raise _ToolError(f"Missing required argument: {req_field}")
+    for arg_name, arg_value in arguments.items():
+        if arg_name not in properties:
+            continue
+        expected_type = properties[arg_name].get("type")
+        if expected_type in _TYPE_CHECKS:
+            if not isinstance(arg_value, _TYPE_CHECKS[expected_type]):
+                raise _ToolError(
+                    f"Argument '{arg_name}' must be {expected_type}"
+                )
+
+
+def _handle_tool_call(name: str, arguments: dict) -> dict:
+    """Execute a tool call. Returns MCP-format result dict with content list."""
     try:
+        _validate_arguments(name, arguments)
+
         if name == "loom_search":
             q = urllib.parse.quote(arguments["query"])
             limit = int(arguments.get("limit", 10))
@@ -126,11 +177,18 @@ def _handle_tool_call(name: str, arguments: dict) -> list[dict]:
                 },
             )
         else:
-            result = {"error": f"Unknown tool: {name}"}
-    except (KeyError, TypeError) as exc:
-        result = {"error": f"Missing required argument: {exc}"}
+            raise _ToolError(f"Unknown tool: {name}")
 
-    return [{"type": "text", "text": json.dumps(result, indent=2)}]
+        return {
+            "content": [
+                {"type": "text", "text": json.dumps(result, indent=2)}
+            ],
+        }
+    except _ToolError as exc:
+        return {
+            "content": [{"type": "text", "text": str(exc)}],
+            "isError": True,
+        }
 
 
 def _write_message(data: dict) -> None:
@@ -142,36 +200,75 @@ def _write_message(data: dict) -> None:
     sys.stdout.buffer.flush()
 
 
-def _read_message() -> dict | None:
-    """Read a Content-Length–framed JSON-RPC message from stdin."""
+_PARSE_ERROR = "parse_error"
+
+
+def _parse_content_length(header: str) -> int:
+    """Extract and validate Content-Length value. Raises ValueError on bad input."""
+    length = int(header.split(":", 1)[1].strip())
+    if length <= 0:
+        raise ValueError("must be positive")
+    if length > _MAX_MESSAGE_SIZE:
+        raise ValueError("exceeds maximum message size")
+    return length
+
+
+def _read_framed_body(buf, length: int) -> dict | str:
+    """Read and parse a JSON body of exactly *length* bytes."""
+    while True:
+        sep = buf.readline()
+        if sep.strip() == b"":
+            break
+    body = buf.read(length)
+    if len(body) < length:
+        _respond_error(
+            None,
+            -32700,
+            f"Parse error: expected {length} bytes, got {len(body)}",
+        )
+        return _PARSE_ERROR
+    try:
+        return json.loads(body)
+    except json.JSONDecodeError as exc:
+        _respond_error(None, -32700, f"Parse error: {exc.msg}")
+        return _PARSE_ERROR
+
+
+def _read_message() -> dict | str | None:
+    """Read a Content-Length-framed JSON-RPC message from stdin.
+
+    Returns the parsed dict, None on EOF, or _PARSE_ERROR after sending
+    a JSON-RPC error response (the caller should skip and read again).
+    """
     buf = sys.stdin.buffer
     while True:
         header_line = buf.readline()
         if not header_line:
             return None
         header = header_line.decode("utf-8").strip()
-        if header.startswith("Content-Length:"):
-            length = int(header.split(":", 1)[1].strip())
-            while True:
-                sep = buf.readline()
-                if sep.strip() == b"":
-                    break
-            body = buf.read(length)
-            if not body:
-                return None
-            try:
-                return json.loads(body)
-            except json.JSONDecodeError:
-                return None
-        elif header == "":
+        if not header:
             continue
+        if not header.startswith("Content-Length:"):
+            continue
+        try:
+            length = _parse_content_length(header)
+        except (ValueError, IndexError):
+            _respond_error(
+                None,
+                -32700,
+                f"Parse error: invalid Content-Length in '{header}'",
+            )
+            return _PARSE_ERROR
+        return _read_framed_body(buf, length)
 
 
 def _respond(msg_id: int | str | None, result: dict) -> None:
     _write_message({"jsonrpc": "2.0", "id": msg_id, "result": result})
 
 
-def _respond_error(msg_id: int | str | None, code: int, message: str) -> None:
+def _respond_error(
+    msg_id: int | str | None, code: int, message: str
+) -> None:
     _write_message(
         {
             "jsonrpc": "2.0",
@@ -181,51 +278,76 @@ def _respond_error(msg_id: int | str | None, code: int, message: str) -> None:
     )
 
 
+def _on_initialize(msg_id, params):
+    client_version = params.get("protocolVersion")
+    supported = client_version in _SUPPORTED_VERSIONS
+    negotiated = client_version if supported else _LATEST_VERSION
+    if client_version and not supported:
+        logger.warning(
+            "Unsupported protocol version '%s', falling back to '%s'",
+            client_version,
+            _LATEST_VERSION,
+        )
+    _respond(
+        msg_id,
+        {
+            "protocolVersion": negotiated,
+            "capabilities": {"tools": {"listChanged": False}},
+            "serverInfo": {"name": "loom-ai", "version": "1.0.0"},
+        },
+    )
+
+
+def _on_tools_call(msg_id, params):
+    tool_name = params.get("name", "")
+    tool_args = params.get("arguments", {})
+    result = _handle_tool_call(tool_name, tool_args)
+    _respond(msg_id, result)
+
+
+_METHOD_HANDLERS = {
+    "initialize": _on_initialize,
+    "notifications/initialized": lambda _id, _p: None,
+    "tools/list": lambda msg_id, _p: _respond(msg_id, {"tools": _TOOLS}),
+    "tools/call": _on_tools_call,
+}
+
+
 def _dispatch(msg: dict) -> bool:
     """Handle one JSON-RPC message. Returns False to stop the loop."""
-    method = msg.get("method", "")
     msg_id = msg.get("id")
-    params = msg.get("params", {})
 
-    if method == "initialize":
-        _respond(
-            msg_id,
-            {
-                "protocolVersion": "2024-11-05",
-                "capabilities": {
-                    "tools": {"listChanged": False},
-                },
-                "serverInfo": {
-                    "name": "loom-ai",
-                    "version": "1.0.0",
-                },
-            },
+    if "method" not in msg:
+        _respond_error(
+            msg_id, -32600, "Invalid Request: missing 'method'"
         )
-    elif method == "notifications/initialized":
-        pass
-    elif method == "tools/list":
-        _respond(msg_id, {"tools": _TOOLS})
-    elif method == "tools/call":
-        tool_name = params.get("name", "")
-        tool_args = params.get("arguments", {})
-        content = _handle_tool_call(tool_name, tool_args)
-        _respond(msg_id, {"content": content})
-    elif method == "shutdown":
+        return True
+
+    method = msg["method"]
+    if method == "shutdown":
         _respond(msg_id, {})
         return False
+
+    handler = _METHOD_HANDLERS.get(method)
+    if handler is not None:
+        handler(msg_id, msg.get("params", {}))
     elif msg_id is not None:
-        _respond_error(
-            msg_id,
-            -32601,
-            f"Method not found: {method}",
-        )
+        _respond_error(msg_id, -32601, f"Method not found: {method}")
     return True
 
 
 def main() -> None:
+    logging.basicConfig(
+        level=os.environ.get("LOG_LEVEL", "WARNING").upper(),
+        stream=sys.stderr,
+    )
     while True:
         msg = _read_message()
-        if msg is None or not _dispatch(msg):
+        if msg is None:
+            break
+        if msg is _PARSE_ERROR:
+            continue
+        if not _dispatch(msg):
             break
 
 
