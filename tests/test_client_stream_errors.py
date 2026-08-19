@@ -46,3 +46,27 @@ async def test_chat_stream_yields_tokens():
         async for t in client.chat_stream([{"role": "user", "content": "hi"}]):
             tokens.append(t)
         assert tokens == ["Hello"]
+
+
+@pytest.mark.asyncio
+async def test_chat_stream_yields_then_raises():
+    """Failure after one or more chunks must still propagate to the caller."""
+    client = LoomClient(ClientConfig(base_url="http://example.test", timeout=5))
+
+    class _Resp:
+        def __enter__(self):
+            return self
+
+        def __exit__(self, *a):
+            return False
+
+        def __iter__(self):
+            yield b'data: {"delta": "partial"}\n'
+            raise ConnectionError("stream cut off")
+
+    with patch("urllib.request.urlopen", return_value=_Resp()):
+        tokens = []
+        with pytest.raises(ConnectionError, match="stream cut off"):
+            async for t in client.chat_stream([{"role": "user", "content": "hi"}]):
+                tokens.append(t)
+        assert tokens == ["partial"]
