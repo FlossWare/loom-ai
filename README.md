@@ -398,7 +398,7 @@ Request lifecycle, error handling, and middleware protocols.
 
 ## Backend Implementations
 
-45 pluggable backend modules in `loom_ai/backends/`:
+58 pluggable backend modules in `loom_ai/backends/`:
 
 | Backend | Purpose |
 |---------|---------|
