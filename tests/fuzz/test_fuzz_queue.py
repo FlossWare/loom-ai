@@ -116,9 +116,7 @@ class TestQueueFuzz:
         assert status["processing"] == 0
         assert status["dead_letter"] == 0
 
-    @given(
-        queue_names=st.lists(FUZZ_QUEUE_NAME, min_size=1, max_size=10, unique=True)
-    )
+    @given(queue_names=st.lists(FUZZ_QUEUE_NAME, min_size=1, max_size=10, unique=True))
     @settings(max_examples=50, deadline=None)
     def test_list_queues_after_enqueue(self, queue_names):
         backend = MemoryQueueBackend()
