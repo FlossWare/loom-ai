@@ -11,6 +11,7 @@ callers can swap between local and remote mode transparently via
 from __future__ import annotations
 
 import dataclasses
+import logging
 import uuid
 from typing import TYPE_CHECKING, Any, AsyncIterator
 
@@ -26,6 +27,8 @@ from loom_ai.models import (
 )
 
 _NO_GRAPH = "Graph backend not configured"
+
+logger = logging.getLogger(__name__)
 
 
 def _asdict(obj: object) -> dict[str, Any]:
@@ -262,9 +265,16 @@ class LocalClient:
     async def list_secrets(self) -> list[str]:
         return await self._cfg.secrets.list_names()
 
-    async def get_secret(  # NOSONAR — reason param required by client API parity
+    async def get_secret(
         self, name: str, *, reason: str = "client request"
     ) -> str:
+        """Return a secret value by *name*.
+
+        ``reason`` is accepted for API parity with :class:`LoomClient` /
+        the REST reveal endpoint.  In local mode it is only written to the
+        process logger; it is not persisted and is not a remote audit trail.
+        """
+        logger.info("secrets.get name=%s reason=%r", name, reason)
         value = await self._cfg.secrets.get(name)
         return value or ""
 
