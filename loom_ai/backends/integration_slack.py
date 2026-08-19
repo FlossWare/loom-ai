@@ -110,12 +110,14 @@ class InMemorySlackGraphAdapter:
         *,
         mapping: ImportMapping | None = None,
     ) -> ImportResult:
+        type_map = getattr(mapping, "type_mappings", None) or {}
         imported = 0
         updated = 0
         errors: list[str] = []
         for entity in entities:
-            if entity.entity_type not in _ENTITY_TYPES:
-                errors.append(f"unsupported entity type: {entity.entity_type}")
+            etype = type_map.get(entity.entity_type, entity.entity_type)
+            if etype not in _ENTITY_TYPES:
+                errors.append(f"unsupported entity type: {etype}")
                 continue
             eid = entity.external_id or str(uuid.uuid4())
             if eid in self._entities:
@@ -136,12 +138,14 @@ class InMemorySlackGraphAdapter:
         *,
         mapping: ImportMapping | None = None,
     ) -> ImportResult:
+        type_map = getattr(mapping, "type_mappings", None) or {}
         imported = 0
         updated = 0
         errors: list[str] = []
         for rel in relationships:
-            if rel.relation_type not in _RELATIONSHIP_TYPES:
-                errors.append(f"unsupported relation type: {rel.relation_type}")
+            rtype = type_map.get(rel.relation_type, rel.relation_type)
+            if rtype not in _RELATIONSHIP_TYPES:
+                errors.append(f"unsupported relation type: {rtype}")
                 continue
             rid = rel.external_id or str(uuid.uuid4())
             if rid in self._relationships:
@@ -164,6 +168,7 @@ class InMemorySlackCapability:
         self._messages: dict[str, dict[str, Any]] = {}
         self._channels: dict[str, dict[str, Any]] = {}
         self._threads: dict[str, list[dict[str, Any]]] = {}
+        self._auth_token: str | None = None
 
     async def discover(self) -> list[CapabilityDescriptor]:
         return list(_CAPABILITIES)
@@ -175,6 +180,8 @@ class InMemorySlackCapability:
         *,
         auth_token: str | None = None,
     ) -> CapabilityResult:
+        if auth_token is not None:
+            self._auth_token = auth_token
         if name == "send_message":
             msg_id = str(uuid.uuid4())
             self._messages[msg_id] = {

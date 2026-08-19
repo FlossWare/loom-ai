@@ -40,12 +40,14 @@ class InMemoryNotionGraphAdapter:
         mapping: ImportMapping | None = None,
     ) -> ImportResult:
         valid_types = {"page", "database", "block", "user", "workspace"}
+        type_map = getattr(mapping, "type_mappings", None) or {}
         imported = 0
         errors = []
 
         for entity in entities:
             try:
-                entity_type = getattr(entity, "entity_type", None)
+                raw_type = getattr(entity, "entity_type", None)
+                entity_type = type_map.get(raw_type, raw_type) if raw_type else None
                 entity_id = getattr(entity, "entity_id", None)
 
                 if not entity_id:
@@ -74,12 +76,14 @@ class InMemoryNotionGraphAdapter:
         mapping: ImportMapping | None = None,
     ) -> ImportResult:
         valid_types = {"database_has_page", "page_has_block", "user_created_page"}
+        type_map = getattr(mapping, "type_mappings", None) or {}
         imported = 0
         errors = []
 
         for rel in relationships:
             try:
-                rel_type = getattr(rel, "relationship_type", None)
+                raw_rtype = getattr(rel, "relationship_type", None)
+                rel_type = type_map.get(raw_rtype, raw_rtype) if raw_rtype else None
                 rel_id = getattr(rel, "relationship_id", None) or f"rel_{uuid.uuid4()}"
 
                 if rel_type in valid_types:
@@ -174,6 +178,88 @@ class InMemoryNotionCapability:
             ),
         ]
 
+    def _invoke_live(
+        self, name: str, arguments: dict, auth_token: str
+    ) -> CapabilityResult:
+        client = NotionClient(auth=auth_token)
+        if name == "create_page":
+            res = client.pages.create(
+                parent={"database_id": arguments["parent_id"]},
+                properties={
+                    "title": {
+                        "title": [{"text": {"content": arguments["title"]}}]
+                    }
+                },
+            )
+            return CapabilityResult(success=True, result=dict(res), error=None)
+        if name == "search":
+            res = client.search(query=arguments["query"])
+            return CapabilityResult(success=True, result=dict(res), error=None)
+        if name == "query_database":
+            res = client.databases.query(database_id=arguments["database_id"])
+            return CapabilityResult(success=True, result=dict(res), error=None)
+        if name == "update_page":
+            props = {}
+            if "title" in arguments:
+                props["title"] = {
+                    "title": [{"text": {"content": arguments["title"]}}]
+                }
+            res = client.pages.update(
+                page_id=arguments["page_id"],
+                properties=props,
+            )
+            return CapabilityResult(success=True, result=dict(res), error=None)
+        return CapabilityResult(
+            success=False, result=None, error=f"Unknown capability: {name}"
+        )
+
+    def _invoke_in_memory(
+        self, name: str, arguments: dict
+    ) -> CapabilityResult:
+        if name == "create_page":
+            new_page = {
+                "id": f"p_{uuid.uuid4().hex[:8]}",
+                "title": arguments["title"],
+                "content": arguments.get("content", ""),
+                "parent_db": arguments["parent_id"],
+            }
+            self._pages.append(new_page)
+            return CapabilityResult(
+                success=True, result={"page": new_page}, error=None
+            )
+        if name == "search":
+            query = arguments["query"].lower()
+            matches = [
+                p for p in self._pages if query in p.get("title", "").lower()
+            ]
+            matches += [
+                d for d in self._databases if query in d.get("title", "").lower()
+            ]
+            return CapabilityResult(
+                success=True, result={"results": matches}, error=None
+            )
+        if name == "query_database":
+            db_id = arguments["database_id"]
+            pages = [p for p in self._pages if p.get("parent_db") == db_id]
+            return CapabilityResult(
+                success=True, result={"results": pages}, error=None
+            )
+        if name == "update_page":
+            page_id = arguments["page_id"]
+            page = next((p for p in self._pages if p["id"] == page_id), None)
+            if page is None:
+                return CapabilityResult(
+                    success=False, result=None, error="Page not found"
+                )
+            if "title" in arguments:
+                page["title"] = arguments["title"]
+            if "content" in arguments:
+                page["content"] = arguments["content"]
+            return CapabilityResult(success=True, result={"page": page}, error=None)
+        return CapabilityResult(
+            success=False, result=None, error=f"Unknown capability: {name}"
+        )
+
     async def invoke(
         self,
         name: str,
@@ -187,85 +273,13 @@ class InMemoryNotionCapability:
                 result=None,
                 error=f"Capability '{name}' is not supported.",
             )
-
         if auth_token and HAS_NOTION_SDK and NotionClient is not None:
             try:
-                client = NotionClient(auth=auth_token)
-                if name == "create_page":
-                    res = client.pages.create(
-                        parent={"database_id": arguments["parent_id"]},
-                        properties={
-                            "title": {
-                                "title": [{"text": {"content": arguments["title"]}}]
-                            }
-                        },
-                    )
-                    return CapabilityResult(success=True, result=dict(res), error=None)
-                elif name == "search":
-                    res = client.search(query=arguments["query"])
-                    return CapabilityResult(success=True, result=dict(res), error=None)
-                elif name == "query_database":
-                    res = client.databases.query(database_id=arguments["database_id"])
-                    return CapabilityResult(success=True, result=dict(res), error=None)
-                elif name == "update_page":
-                    props = {}
-                    if "title" in arguments:
-                        props["title"] = {
-                            "title": [{"text": {"content": arguments["title"]}}]
-                        }
-                    res = client.pages.update(
-                        page_id=arguments["page_id"],
-                        properties=props,
-                    )
-                    return CapabilityResult(success=True, result=dict(res), error=None)
+                return self._invoke_live(name, arguments, auth_token)
             except Exception as e:
                 return CapabilityResult(success=False, result=None, error=str(e))
-
         try:
-            if name == "create_page":
-                new_page = {
-                    "id": f"p_{uuid.uuid4().hex[:8]}",
-                    "title": arguments["title"],
-                    "content": arguments.get("content", ""),
-                    "parent_db": arguments["parent_id"],
-                }
-                self._pages.append(new_page)
-                return CapabilityResult(
-                    success=True, result={"page": new_page}, error=None
-                )
-
-            elif name == "search":
-                query = arguments["query"].lower()
-                matches = [
-                    p for p in self._pages if query in p.get("title", "").lower()
-                ]
-                matches += [
-                    d for d in self._databases if query in d.get("title", "").lower()
-                ]
-                return CapabilityResult(
-                    success=True, result={"results": matches}, error=None
-                )
-
-            elif name == "query_database":
-                db_id = arguments["database_id"]
-                pages = [p for p in self._pages if p.get("parent_db") == db_id]
-                return CapabilityResult(
-                    success=True, result={"results": pages}, error=None
-                )
-
-            elif name == "update_page":
-                page_id = arguments["page_id"]
-                page = next((p for p in self._pages if p["id"] == page_id), None)
-                if page is None:
-                    return CapabilityResult(
-                        success=False, result=None, error="Page not found"
-                    )
-                if "title" in arguments:
-                    page["title"] = arguments["title"]
-                if "content" in arguments:
-                    page["content"] = arguments["content"]
-                return CapabilityResult(success=True, result={"page": page}, error=None)
-
+            return self._invoke_in_memory(name, arguments)
         except KeyError as e:
             return CapabilityResult(
                 success=False,
@@ -273,12 +287,8 @@ class InMemoryNotionCapability:
                 error=f"Missing required argument: {str(e)}",
             )
 
-        return CapabilityResult(
-            success=False, result=None, error="Unknown error occurred"
-        )
-
     async def health(self, name: str | None = None) -> dict[str, bool]:
-        status = {cap: True for cap in self._capabilities}
+        status = dict.fromkeys(self._capabilities, True)
         if name is not None:
             return {name: status.get(name, False)}
         return status
