@@ -481,6 +481,7 @@ class InMemoryTournamentRunner:
         *,
         task: str,
     ) -> list[JudgeVerdict]:
+        _ = task
         if not candidates:
             return []
 

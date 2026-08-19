@@ -263,6 +263,7 @@ class InMemoryInferenceRouter:
         preferred_model: str | None = None,
         budget_usd: float | None = None,
     ) -> InferenceEndpoint:
+        _ = budget_usd
         candidates = [ep for ep in self._endpoints.values() if ep.healthy]
 
         if preferred_model:
@@ -498,20 +499,28 @@ class InMemoryAgentMemory:
             )
         return entry_id
 
+    @staticmethod
+    def _matches_query(
+        entry: AgentMemoryEntry, query: MemoryQuery,
+    ) -> bool:
+        if entry.superseded_by is not None:
+            return False
+        if query.agent_id and entry.agent_id != query.agent_id:
+            return False
+        if query.scope and entry.scope != query.scope:
+            return False
+        if query.memory_type and entry.memory_type != query.memory_type:
+            return False
+        if entry.confidence < query.min_confidence:
+            return False
+        if query.query and query.query.lower() not in entry.content.lower():
+            return False
+        return True
+
     async def recall(self, query: MemoryQuery) -> list[AgentMemoryEntry]:
         results: list[AgentMemoryEntry] = []
         for entry in self._entries.values():
-            if entry.superseded_by is not None:
-                continue
-            if query.agent_id and entry.agent_id != query.agent_id:
-                continue
-            if query.scope and entry.scope != query.scope:
-                continue
-            if query.memory_type and entry.memory_type != query.memory_type:
-                continue
-            if entry.confidence < query.min_confidence:
-                continue
-            if query.query and query.query.lower() not in entry.content.lower():
+            if not self._matches_query(entry, query):
                 continue
             results.append(entry)
             if len(results) >= query.limit:
