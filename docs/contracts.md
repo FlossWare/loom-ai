@@ -104,10 +104,10 @@ external graph ingestion, and belief/evidence management.
 | Protocol | Source | Purpose | Stability | Backends |
 |----------|--------|---------|-----------|----------|
 | `KnowledgeGraph` | `contracts_phase4` | Core entity, relationship, and claim operations | experimental | `InMemoryKnowledgeGraph` |
-| `TemporalKnowledgeStore` | `contracts_phase4` | Temporal validity and historical queries | experimental | -- |
-| `GraphRetriever` | `contracts_phase4` | Graph-enhanced retrieval (local/global/hybrid) | experimental | -- |
-| `ExternalGraphAdapter` | `contracts_phase4` | External graph and code graph ingestion | experimental | -- |
-| `BeliefManager` | `contracts_phase4` | Belief, evidence, contradiction, and consensus | experimental | -- |
+| `TemporalKnowledgeStore` | `contracts_phase4` | Temporal validity and historical queries | experimental | `InMemoryTemporalKnowledgeStore` |
+| `GraphRetriever` | `contracts_phase4` | Graph-enhanced retrieval (local/global/hybrid) | experimental | `InMemoryGraphRetriever` |
+| `ExternalGraphAdapter` | `contracts_phase4` | External graph and code graph ingestion | experimental | `InMemoryExternalGraphAdapter` |
+| `BeliefManager` | `contracts_phase4` | Belief, evidence, contradiction, and consensus | experimental | `InMemoryBeliefManager` |
 
 ## Advanced Evaluation and Telemetry (8 protocols)
 
@@ -117,14 +117,14 @@ and program optimization.
 
 | Protocol | Source | Purpose | Stability | Backends |
 |----------|--------|---------|-----------|----------|
-| `EvalSuite` | `contracts_phase5` | Dataset-driven evaluation and regression testing | experimental | -- |
-| `GenAITelemetry` | `contracts_phase5` | GenAI-specific observability with semantic spans | experimental | -- |
-| `InferenceRouter` | `contracts_phase5` | Capability-aware model routing with adaptive selection | experimental | -- |
-| `AgentLifecycleRuntime` | `contracts_phase5` | Agent lifecycle, state, and durable execution | experimental | -- |
-| `AgentMemory` | `contracts_phase5` | Persistent, scoped, typed agent memory | experimental | -- |
-| `OutputValidator` | `contracts_phase5` | Schema-driven output validation and tool auth | experimental | -- |
-| `SecurityGate` | `contracts_phase5` | AI security, authorization, and trust boundaries | experimental | -- |
-| `ProgramOptimizer` | `contracts_phase5` | Evaluation-driven prompt/model/strategy optimization | experimental | -- |
+| `EvalSuite` | `contracts_phase5` | Dataset-driven evaluation and regression testing | experimental | `InMemoryEvalSuite` |
+| `GenAITelemetry` | `contracts_phase5` | GenAI-specific observability with semantic spans | experimental | `InMemoryGenAITelemetry` |
+| `InferenceRouter` | `contracts_phase5` | Capability-aware model routing with adaptive selection | experimental | `InMemoryInferenceRouter` |
+| `AgentLifecycleRuntime` | `contracts_phase5` | Agent lifecycle, state, and durable execution | experimental | `InMemoryAgentLifecycleRuntime` |
+| `AgentMemory` | `contracts_phase5` | Persistent, scoped, typed agent memory | experimental | `InMemoryAgentMemory` |
+| `OutputValidator` | `contracts_phase5` | Schema-driven output validation and tool auth | experimental | `InMemoryOutputValidator` |
+| `SecurityGate` | `contracts_phase5` | AI security, authorization, and trust boundaries | experimental | `InMemorySecurityGate` |
+| `ProgramOptimizer` | `contracts_phase5` | Evaluation-driven prompt/model/strategy optimization | experimental | `InMemoryProgramOptimizer` |
 
 ## Agent Architecture (7 protocols)
 
@@ -134,12 +134,12 @@ trajectory capture, executable environments, and capability taxonomy.
 | Protocol | Source | Purpose | Stability | Backends |
 |----------|--------|---------|-----------|----------|
 | `AgentLoop` | `contracts_phase6` | Re-entrant agent loop with pause/resume/cancel | experimental | `InMemoryAgentLoop` |
-| `RecipeExecutor` | `contracts_phase6` | Portable, declarative agent recipe execution | experimental | -- |
-| `ACPAdapter` | `contracts_phase6` | ACP agent interoperability and session management | experimental | -- |
-| `ContextAssembler` | `contracts_phase6` | Context construction, budgeting, and compaction | experimental | -- |
-| `TrajectoryStore` | `contracts_phase6` | Trajectory capture, replay, and curation | experimental | -- |
-| `AgentEnvironment` | `contracts_phase6` | Executable environment lifecycle and observation | experimental | -- |
-| `AgentCapabilityRegistry` | `contracts_phase6` | Agent/model capability taxonomy and matching | experimental | -- |
+| `RecipeExecutor` | `contracts_phase6` | Portable, declarative agent recipe execution | experimental | `InMemoryRecipeExecutor` |
+| `ACPAdapter` | `contracts_phase6` | ACP agent interoperability and session management | experimental | `InMemoryACPAdapter` |
+| `ContextAssembler` | `contracts_phase6` | Context construction, budgeting, and compaction | experimental | `InMemoryContextAssembler` |
+| `TrajectoryStore` | `contracts_phase6` | Trajectory capture, replay, and curation | experimental | `InMemoryTrajectoryStore` |
+| `AgentEnvironment` | `contracts_phase6` | Executable environment lifecycle and observation | experimental | `InMemoryAgentEnvironment` |
+| `AgentCapabilityRegistry` | `contracts_phase6` | Agent/model capability taxonomy and matching | experimental | `InMemoryAgentCapabilityRegistry` |
 
 ## Provider Discovery (4 protocols)
 
@@ -148,10 +148,10 @@ enforcement, and catalog synchronization.
 
 | Protocol | Source | Purpose | Stability | Backends |
 |----------|--------|---------|-----------|----------|
-| `ProviderRegistry` | `contracts_phase7` | Dynamic provider and model discovery | experimental | -- |
-| `ProviderCapabilityRegistry` | `contracts_phase7` | Rate limits, quotas, pricing metadata | experimental | -- |
-| `PolicyRegistry` | `contracts_phase7` | Provider policy, privacy, and eligibility | experimental | -- |
-| `CatalogSynchronizer` | `contracts_phase7` | Model catalog sync and staleness detection | experimental | -- |
+| `ProviderRegistry` | `contracts_phase7` | Dynamic provider and model discovery | experimental | `InMemoryProviderRegistry` |
+| `ProviderCapabilityRegistry` | `contracts_phase7` | Rate limits, quotas, pricing metadata | experimental | `InMemoryProviderCapabilityRegistry` |
+| `PolicyRegistry` | `contracts_phase7` | Provider policy, privacy, and eligibility | experimental | `InMemoryPolicyRegistry` |
+| `CatalogSynchronizer` | `contracts_phase7` | Model catalog sync and staleness detection | experimental | `InMemoryCatalogSynchronizer` |
 
 ## Competitive Evaluation (9 protocols)
 
@@ -161,15 +161,15 @@ inference optimization, output normalization, and consensus strategies.
 
 | Protocol | Source | Purpose | Stability | Backends |
 |----------|--------|---------|-----------|----------|
-| `EvalCapabilityRegistry` | `contracts_phase8` | Capability registry and discovery for evaluation | experimental | -- |
-| `CapabilitySelector` | `contracts_phase8` | Capability health, fallback, and backend selection | experimental | -- |
-| `InteractionEvaluator` | `contracts_phase8` | Multi-agent interaction evaluation | experimental | -- |
-| `SkillEstimator` | `contracts_phase8` | Bayesian agent capability and skill estimation | experimental | -- |
-| `EvaluationEnvironment` | `contracts_phase8` | Dynamic multi-agent evaluation environment | experimental | -- |
-| `TournamentRunner` | `contracts_phase8` | Multi-model competitive evaluation | experimental | -- |
-| `InferenceOptimizer` | `contracts_phase8` | Adaptive inference parameter optimization | experimental | -- |
-| `OutputNormalizer` | `contracts_phase8` | Model output normalization and semantic comparison | experimental | -- |
-| `ConsensusStrategy` | `contracts_phase8` | Pluggable consensus/ensemble/voting strategies | experimental | -- |
+| `EvalCapabilityRegistry` | `contracts_phase8` | Capability registry and discovery for evaluation | experimental | `InMemoryEvalCapabilityRegistry` |
+| `CapabilitySelector` | `contracts_phase8` | Capability health, fallback, and backend selection | experimental | `InMemoryCapabilitySelector` |
+| `InteractionEvaluator` | `contracts_phase8` | Multi-agent interaction evaluation | experimental | `InMemoryInteractionEvaluator` |
+| `SkillEstimator` | `contracts_phase8` | Bayesian agent capability and skill estimation | experimental | `InMemorySkillEstimator` |
+| `EvaluationEnvironment` | `contracts_phase8` | Dynamic multi-agent evaluation environment | experimental | `InMemoryEvaluationEnvironment` |
+| `TournamentRunner` | `contracts_phase8` | Multi-model competitive evaluation | experimental | `InMemoryTournamentRunner` |
+| `InferenceOptimizer` | `contracts_phase8` | Adaptive inference parameter optimization | experimental | `InMemoryInferenceOptimizer` |
+| `OutputNormalizer` | `contracts_phase8` | Model output normalization and semantic comparison | experimental | `InMemoryOutputNormalizer` |
+| `ConsensusStrategy` | `contracts_phase8` | Pluggable consensus/ensemble/voting strategies | experimental | `InMemoryConsensusStrategy` |
 
 ## Pluggable Runtimes (10 protocols)
 
@@ -180,16 +180,16 @@ validation.
 
 | Protocol | Source | Purpose | Stability | Backends |
 |----------|--------|---------|-----------|----------|
-| `ModelEvaluationCandidate` | `contracts_phase9` | Provider-neutral model evaluation and profiling | experimental | -- |
-| `CanonicalSourceIndex` | `contracts_phase9` | Canonical-source vs derived-index lifecycle | experimental | -- |
-| `ContextCompressor` | `contracts_phase9` | Reversible, content-aware context compression | experimental | -- |
-| `PromptCacheOptimizer` | `contracts_phase9` | Provider-neutral prompt-cache optimization | experimental | -- |
-| `PluggableAgentRuntime` | `contracts_phase9` | Interchangeable agent runtimes (Goose, Claude Code, etc.) | experimental | -- |
-| `ContextEngine` | `contracts_phase9` | Pluggable context-engineering middleware | experimental | -- |
-| `CapabilityBackend` | `contracts_phase9` | Pluggable capability and tool backend | experimental | -- |
-| `EvaluationEngine` | `contracts_phase9` | Provider-neutral evaluation and tournament engine | experimental | -- |
-| `HealthCheckPolicy` | `contracts_phase9` | Authenticated health-check semantics | experimental | -- |
-| `RequestValidator` | `contracts_phase9` | REST API request/response validation | experimental | -- |
+| `ModelEvaluationCandidate` | `contracts_phase9` | Provider-neutral model evaluation and profiling | experimental | `InMemoryModelEvaluationCandidate` |
+| `CanonicalSourceIndex` | `contracts_phase9` | Canonical-source vs derived-index lifecycle | experimental | `InMemoryCanonicalSourceIndex` |
+| `ContextCompressor` | `contracts_phase9` | Reversible, content-aware context compression | experimental | `InMemoryContextCompressor` |
+| `PromptCacheOptimizer` | `contracts_phase9` | Provider-neutral prompt-cache optimization | experimental | `InMemoryPromptCacheOptimizer` |
+| `PluggableAgentRuntime` | `contracts_phase9` | Interchangeable agent runtimes (Goose, Claude Code, etc.) | experimental | `InMemoryPluggableAgentRuntime` |
+| `ContextEngine` | `contracts_phase9` | Pluggable context-engineering middleware | experimental | `InMemoryContextEngine` |
+| `CapabilityBackend` | `contracts_phase9` | Pluggable capability and tool backend | experimental | `InMemoryCapabilityBackend` |
+| `EvaluationEngine` | `contracts_phase9` | Provider-neutral evaluation and tournament engine | experimental | `InMemoryEvaluationEngine` |
+| `HealthCheckPolicy` | `contracts_phase9` | Authenticated health-check semantics | experimental | `InMemoryHealthCheckPolicy` |
+| `RequestValidator` | `contracts_phase9` | REST API request/response validation | experimental | `InMemoryRequestValidator` |
 
 ## API (3 protocols)
 
@@ -197,9 +197,9 @@ REST API request lifecycle, error handling, and middleware.
 
 | Protocol | Source | Purpose | Stability | Backends |
 |----------|--------|---------|-----------|----------|
-| `RequestLifecycle` | `contracts_api` | Validate, authorize, execute, respond lifecycle | stable | -- |
-| `ErrorHandler` | `contracts_api` | Centralized error handling and formatting | stable | -- |
-| `Middleware` | `contracts_api` | Pre/post request hooks | stable | -- |
+| `RequestLifecycle` | `contracts_api` | Validate, authorize, execute, respond lifecycle | stable | `InMemoryRequestLifecycle` |
+| `ErrorHandler` | `contracts_api` | Centralized error handling and formatting | stable | `InMemoryErrorHandler` |
+| `Middleware` | `contracts_api` | Pre/post request hooks | stable | `PassthroughMiddleware` |
 
 ## Execution (3 protocols)
 
@@ -208,9 +208,9 @@ with lifecycle hooks.
 
 | Protocol | Source | Purpose | Stability | Backends |
 |----------|--------|---------|-----------|----------|
-| `ExecutionStep` | `contracts_execution` | Single unit of work in an execution pipeline | stable | -- |
+| `ExecutionStep` | `contracts_execution` | Single unit of work in an execution pipeline | stable | `NoopExecutionStep` |
 | `ExecutionPipeline` | `contracts_execution` | Sequential step runner with cancellation and deadlines | stable | `SequentialExecutionPipeline` |
-| `ExecutionObserver` | `contracts_execution` | Lifecycle observer for pipeline step events | stable | -- |
+| `ExecutionObserver` | `contracts_execution` | Lifecycle observer for pipeline step events | stable | `LoggingExecutionObserver` |
 
 ---
 
