@@ -55,6 +55,7 @@ def test_health_response_shape(monkeypatch):
         "consensus",
         "tools",
         "resources",
+        "router",
     ):
         assert key in body["backends"]
         assert isinstance(body["backends"][key], str)
