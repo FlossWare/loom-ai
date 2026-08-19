@@ -1,82 +1,51 @@
-"""Aider adapter for loom-ai.
+"""Aider CLI adapter for loom-ai.
 
-Configures Aider (github.com/Aider-AI/aider) to use loom-ai as its LLM
-backend.  Aider supports OpenAI-compatible endpoints via environment
-variables and command-line flags.
+Configures Aider to use loom-ai as its LLM backend via OpenAI-compatible API.
 
 Usage::
 
-    # Generate aider environment variables
-    python -m loom_ai.clients.aider --env
+    # Print aider flags
+    python -m loom_ai.clients.aider
 
-    # Generate aider command line
-    python -m loom_ai.clients.aider --cmd
-
-    # Run aider through loom-ai directly
-    eval $(python -m loom_ai.clients.aider --env) && aider
-
-Integration::
-
-    # Via environment
-    export OPENAI_API_BASE="http://127.0.0.1:5000/llm"
-    export OPENAI_API_KEY="loom-ai"
-    aider --model openai/gpt-4o-mini
-
-    # Via command line
-    aider --openai-api-base http://127.0.0.1:5000/llm \\
-          --openai-api-key loom-ai \\
-          --model openai/gpt-4o-mini
-
-    # Via .aider.conf.yml
-    openai-api-base: http://127.0.0.1:5000/llm
-    openai-api-key: loom-ai
-    model: openai/gpt-4o-mini
+    # Or set env for aider:
+    export OPENAI_API_BASE=http://127.0.0.1:5000/llm
+    export OPENAI_API_KEY=loom-ai
+    aider --model gpt-4o-mini
 """
 
 from __future__ import annotations
 
-import json
 import os
-import shlex
 import sys
 
 
-def generate_env(
+def get_aider_env(
     loom_url: str = "http://127.0.0.1:5000",
     api_key: str = "",
     model: str = "gpt-4o-mini",
-) -> str:
-    """Generate shell exports for Aider."""
-    return "\n".join([
-        f"export OPENAI_API_BASE={shlex.quote(f'{loom_url}/llm')}",
-        f"export OPENAI_API_KEY={shlex.quote(api_key or 'loom-ai')}",
-    ])
+) -> dict[str, str]:
+    """Return environment variables for Aider to use loom-ai."""
+    return {
+        "OPENAI_API_BASE": f"{loom_url}/llm",
+        "OPENAI_API_KEY": api_key or "loom-ai",
+        "AIDER_MODEL": model,
+    }
 
 
-def generate_cmd(
+def get_aider_args(
     loom_url: str = "http://127.0.0.1:5000",
     api_key: str = "",
     model: str = "gpt-4o-mini",
-) -> str:
-    """Generate aider command line."""
-    return (
-        f"aider --openai-api-base {shlex.quote(f'{loom_url}/llm')} "
-        f"--openai-api-key {shlex.quote(api_key or 'loom-ai')} "
-        f"--model {shlex.quote(f'openai/{model}')}"
-    )
-
-
-def generate_yaml(
-    loom_url: str = "http://127.0.0.1:5000",
-    api_key: str = "",
-    model: str = "gpt-4o-mini",
-) -> str:
-    """Generate .aider.conf.yml content."""
-    return "\n".join([
-        f"openai-api-base: {loom_url}/llm",
-        f"openai-api-key: {api_key or 'loom-ai'}",
-        f"model: openai/{model}",
-    ])
+) -> list[str]:
+    """Return CLI arguments to point Aider at loom-ai."""
+    return [
+        "--openai-api-base",
+        f"{loom_url}/llm",
+        "--openai-api-key",
+        api_key or "loom-ai",
+        "--model",
+        model,
+    ]
 
 
 def main() -> None:
@@ -85,17 +54,10 @@ def main() -> None:
     model = os.environ.get("LOOM_MODEL", "gpt-4o-mini")
 
     if "--env" in sys.argv:
-        print(generate_env(loom_url, api_key, model))
-    elif "--cmd" in sys.argv:
-        print(generate_cmd(loom_url, api_key, model))
-    elif "--yaml" in sys.argv:
-        print(generate_yaml(loom_url, api_key, model))
+        for k, v in get_aider_env(loom_url, api_key, model).items():
+            print(f"export {k}={v}")
     else:
-        print(json.dumps({
-            "env": generate_env(loom_url, api_key, model),
-            "cmd": generate_cmd(loom_url, api_key, model),
-            "yaml": generate_yaml(loom_url, api_key, model),
-        }, indent=2))
+        print(" ".join(get_aider_args(loom_url, api_key, model)))
 
 
 if __name__ == "__main__":

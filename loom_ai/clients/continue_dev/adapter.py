@@ -1,7 +1,7 @@
 """Continue.dev adapter for loom-ai.
 
-Configures Continue (continue.dev) to use loom-ai as its LLM backend.
-Continue supports OpenAI-compatible endpoints via its config.json.
+Generates Continue config snippets so Continue uses loom-ai as an
+OpenAI-compatible endpoint via its config.json.
 
 Usage::
 
@@ -56,7 +56,9 @@ def generate_full_config(
     return {
         "models": [generate_model_config(loom_url, api_key, model)],
         "tabAutocompleteModel": generate_model_config(
-            loom_url, api_key, model,
+            loom_url,
+            api_key,
+            model,
             title="loom-ai-autocomplete",
         ),
     }
