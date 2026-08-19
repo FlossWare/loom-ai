@@ -78,7 +78,7 @@ class InMemoryModelEvaluationCandidate:
         *,
         task_type: str,
         test_input: str,
-        provider: str | None = None,
+        _provider: str | None = None,
     ) -> ModelBenchmark:
         return ModelBenchmark(
             model=model,
@@ -97,9 +97,7 @@ class InMemoryModelEvaluationCandidate:
     ) -> list[ModelBenchmark]:
         results: list[ModelBenchmark] = []
         for model in candidates:
-            bm = await self.benchmark(
-                model, task_type=task_type, test_input=test_input
-            )
+            bm = await self.benchmark(model, task_type=task_type, test_input=test_input)
             results.append(bm)
         return results
 
@@ -389,8 +387,7 @@ class InMemoryContextEngine:
         return ContextTransformation(
             id=tid,
             transformation_type=(
-                "passthrough" if output_tokens == input_tokens
-                else "truncation"
+                "passthrough" if output_tokens == input_tokens else "truncation"
             ),
             input_tokens=input_tokens,
             output_tokens=output_tokens,
@@ -610,7 +607,9 @@ class InMemoryHealthCheckPolicy:
         )
 
     async def check_readiness(
-        self, *, authenticated: bool = False,
+        self,
+        *,
+        authenticated: bool = False,
     ) -> HealthCheckResult:
         details: list[HealthDetail] = []
         if authenticated:
@@ -667,7 +666,8 @@ class InMemoryRequestValidator:
         schema = self._response_schemas.get(endpoint)
         if schema is None:
             return ValidationReport(
-                valid=True, endpoint=endpoint,
+                valid=True,
+                endpoint=endpoint,
                 http_status=status_code,
             )
         report = self._validate_payload(payload, schema, endpoint)
