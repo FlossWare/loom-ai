@@ -639,7 +639,10 @@ def _mount_secrets_routes(app: FastAPI, config: LoomConfig, auth_deps: list) -> 
     @router.post(
         "/{name}/reveal",
         response_model=GetSecretResponse,
-        responses=_NOT_FOUND_RESPONSES,
+        responses={
+            400: {"description": "Missing X-Secret-Access-Reason header"},
+            **_NOT_FOUND_RESPONSES,
+        },
     )
     async def reveal_secret(
         name: str,
