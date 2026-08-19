@@ -6,113 +6,64 @@
 <title>Loom Chat</title>
 <style>
   :root {
-    --bg: #0f0f0f;
-    --surface: #1a1a1a;
-    --surface2: #242424;
-    --border: #333;
-    --text: #e8e8e8;
-    --muted: #9a9a9a;
-    --accent: #d97757;
-    --accent-dim: #b45c3f;
-    --danger: #e85d5d;
-    --radius: 16px;
+    --bg: #121212; --surface: #1c1c1c; --surface2: #2a2a2a; --border: #3a3a3a;
+    --text: #f0f0f0; --muted: #b0b0b0; --accent: #e07a55; --accent-dim: #c45f3c;
+    --danger: #ff6b6b; --radius: 16px;
     --font: "Segoe UI", system-ui, -apple-system, sans-serif;
     --mono: ui-monospace, "Cascadia Code", "SF Mono", Menlo, monospace;
   }
   * { box-sizing: border-box; margin: 0; padding: 0; }
   html, body { height: 100%; }
   body {
-    font-family: var(--font);
-    background: var(--bg);
-    color: var(--text);
-    display: flex;
-    flex-direction: column;
+    font-family: var(--font); background: var(--bg); color: var(--text);
+    display: flex; flex-direction: column;
   }
   header {
-    display: flex;
-    align-items: center;
-    gap: 12px;
-    padding: 12px 20px;
-    border-bottom: 1px solid var(--border);
-    background: var(--surface);
-    flex-shrink: 0;
+    display: flex; align-items: center; gap: 12px; padding: 12px 20px;
+    border-bottom: 1px solid var(--border); background: var(--surface); flex-shrink: 0;
   }
   header .logo {
-    width: 28px; height: 28px;
-    border-radius: 8px;
-    background: linear-gradient(135deg, var(--accent), #7c5cff);
+    width: 28px; height: 28px; border-radius: 8px;
+    background: linear-gradient(135deg, var(--accent), #8b6cff);
   }
-  header h1 { font-size: 1rem; font-weight: 600; letter-spacing: -0.02em; }
+  header h1 { font-size: 1rem; font-weight: 600; }
   header .status {
-    margin-left: auto;
-    font-size: 0.75rem;
-    color: var(--muted);
+    margin-left: auto; font-size: 0.75rem; color: var(--muted);
     display: flex; align-items: center; gap: 6px;
   }
-  header .dot {
-    width: 8px; height: 8px; border-radius: 50%;
-    background: #666;
-  }
+  header .dot { width: 8px; height: 8px; border-radius: 50%; background: #777; }
   header .dot.ok { background: #3ecf8e; }
   header .dot.err { background: var(--danger); }
   #messages {
-    flex: 1;
-    overflow-y: auto;
-    padding: 24px 16px 8px;
-    display: flex;
-    flex-direction: column;
-    gap: 20px;
-    max-width: 800px;
-    width: 100%;
-    margin: 0 auto;
+    flex: 1; overflow-y: auto; padding: 24px 16px 8px;
+    display: flex; flex-direction: column; gap: 20px;
+    max-width: 800px; width: 100%; margin: 0 auto;
   }
-  .msg {
-    display: flex;
-    gap: 12px;
-    line-height: 1.55;
-    font-size: 0.95rem;
-  }
+  .msg { display: flex; gap: 12px; line-height: 1.55; font-size: 0.95rem; }
   .msg .avatar {
-    width: 28px; height: 28px; border-radius: 50%;
-    flex-shrink: 0;
-    display: grid; place-items: center;
-    font-size: 0.7rem; font-weight: 700;
+    width: 28px; height: 28px; border-radius: 50%; flex-shrink: 0;
+    display: grid; place-items: center; font-size: 0.7rem; font-weight: 700;
   }
   .msg.user .avatar { background: var(--surface2); color: var(--muted); }
   .msg.assistant .avatar {
-    background: linear-gradient(135deg, var(--accent), #7c5cff);
-    color: #fff;
+    background: linear-gradient(135deg, var(--accent), #8b6cff); color: #fff;
   }
   .msg .body {
-    flex: 1;
-    min-width: 0;
-    white-space: pre-wrap;
-    word-break: break-word;
+    flex: 1; min-width: 0; white-space: pre-wrap; overflow-wrap: anywhere;
   }
   .msg .body pre {
-    background: var(--surface2);
-    border: 1px solid var(--border);
-    border-radius: 8px;
-    padding: 12px;
-    overflow-x: auto;
-    font-family: var(--mono);
-    font-size: 0.85rem;
-    margin: 8px 0;
+    background: var(--surface2); border: 1px solid var(--border);
+    border-radius: 8px; padding: 12px; overflow-x: auto;
+    font-family: var(--mono); font-size: 0.85rem; margin: 8px 0;
   }
   .msg .body code {
-    font-family: var(--mono);
-    font-size: 0.88em;
-    background: var(--surface2);
-    padding: 1px 5px;
-    border-radius: 4px;
+    font-family: var(--mono); font-size: 0.88em;
+    background: var(--surface2); padding: 1px 5px; border-radius: 4px;
   }
   .msg .body pre code { background: none; padding: 0; }
-  .typing {
-    display: inline-flex; gap: 4px; padding: 4px 0;
-  }
+  .typing { display: inline-flex; gap: 4px; padding: 4px 0; }
   .typing span {
-    width: 6px; height: 6px; border-radius: 50%;
-    background: var(--muted);
+    width: 6px; height: 6px; border-radius: 50%; background: var(--muted);
     animation: bounce 1.2s infinite ease-in-out;
   }
   .typing span:nth-child(2) { animation-delay: 0.15s; }
@@ -122,100 +73,56 @@
     40% { transform: translateY(-4px); opacity: 1; }
   }
   footer {
-    flex-shrink: 0;
-    border-top: 1px solid var(--border);
-    background: var(--surface);
-    padding: 12px 16px 16px;
+    flex-shrink: 0; border-top: 1px solid var(--border);
+    background: var(--surface); padding: 12px 16px 16px;
   }
   .composer-wrap { max-width: 800px; margin: 0 auto; }
   .composer {
-    display: flex;
-    gap: 8px;
-    align-items: flex-end;
-    background: var(--surface2);
-    border: 1px solid var(--border);
-    border-radius: var(--radius);
-    padding: 10px 12px;
+    display: flex; gap: 8px; align-items: flex-end;
+    background: var(--surface2); border: 1px solid var(--border);
+    border-radius: var(--radius); padding: 10px 12px;
   }
   .composer:focus-within { border-color: var(--accent-dim); }
   #input {
-    flex: 1;
-    background: transparent;
-    border: none;
-    outline: none;
-    color: var(--text);
-    font-family: var(--font);
-    font-size: 0.95rem;
-    resize: none;
-    max-height: 160px;
-    line-height: 1.45;
-    min-height: 24px;
+    flex: 1; background: transparent; border: none; outline: none;
+    color: var(--text); font-family: var(--font); font-size: 0.95rem;
+    resize: none; max-height: 160px; line-height: 1.45; min-height: 24px;
   }
   #send {
-    background: var(--accent);
-    color: #fff;
-    border: none;
-    border-radius: 10px;
-    width: 36px; height: 36px;
-    cursor: pointer;
-    display: grid; place-items: center;
+    background: var(--accent); color: #fff; border: none; border-radius: 10px;
+    width: 36px; height: 36px; cursor: pointer; display: grid; place-items: center;
     flex-shrink: 0;
   }
   #send:hover { background: var(--accent-dim); }
   #send:disabled { opacity: 0.4; cursor: not-allowed; }
   .toolbar {
-    display: flex;
-    gap: 8px;
-    margin-bottom: 8px;
-    flex-wrap: wrap;
-    align-items: center;
+    display: flex; gap: 8px; margin-bottom: 8px; flex-wrap: wrap; align-items: center;
   }
   .toolbar select, .toolbar input[type="text"] {
-    background: var(--surface2);
-    border: 1px solid var(--border);
-    color: var(--text);
-    border-radius: 8px;
-    padding: 6px 10px;
-    font-size: 0.8rem;
+    background: var(--surface2); border: 1px solid var(--border); color: var(--text);
+    border-radius: 8px; padding: 6px 10px; font-size: 0.8rem;
   }
   .toolbar label { font-size: 0.75rem; color: var(--muted); }
-  .hint {
-    text-align: center;
-    font-size: 0.75rem;
-    color: var(--muted);
-    margin-top: 8px;
-  }
-  .empty {
-    margin: auto;
-    text-align: center;
-    color: var(--muted);
-    padding: 48px 16px;
-  }
-  .empty h2 {
-    color: var(--text);
-    font-weight: 600;
-    margin-bottom: 8px;
-    font-size: 1.25rem;
-  }
+  .hint { text-align: center; font-size: 0.75rem; color: var(--muted); margin-top: 8px; }
+  .empty { margin: auto; text-align: center; color: var(--muted); padding: 48px 16px; }
+  .empty h2 { color: var(--text); font-weight: 600; margin-bottom: 8px; font-size: 1.25rem; }
   .suggestions {
-    display: flex; flex-wrap: wrap; gap: 8px;
-    justify-content: center; margin-top: 20px;
+    display: flex; flex-wrap: wrap; gap: 8px; justify-content: center; margin-top: 20px;
   }
   .suggestions button {
-    background: var(--surface2);
-    border: 1px solid var(--border);
-    color: var(--text);
-    border-radius: 999px;
-    padding: 8px 14px;
-    font-size: 0.85rem;
-    cursor: pointer;
+    background: var(--surface2); border: 1px solid var(--border); color: var(--text);
+    border-radius: 999px; padding: 8px 14px; font-size: 0.85rem; cursor: pointer;
   }
   .suggestions button:hover { border-color: var(--accent); }
+  .sr-only {
+    position: absolute; width: 1px; height: 1px; padding: 0; margin: -1px;
+    overflow: hidden; clip: rect(0,0,0,0); border: 0;
+  }
 </style>
 </head>
 <body>
 <header>
-  <div class="logo"></div>
+  <div class="logo" aria-hidden="true"></div>
   <h1>Loom</h1>
   <div class="status"><span class="dot" id="dot"></span><span id="statusText">connecting…</span></div>
 </header>
@@ -233,21 +140,25 @@
 <footer>
   <div class="composer-wrap">
     <div class="toolbar">
-      <label>Model <select id="model"><option value="">default</option></select></label>
-      <label>System <input type="text" id="system" placeholder="optional system prompt" style="width:220px"/></label>
-      <label><input type="checkbox" id="stream" checked/> stream</label>
+      <label for="model">Model</label>
+      <select id="model"><option value="">default</option></select>
+      <label for="system">System</label>
+      <input type="text" id="system" placeholder="optional system prompt" style="width:220px"/>
+      <label for="stream"><input type="checkbox" id="stream" checked/> stream</label>
     </div>
     <div class="composer">
+      <label for="input" class="sr-only">Message</label>
       <textarea id="input" rows="1" placeholder="Message Loom…" autofocus></textarea>
-      <button id="send" title="Send" aria-label="Send">
-        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M5 12h14M13 6l6 6-6 6"/></svg>
+      <button id="send" type="button" title="Send" aria-label="Send">
+        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" aria-hidden="true"><path d="M5 12h14M13 6l6 6-6 6"/></svg>
       </button>
     </div>
     <p class="hint">Enter to send · Shift+Enter for newline · Auth via LOOM_API_KEY if set</p>
   </div>
 </footer>
 <script>
-const API_KEY = new URLSearchParams(location.search).get("key") || localStorage.getItem("loom_api_key") || "";
+const API_KEY = new URLSearchParams(location.search).get("key")
+  || localStorage.getItem("loom_api_key") || "";
 const messagesEl = document.getElementById("messages");
 const input = document.getElementById("input");
 const sendBtn = document.getElementById("send");
@@ -259,51 +170,29 @@ const history = [];
 
 function headers() {
   const h = { "Content-Type": "application/json" };
-  if (API_KEY) h["Authorization"] = "Bearer " + API_KEY;
+  if (API_KEY) h.Authorization = "Bearer " + API_KEY;
   return h;
 }
-
+function statusClass(ok) {
+  if (ok === true) return "ok";
+  if (ok === false) return "err";
+  return "";
+}
 function setStatus(ok, text) {
-  document.getElementById("dot").className = "dot " + (ok === true ? "ok" : ok === false ? "err" : "");
+  document.getElementById("dot").className = "dot " + statusClass(ok);
   document.getElementById("statusText").textContent = text;
 }
-
-async function boot() {
-  try {
-    const r = await fetch("/health", { headers: headers() });
-    const j = await r.json();
-    setStatus(true, (j.backends && j.backends.llm) || "healthy");
-    if (j.backends && j.backends.llm && j.backends.llm !== "None") {
-      try {
-        const m = await fetch("/llm/models", { headers: headers() });
-        if (m.ok) {
-          const mj = await m.json();
-          (mj.models || []).forEach(name => {
-            const o = document.createElement("option");
-            o.value = name; o.textContent = name;
-            modelSel.appendChild(o);
-          });
-        }
-      } catch (_) {}
-    }
-  } catch (e) {
-    setStatus(false, "offline");
-  }
-}
-
 function escapeHtml(s) {
-  return s.replace(/&/g,"&amp;").replace(/</g,"&lt;").replace(/>/g,"&gt;");
+  return s.replaceAll("&", "&amp;").replaceAll("<", "&lt;").replaceAll(">", "&gt;");
 }
-
 function renderMarkdownLite(text) {
   let html = escapeHtml(text);
   html = html.replace(/```(\w*)\n([\s\S]*?)```/g, (_, lang, code) =>
-    `<pre><code class="lang-${lang}">${code}</code></pre>`);
+    "<pre><code class=\"lang-" + lang + "\">" + code + "</code></pre>");
   html = html.replace(/`([^`]+)`/g, "<code>$1</code>");
   return html;
 }
-
-function addMsg(role, content, {streaming} = {}) {
+function addMsg(role, content, streaming) {
   if (empty) empty.remove();
   const div = document.createElement("div");
   div.className = "msg " + role;
@@ -314,8 +203,10 @@ function addMsg(role, content, {streaming} = {}) {
   body.className = "body";
   if (streaming) {
     body.innerHTML = '<div class="typing"><span></span><span></span><span></span></div>';
+  } else if (role === "assistant") {
+    body.innerHTML = renderMarkdownLite(content);
   } else {
-    body.innerHTML = role === "assistant" ? renderMarkdownLite(content) : escapeHtml(content);
+    body.textContent = content;
   }
   div.appendChild(av);
   div.appendChild(body);
@@ -323,121 +214,138 @@ function addMsg(role, content, {streaming} = {}) {
   messagesEl.scrollTop = messagesEl.scrollHeight;
   return body;
 }
-
 function autosize() {
   input.style.height = "auto";
   input.style.height = Math.min(input.scrollHeight, 160) + "px";
 }
-input.addEventListener("input", autosize);
-
+function showError(bodyEl, err) {
+  const msg = String(err && err.message ? err.message : err);
+  bodyEl.innerHTML = '<span style="color:var(--danger)">Error: ' + escapeHtml(msg) + "</span>";
+}
+function buildPayload() {
+  const msgs = [];
+  const sys = systemInp.value.trim();
+  if (sys) msgs.push({ role: "system", content: sys });
+  history.forEach((m) => msgs.push(m));
+  const payload = { messages: msgs, temperature: 0.7 };
+  if (modelSel.value) payload.model = modelSel.value;
+  return payload;
+}
+async function nonStreamChat(payload, bodyEl) {
+  const r = await fetch("/llm/chat", {
+    method: "POST", headers: headers(), body: JSON.stringify(payload),
+  });
+  if (!r.ok) throw new Error(await r.text() || r.statusText);
+  const j = await r.json();
+  const content = j.content || j.response || JSON.stringify(j);
+  bodyEl.innerHTML = renderMarkdownLite(content);
+  history.push({ role: "assistant", content });
+}
+function parseStreamDelta(data) {
+  try {
+    const j = JSON.parse(data);
+    if (j.error) throw new Error(String(j.error));
+    return j.delta || j.content || "";
+  } catch (parseErr) {
+    if (data.startsWith("{")) throw parseErr;
+    return data;
+  }
+}
+async function streamChat(payload, bodyEl) {
+  const r = await fetch("/llm/chat/stream", {
+    method: "POST", headers: headers(), body: JSON.stringify(payload),
+  });
+  if (!r.ok) throw new Error(await r.text() || r.statusText);
+  const reader = r.body.getReader();
+  const dec = new TextDecoder();
+  let acc = "";
+  bodyEl.textContent = "";
+  while (true) {
+    const { done, value } = await reader.read();
+    if (done) break;
+    const chunk = dec.decode(value, { stream: true });
+    for (const line of chunk.split("\n")) {
+      if (!line.startsWith("data: ")) continue;
+      const data = line.slice(6);
+      if (data === "[DONE]") continue;
+      acc += parseStreamDelta(data);
+      bodyEl.innerHTML = renderMarkdownLite(acc);
+      messagesEl.scrollTop = messagesEl.scrollHeight;
+    }
+  }
+  if (!acc) throw new Error("empty stream");
+  history.push({ role: "assistant", content: acc });
+}
 async function send() {
   const text = input.value.trim();
   if (!text || sendBtn.disabled) return;
   input.value = "";
   autosize();
   sendBtn.disabled = true;
-  addMsg("user", text);
+  addMsg("user", text, false);
   history.push({ role: "user", content: text });
-
-  const bodyEl = addMsg("assistant", "", { streaming: true });
-  const msgs = [];
-  const sys = systemInp.value.trim();
-  if (sys) msgs.push({ role: "system", content: sys });
-  history.forEach(m => msgs.push(m));
-
-  const payload = { messages: msgs, temperature: 0.7 };
-  if (modelSel.value) payload.model = modelSel.value;
-
+  const bodyEl = addMsg("assistant", "", true);
+  const payload = buildPayload();
   try {
     if (streamChk.checked) {
-      const r = await fetch("/llm/chat/stream", {
-        method: "POST",
-        headers: headers(),
-        body: JSON.stringify(payload),
-      });
-      if (!r.ok) {
-        const err = await r.text();
-        throw new Error(err || r.statusText);
-      }
-      const reader = r.body.getReader();
-      const dec = new TextDecoder();
-      let acc = "";
-      bodyEl.textContent = "";
-      while (true) {
-        const { done, value } = await reader.read();
-        if (done) break;
-        const chunk = dec.decode(value, { stream: true });
-        for (const line of chunk.split("\n")) {
-          if (line.startsWith("data: ")) {
-            const data = line.slice(6);
-            if (data === "[DONE]") continue;
-            try {
-              const j = JSON.parse(data);
-              const delta = j.delta || j.content || "";
-              acc += delta;
-              bodyEl.innerHTML = renderMarkdownLite(acc);
-              messagesEl.scrollTop = messagesEl.scrollHeight;
-            } catch {
-              acc += data;
-              bodyEl.innerHTML = renderMarkdownLite(acc);
-            }
-          }
+      try {
+        await streamChat(payload, bodyEl);
+      } catch (streamErr) {
+        const msg = String(streamErr && streamErr.message ? streamErr.message : streamErr);
+        if (msg.includes("404") || msg.includes("empty stream")) {
+          await nonStreamChat(payload, bodyEl);
+        } else {
+          throw streamErr;
         }
       }
-      if (!acc) throw new Error("empty stream");
-      history.push({ role: "assistant", content: acc });
     } else {
-      const r = await fetch("/llm/chat", {
-        method: "POST",
-        headers: headers(),
-        body: JSON.stringify(payload),
-      });
-      if (!r.ok) throw new Error(await r.text() || r.statusText);
-      const j = await r.json();
-      const content = j.content || j.response || JSON.stringify(j);
-      bodyEl.innerHTML = renderMarkdownLite(content);
-      history.push({ role: "assistant", content });
+      await nonStreamChat(payload, bodyEl);
     }
-  } catch (e) {
-    if (String(e.message).includes("404") || String(e).includes("empty stream")) {
-      try {
-        const r = await fetch("/llm/chat", {
-          method: "POST",
-          headers: headers(),
-          body: JSON.stringify(payload),
-        });
-        if (!r.ok) throw new Error(await r.text() || r.statusText);
-        const j = await r.json();
-        const content = j.content || j.response || JSON.stringify(j);
-        bodyEl.innerHTML = renderMarkdownLite(content);
-        history.push({ role: "assistant", content });
-      } catch (e2) {
-        bodyEl.innerHTML = `<span style="color:var(--danger)">Error: ${escapeHtml(String(e2.message || e2))}</span>`;
-      }
-    } else {
-      bodyEl.innerHTML = `<span style="color:var(--danger)">Error: ${escapeHtml(String(e.message || e))}</span>`;
-    }
+  } catch (error_) {
+    showError(bodyEl, error_);
   } finally {
     sendBtn.disabled = false;
     input.focus();
   }
 }
-
+async function loadModels() {
+  const m = await fetch("/llm/models", { headers: headers() });
+  if (!m.ok) return;
+  const mj = await m.json();
+  (mj.models || []).forEach((name) => {
+    const o = document.createElement("option");
+    o.value = name;
+    o.textContent = name;
+    modelSel.appendChild(o);
+  });
+}
+async function boot() {
+  try {
+    const r = await fetch("/health", { headers: headers() });
+    const j = await r.json();
+    const llm = j.backends && j.backends.llm;
+    setStatus(true, llm || "healthy");
+    if (llm && llm !== "None") {
+      try { await loadModels(); }
+      catch (modelErr) { console.warn("model list failed", modelErr); }
+    }
+  } catch (bootErr) {
+    console.warn("health check failed", bootErr);
+    setStatus(false, "offline");
+  }
+}
+input.addEventListener("input", autosize);
 sendBtn.addEventListener("click", send);
 input.addEventListener("keydown", (e) => {
-  if (e.key === "Enter" && !e.shiftKey) {
-    e.preventDefault();
-    send();
-  }
+  if (e.key === "Enter" && !e.shiftKey) { e.preventDefault(); send(); }
 });
-document.querySelectorAll(".suggestions button").forEach(btn => {
+document.querySelectorAll(".suggestions button").forEach((btn) => {
   btn.addEventListener("click", () => {
-    input.value = btn.getAttribute("data-q");
+    input.value = btn.dataset.q || "";
     autosize();
     send();
   });
 });
-
 boot();
 </script>
 </body>
