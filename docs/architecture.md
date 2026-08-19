@@ -30,7 +30,7 @@ For installation, quick-start examples, and the full protocol table see the
 
 **Application layer** -- user code, agent runtimes (Goose, custom agents),
 client SDK (`LocalClient` for embedded mode, `LoomClient` for REST),
-`get_client()` auto-detection factory, CLI (`loom` command), and 7 tool
+`get_client()` auto-detection factory, CLI (`loom` command), and 6 tool
 adapters (Crush, OpenCode, Aider, Cursor, Continue.dev, Claude Code MCP
 bridge).  This layer depends on contracts and optionally on orchestration
 components like `ConsensusEngine`.
