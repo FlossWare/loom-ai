@@ -190,19 +190,29 @@ class InMemoryTemporalKnowledgeStore:
         end: str = "",
     ) -> list[Claim]:
         """Return all claims about an entity within a time window."""
-        results: list[Claim] = []
-        for claim in self._claims.values():
-            if claim.subject_id != entity_id:
-                continue
-            vf = (claim.temporal.valid_from if claim.temporal else "") or ""
-            vu = (claim.temporal.valid_until if claim.temporal else "") or ""
-            if end and vf and vf > end:
-                continue
-            if start and vu and vu < start:
-                continue
-            results.append(claim)
-        results.sort(key=lambda c: (c.temporal.valid_from if c.temporal else "") or "")
+        results = [
+            c
+            for c in self._claims.values()
+            if c.subject_id == entity_id
+            and self._in_window(c, start, end)
+        ]
+        results.sort(
+            key=lambda c: (
+                c.temporal.valid_from if c.temporal else ""
+            )
+            or ""
+        )
         return results
+
+    @staticmethod
+    def _in_window(claim: Claim, start: str, end: str) -> bool:
+        vf = (claim.temporal.valid_from if claim.temporal else "") or ""
+        vu = (claim.temporal.valid_until if claim.temporal else "") or ""
+        if end and vf and vf > end:
+            return False
+        if start and vu and vu < start:
+            return False
+        return True
 
 
 # ── InMemoryGraphRetriever ──────────────────────────────────────────────
@@ -258,25 +268,43 @@ class InMemoryGraphRetriever:
             current, current_depth = queue.popleft()
             if current_depth >= depth:
                 continue
-
-            rels = await self._graph.get_relationships(current, direction="both")
-            for rel in rels:
-                if rel.id not in seen_rels:
-                    seen_rels.add(rel.id)
-                    relationships.append(rel)
-                neighbor_id = (
-                    rel.target_id if rel.source_id == current else rel.source_id
-                )
-                if neighbor_id not in visited:
-                    visited.add(neighbor_id)
-                    entity = await self._graph.get_entity(neighbor_id)
-                    if entity is not None:
-                        entities.append(entity)
-                        if len(entities) >= limit:
-                            break
-                    queue.append((neighbor_id, current_depth + 1))
+            rels = await self._graph.get_relationships(
+                current, direction="both"
+            )
+            await self._collect_neighbors(
+                rels, current, current_depth,
+                entities, relationships, seen_rels, visited, queue, limit,
+            )
 
         return SubgraphResult(entities=entities, relationships=relationships)
+
+    async def _collect_neighbors(
+        self,
+        rels: list[KnowledgeRelationship],
+        current: str,
+        current_depth: int,
+        entities: list[KnowledgeEntity],
+        relationships: list[KnowledgeRelationship],
+        seen_rels: set[str],
+        visited: set[str],
+        queue: deque[tuple[str, int]],
+        limit: int,
+    ) -> None:
+        for rel in rels:
+            if rel.id not in seen_rels:
+                seen_rels.add(rel.id)
+                relationships.append(rel)
+            neighbor_id = (
+                rel.target_id if rel.source_id == current else rel.source_id
+            )
+            if neighbor_id not in visited:
+                visited.add(neighbor_id)
+                entity = await self._graph.get_entity(neighbor_id)
+                if entity is not None:
+                    entities.append(entity)
+                    if len(entities) >= limit:
+                        return
+                queue.append((neighbor_id, current_depth + 1))
 
     async def retrieve_path(
         self,
