@@ -54,6 +54,192 @@ pip install flossware-loom-ai[redis]       # + Redis queues
 pip install flossware-loom-ai[all]         # everything
 ```
 
+## Configuration
+
+`pip install` adds only the Python client libraries — it does **not** provision
+databases or services. You bring your own infrastructure and point loom-ai at it
+with environment variables. `LoomConfig.from_env()` reads these at startup.
+
+### Backend selectors
+
+| Variable | Options | Default |
+|----------|---------|---------|
+| `LOOM_STORAGE` | `memory`, `postgresql` | `memory` |
+| `LOOM_QUEUE` | `memory`, `redis` | `memory` |
+| `LOOM_SECRETS` | `env`, `dotenv`, `postgresql` | `env` |
+| `LOOM_EMBEDDING` | `noop`, `openai`, `litellm` | `noop` |
+| `LOOM_SEARCH` | `memory`, `postgresql` | `memory` |
+| `LOOM_GRAPH` | `disabled`, `memory`, `orientdb` | `disabled` |
+| `LOOM_TOOLS` | `disabled`, `memory` | `disabled` |
+| `LOOM_RESOURCES` | `disabled`, `memory` | `disabled` |
+
+### PostgreSQL
+
+Used when `LOOM_STORAGE`, `LOOM_SEARCH`, or `LOOM_SECRETS` is set to `postgresql`.
+All three share the same connection pool.
+
+| Variable | Default | Description |
+|----------|---------|-------------|
+| `LOOM_PG_HOST` | `localhost` | Hostname or IP |
+| `LOOM_PG_PORT` | `5432` | Port |
+| `LOOM_PG_USER` | `loom` | Database user |
+| `LOOM_PG_PASSWORD` | *(empty)* | Password (URL-encoded automatically) |
+| `LOOM_PG_DATABASE` | `loom` | Database name |
+
+You can point these at any existing PostgreSQL 12+ instance. The database must
+have the following tables pre-created:
+
+- `documents` (id text PK, title text, content text, url text, category text, metadata jsonb, created_at text)
+- `chunks` (id text PK, document_id text, content text, chunk_index int, metadata jsonb)
+- `embeddings` (id text PK, chunk_id text, vector vector, model text, dimensions int)
+- `secrets` (name text PK, value text) — only if using `LOOM_SECRETS=postgresql`
+
+If using `LOOM_SEARCH=postgresql` with semantic search, enable the
+[pgvector](https://github.com/pgvector/pgvector) extension (`CREATE EXTENSION vector`).
+
+Loom-ai does not run migrations automatically — you manage the schema with
+your own tooling (Alembic, Flyway, plain SQL, etc.).
+
+### Redis
+
+Used when `LOOM_QUEUE=redis`.
+
+| Variable | Default | Description |
+|----------|---------|-------------|
+| `LOOM_REDIS_URL` | `redis://localhost:6379/0` | Full Redis URL with database number |
+
+Supports any Redis 5+ instance. The URL includes authentication and database selection:
+
+```
+redis://user:password@my-redis:6379/2
+```
+
+**Queue names are dynamic** — created on the fly when you call `enqueue("my-queue", ...)`.
+No upfront configuration needed. All keys are namespaced under the prefix `loom:queue:`
+(e.g. `loom:queue:my-queue:pending`), so loom-ai coexists safely with other
+applications on the same Redis instance.
+
+Built-in features: priority scoring, lease-based processing (300s default),
+retry with exponential backoff (3 max), and automatic dead-letter queue per
+queue name. These defaults are configurable when constructing
+`RedisQueueBackend` directly (see `lease_timeout`, `max_retries`,
+`backoff_base` constructor params).
+
+### OrientDB
+
+Used when `LOOM_GRAPH=orientdb`.
+
+| Variable | Default | Description |
+|----------|---------|-------------|
+| `ORIENTDB_HOST` | `localhost` | Hostname or IP |
+| `ORIENTDB_PORT` | `2424` | Binary protocol port |
+| `ORIENTDB_USER` | `root` | Database user |
+| `ORIENTDB_PASSWORD` | *(empty)* | Password |
+| `ORIENTDB_DB` | `loom_ai` | Database name (must exist) |
+
+Connects to any existing OrientDB 3.x instance. The database must already exist;
+loom-ai opens it but does not create it. Vertex/edge classes (`KnowledgeEntity`,
+`KnowledgeRelationship`, `Claim`) are created on first insert if they don't exist.
+
+### LLM
+
+Any OpenAI-compatible chat completion endpoint (LiteLLM, vLLM, Ollama, etc.).
+
+| Variable | Default | Description |
+|----------|---------|-------------|
+| `LOOM_LLM_BASE_URL` | *(unset — LLM disabled)* | Base URL (e.g. `http://litellm:4000/v1`) |
+| `LOOM_LLM_API_KEY` | *(empty)* | Bearer token / API key |
+| `LOOM_LLM_MODEL` | `gpt-4o-mini` | Default model identifier |
+| `LOOM_LLM_PROVIDER` | `openai-compatible` | Provider tag for response parsing |
+
+When `LOOM_LLM_BASE_URL` is unset, the LLM and consensus backends are disabled
+(chat/consensus calls will raise). This is fine for storage-only or search-only
+usage.
+
+### Embeddings
+
+| Variable | Default | Description |
+|----------|---------|-------------|
+| `OPENAI_API_KEY` | *(required for `openai`)* | OpenAI API key |
+
+When `LOOM_EMBEDDING=openai`, the `OPENAI_API_KEY` env var must be set.
+
+When `LOOM_EMBEDDING=litellm`, LiteLLM reads provider keys automatically from
+standard env vars (`OPENAI_API_KEY`, `COHERE_API_KEY`, `VOYAGE_API_KEY`, etc.)
+depending on the model you configure. No loom-specific vars needed.
+
+### Secrets
+
+| Variable | Default | Description |
+|----------|---------|-------------|
+| `LOOM_SECRETS_FILE` | `.env` | Path to dotenv file (when `LOOM_SECRETS=dotenv`) |
+| `LOOM_SECRETS_PREFIX` | *(empty)* | Key prefix filter (e.g. `APP_` makes `get("FOO")` resolve to `APP_FOO`) |
+
+The `env` backend reads directly from `os.environ` (no credentials needed).
+The `dotenv` backend reads from a `.env` file, then falls back to `os.environ`.
+Both support an optional prefix to namespace your secrets.
+
+### Client SDK / REST
+
+Used by `LoomClient` when connecting to a remote loom-ai server.
+
+| Variable | Default | Description |
+|----------|---------|-------------|
+| `LOOM_URL` | *(unset)* | Full server URL (e.g. `http://loom:5000`) |
+| `LOOM_HOST` | `127.0.0.1` | Server host (used when `LOOM_URL` unset) |
+| `LOOM_PORT` | `5000` | Server port |
+| `LOOM_API_KEY` | *(empty)* | Bearer token for server auth |
+| `LOOM_TIMEOUT` | `60` | Request timeout in seconds |
+
+When neither `LOOM_URL` nor `LOOM_HOST` is set, `get_client()` returns a
+`LocalClient` (embedded mode, no server needed).
+
+### Security note
+
+Avoid exporting credentials directly in your shell (they end up in
+`.bash_history`). Use a `.env` file, a secret manager, or your shell's
+secure credential store instead. Loom-ai supports `LOOM_SECRETS=dotenv` for
+reading from a `.env` file, and you can plug in any secrets backend (Vault,
+AWS Secrets Manager, etc.) via the `SecretsBackend` protocol.
+
+### Examples
+
+**Use an existing PostgreSQL + Redis + LiteLLM proxy:**
+
+```bash
+export LOOM_STORAGE=postgresql
+export LOOM_SEARCH=postgresql
+export LOOM_QUEUE=redis
+export LOOM_EMBEDDING=litellm
+
+export LOOM_PG_HOST=db.example.com
+export LOOM_PG_DATABASE=myapp
+export LOOM_PG_USER=myuser
+export LOOM_PG_PASSWORD=secret
+
+export LOOM_REDIS_URL=redis://:redispass@cache.example.com:6379/0
+
+export LOOM_LLM_BASE_URL=http://litellm.example.com:4000/v1
+export LOOM_LLM_API_KEY=sk-my-litellm-key
+```
+
+**Use existing OrientDB for knowledge graph:**
+
+```bash
+export LOOM_GRAPH=orientdb
+export ORIENTDB_HOST=graph.example.com
+export ORIENTDB_USER=admin
+export ORIENTDB_PASSWORD=secret
+export ORIENTDB_DB=my_knowledge_graph
+```
+
+**Minimal local setup (zero dependencies, zero config):**
+
+```bash
+# Nothing to set — all backends default to in-memory/stdlib
+python -c "import asyncio; from loom_ai import LoomConfig; asyncio.run(LoomConfig.from_env())"
+```
+
 ## Quick Start
 
 ```python
@@ -139,6 +325,40 @@ python -m loom_ai.clients.claude             # print MCP config JSON
 python -m loom_ai.clients.claude --env       # print shell exports
 python -m loom_ai.clients.claude.mcp_bridge  # run MCP stdio server
 ```
+
+## Bring Your Own Backend
+
+Every loom-ai backend is a small async interface defined with `typing.Protocol`.
+To swap in your own database, queue, graph store, or anything else:
+
+1. Write a class whose methods match the protocol signatures
+2. Pass the instance to `LoomConfig`
+
+No inheritance, no registration, no framework imports required.
+
+| Want to use... | Implement | Methods |
+|----------------|-----------|---------|
+| MongoDB, DynamoDB, S3 | `StorageBackend` | 13 |
+| RabbitMQ, Kafka, SQS | `QueueBackend` | 6 |
+| Vault, AWS Secrets Manager | `SecretsBackend` | 4 |
+| Cohere, Voyage AI, local ONNX | `EmbeddingBackend` | 4 |
+| Elasticsearch, Meilisearch | `SearchBackend` | 5 |
+| Neo4j, ArangoDB, TigerGraph | `GraphBackend` | 7 |
+| Ollama, vLLM, custom server | `LLMBackend` | 3 |
+
+```python
+class MyQueue:
+    async def enqueue(self, queue_name, items): ...
+    async def fetch(self, queue_name, count, worker_id): ...
+    async def complete(self, queue_name, item_id): ...
+    async def requeue(self, queue_name, items): ...
+    async def status(self, queue_name): ...
+    async def list_queues(self): ...
+
+cfg = LoomConfig(queue=MyQueue(), ...)
+```
+
+See [docs/architecture.md](docs/architecture.md#extension-model) for the full extension guide with examples for LLM, queue, graph, and secrets backends.
 
 ## Protocol Contracts
 
