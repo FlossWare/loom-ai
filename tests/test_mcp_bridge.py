@@ -141,3 +141,16 @@ def test_dispatch_tools_call_invalid_args():
             is True
         )
     assert written[0]["error"]["code"] == bridge._INVALID_PARAMS
+
+
+def test_framing_missing_content_length():
+    """Header block without Content-Length is a framing error, not a retry."""
+    bad = b"X-Unused: 1\r\n\r\n"
+    buf = io.BytesIO(bad)
+
+    class _Fake:
+        buffer = buf
+
+    with patch.object(bridge.sys, "stdin", _Fake()):
+        with pytest.raises(bridge._FramingError, match="missing Content-Length"):
+            bridge._read_message()
