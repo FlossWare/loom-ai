@@ -15,6 +15,9 @@ import json
 import os
 from pathlib import Path
 
+# Static UI is package data — never taken from the request path.
+_CHAT_HTML = Path(__file__).resolve().parent.parent / "static" / "chat.html"
+
 
 def main() -> None:
     try:
@@ -24,7 +27,8 @@ def main() -> None:
             "Install server extra: pip install flossware-loom-ai[server]"
         ) from exc
 
-    from fastapi.responses import HTMLResponse, RedirectResponse, StreamingResponse
+    from fastapi import HTTPException, Request
+    from fastapi.responses import FileResponse, RedirectResponse, StreamingResponse
 
     from loom_ai.config import LoomConfig
     from loom_ai.server import create_app
@@ -32,14 +36,19 @@ def main() -> None:
     config = asyncio.run(LoomConfig.from_env())
     app = create_app(config)
 
-    chat_html = Path(__file__).resolve().parent.parent / "static" / "chat.html"
     route_paths = {getattr(r, "path", None) for r in app.routes}
 
     if "/ui" not in route_paths:
 
         @app.get("/ui")
         async def chat_ui():
-            return HTMLResponse(chat_html.read_text(encoding="utf-8"))
+            if not _CHAT_HTML.is_file():
+                raise HTTPException(status_code=404, detail="Chat UI not installed")
+            # FileResponse serves a fixed package path (not user-controlled).
+            return FileResponse(
+                path=_CHAT_HTML,
+                media_type="text/html; charset=utf-8",
+            )
 
         @app.get("/")
         async def root():
@@ -49,27 +58,34 @@ def main() -> None:
         from loom_ai.models import ChatMessage
 
         @app.post("/llm/chat/stream")
-        async def llm_chat_stream(request):  # type: ignore[no-untyped-def]
+        async def llm_chat_stream(request: Request):
             body = await request.json()
-            messages = [
-                ChatMessage(role=m["role"], content=m["content"])
-                for m in body.get("messages", [])
-            ]
+            raw_msgs = body.get("messages")
+            if not isinstance(raw_msgs, list) or not raw_msgs:
+                raise HTTPException(status_code=422, detail="messages required")
+            messages: list[ChatMessage] = []
+            for m in raw_msgs:
+                if not isinstance(m, dict) or "role" not in m or "content" not in m:
+                    raise HTTPException(status_code=422, detail="invalid message")
+                messages.append(
+                    ChatMessage(role=str(m["role"]), content=str(m["content"]))
+                )
+            temperature = float(body.get("temperature", 0.7))
+            model = body.get("model")
+            max_tokens = body.get("max_tokens")
 
             async def gen():
                 try:
                     async for token in config.llm.chat_stream(
                         messages,
-                        model=body.get("model"),
-                        temperature=float(body.get("temperature", 0.7)),
-                        max_tokens=body.get("max_tokens"),
+                        model=model if isinstance(model, str) else None,
+                        temperature=temperature,
+                        max_tokens=max_tokens if isinstance(max_tokens, int) else None,
                     ):
-                        payload = json.dumps({"delta": token})
-                        yield f"data: {payload}\n\n"
+                        yield f"data: {json.dumps({'delta': token})}\n\n"
                     yield "data: [DONE]\n\n"
                 except Exception as exc:
-                    payload = json.dumps({"error": type(exc).__name__})
-                    yield f"data: {payload}\n\n"
+                    yield f"data: {json.dumps({'error': type(exc).__name__})}\n\n"
 
             return StreamingResponse(gen(), media_type="text/event-stream")
 
