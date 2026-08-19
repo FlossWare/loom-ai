@@ -10,6 +10,7 @@ import pytest
 
 from loom_ai.clients.claude.mcp_bridge import (
     _LATEST_VERSION,
+    _MAX_MESSAGE_SIZE,
     _PARSE_ERROR,
     _SUPPORTED_VERSIONS,
     _dispatch,
@@ -36,48 +37,56 @@ class TestProtocolNegotiation:
     def test_supported_version_echoed(self):
         sent, writer = _capture_writes()
         with patch("loom_ai.clients.claude.mcp_bridge._write_message", writer):
-            _dispatch({
-                "jsonrpc": "2.0",
-                "id": 1,
-                "method": "initialize",
-                "params": {"protocolVersion": "2024-11-05"},
-            })
+            _dispatch(
+                {
+                    "jsonrpc": "2.0",
+                    "id": 1,
+                    "method": "initialize",
+                    "params": {"protocolVersion": "2024-11-05"},
+                }
+            )
         result = sent[0]["result"]
         assert result["protocolVersion"] == "2024-11-05"
 
     def test_latest_supported_version_echoed(self):
         sent, writer = _capture_writes()
         with patch("loom_ai.clients.claude.mcp_bridge._write_message", writer):
-            _dispatch({
-                "jsonrpc": "2.0",
-                "id": 1,
-                "method": "initialize",
-                "params": {"protocolVersion": _LATEST_VERSION},
-            })
+            _dispatch(
+                {
+                    "jsonrpc": "2.0",
+                    "id": 1,
+                    "method": "initialize",
+                    "params": {"protocolVersion": _LATEST_VERSION},
+                }
+            )
         result = sent[0]["result"]
         assert result["protocolVersion"] == _LATEST_VERSION
 
     def test_unsupported_version_falls_back_to_latest(self):
         sent, writer = _capture_writes()
         with patch("loom_ai.clients.claude.mcp_bridge._write_message", writer):
-            _dispatch({
-                "jsonrpc": "2.0",
-                "id": 2,
-                "method": "initialize",
-                "params": {"protocolVersion": "2099-01-01"},
-            })
+            _dispatch(
+                {
+                    "jsonrpc": "2.0",
+                    "id": 2,
+                    "method": "initialize",
+                    "params": {"protocolVersion": "2099-01-01"},
+                }
+            )
         result = sent[0]["result"]
         assert result["protocolVersion"] == _LATEST_VERSION
 
     def test_missing_version_falls_back_to_latest(self):
         sent, writer = _capture_writes()
         with patch("loom_ai.clients.claude.mcp_bridge._write_message", writer):
-            _dispatch({
-                "jsonrpc": "2.0",
-                "id": 3,
-                "method": "initialize",
-                "params": {},
-            })
+            _dispatch(
+                {
+                    "jsonrpc": "2.0",
+                    "id": 3,
+                    "method": "initialize",
+                    "params": {},
+                }
+            )
         result = sent[0]["result"]
         assert result["protocolVersion"] == _LATEST_VERSION
 
@@ -143,6 +152,18 @@ class TestReadMessageValidation:
         assert msg is _PARSE_ERROR
         assert sent[0]["error"]["code"] == -32700
 
+    def test_oversized_content_length_returns_parse_error(self):
+        huge_length = _MAX_MESSAGE_SIZE + 1
+        raw = f"Content-Length: {huge_length}\r\n\r\n".encode()
+        sent, writer = _capture_writes()
+        with (
+            patch("sys.stdin", _fake_stdin(raw)),
+            patch("loom_ai.clients.claude.mcp_bridge._write_message", writer),
+        ):
+            msg = _read_message()
+        assert msg is _PARSE_ERROR
+        assert sent[0]["error"]["code"] == -32700
+
     def test_eof_returns_none(self):
         with patch("sys.stdin", _fake_stdin(b"")):
             msg = _read_message()
@@ -160,11 +181,13 @@ class TestDispatchValidation:
     def test_unknown_method_returns_method_not_found(self):
         sent, writer = _capture_writes()
         with patch("loom_ai.clients.claude.mcp_bridge._write_message", writer):
-            _dispatch({
-                "jsonrpc": "2.0",
-                "id": 6,
-                "method": "nonexistent/method",
-            })
+            _dispatch(
+                {
+                    "jsonrpc": "2.0",
+                    "id": 6,
+                    "method": "nonexistent/method",
+                }
+            )
         assert sent[0]["error"]["code"] == -32601
 
     def test_notification_without_method_ignored(self):
@@ -187,9 +210,13 @@ class TestToolArgumentValidation:
 
     def test_wrong_type_array(self):
         with pytest.raises(_ToolError, match="must be array"):
-            _validate_arguments("loom_consensus", {
-                "prompt": "test", "models": "not-a-list",
-            })
+            _validate_arguments(
+                "loom_consensus",
+                {
+                    "prompt": "test",
+                    "models": "not-a-list",
+                },
+            )
 
     def test_unknown_tool(self):
         with pytest.raises(_ToolError, match="Unknown tool"):
@@ -199,14 +226,29 @@ class TestToolArgumentValidation:
         with pytest.raises(_ToolError, match="key-value object"):
             _validate_arguments("loom_search", "not a dict")
 
+    def test_optional_arg_wrong_type_rejected(self):
+        with pytest.raises(_ToolError, match="must be integer"):
+            _validate_arguments("loom_search", {"query": "hello", "limit": "ten"})
+
+    def test_optional_arg_correct_type_passes(self):
+        _validate_arguments("loom_search", {"query": "hello", "limit": 5})
+
     def test_valid_arguments_pass(self):
         _validate_arguments("loom_search", {"query": "hello"})
-        _validate_arguments("loom_store", {
-            "title": "t", "content": "c",
-        })
-        _validate_arguments("loom_consensus", {
-            "prompt": "p", "models": ["m1"],
-        })
+        _validate_arguments(
+            "loom_store",
+            {
+                "title": "t",
+                "content": "c",
+            },
+        )
+        _validate_arguments(
+            "loom_consensus",
+            {
+                "prompt": "p",
+                "models": ["m1"],
+            },
+        )
 
 
 class TestHandleToolCallErrors:
