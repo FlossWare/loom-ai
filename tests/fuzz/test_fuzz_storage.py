@@ -9,7 +9,6 @@ from __future__ import annotations
 
 import asyncio
 
-import pytest
 from hypothesis import given, settings
 from hypothesis import strategies as st
 
@@ -111,7 +110,11 @@ class TestStorageFuzz:
     @given(
         emb_id=FUZZ_ID,
         chunk_id=FUZZ_ID,
-        vector=st.lists(st.floats(allow_nan=False, allow_infinity=False), min_size=1, max_size=16),
+        vector=st.lists(
+            st.floats(allow_nan=False, allow_infinity=False),
+            min_size=1,
+            max_size=16,
+        ),
     )
     @settings(max_examples=50, deadline=None)
     def test_store_embeddings_never_crashes(self, emb_id, chunk_id, vector):
@@ -140,8 +143,7 @@ class TestStorageConcurrency:
     async def test_concurrent_stores_do_not_corrupt(self):
         backend = MemoryStorageBackend()
         docs = [
-            Document(id=f"conc-{i}", title=f"T{i}", content=f"C{i}")
-            for i in range(50)
+            Document(id=f"conc-{i}", title=f"T{i}", content=f"C{i}") for i in range(50)
         ]
 
         await asyncio.gather(*(backend.store_document(d) for d in docs))
@@ -154,9 +156,7 @@ class TestStorageConcurrency:
     async def test_concurrent_store_and_delete(self):
         backend = MemoryStorageBackend()
         for i in range(20):
-            await backend.store_document(
-                Document(id=f"cd-{i}", title="t", content="c")
-            )
+            await backend.store_document(Document(id=f"cd-{i}", title="t", content="c"))
 
         async def store_more():
             for i in range(20, 40):

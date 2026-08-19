@@ -25,7 +25,6 @@ if TYPE_CHECKING:
         Claim,
         KnowledgeEntity,
         KnowledgeRelationship,
-        SubgraphResult,
     )
 
 _SAFE_RID = re.compile(r"^#\d+:\d+$")
@@ -61,6 +60,7 @@ class OrientDBGraphBackend:
     @classmethod
     async def from_env(cls) -> OrientDBGraphBackend:
         """Build from environment variables (all blocking I/O runs in a thread)."""
+
         def _connect() -> OrientDBGraphBackend:
             host = os.environ.get("ORIENTDB_HOST", "localhost")
             port = int(os.environ.get("ORIENTDB_PORT", "2424"))
@@ -78,7 +78,11 @@ class OrientDBGraphBackend:
     async def add_entity(self, entity: KnowledgeEntity) -> str:
         label = _escape(entity.label)
         etype = _escape(entity.entity_type)
-        cmd = f"INSERT INTO KnowledgeEntity SET label = '{label}', entity_type = '{etype}'"
+        cmd = (
+            f"INSERT INTO KnowledgeEntity"
+            f" SET label = '{label}',"
+            f" entity_type = '{etype}'"
+        )
         result = await asyncio.to_thread(self._client.command, cmd)
         rid = str(result[0]._rid) if result else entity.id or ""
         entity.id = rid

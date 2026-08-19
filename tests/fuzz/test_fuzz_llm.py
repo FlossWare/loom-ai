@@ -91,7 +91,13 @@ class TestLLMFuzz:
         self, messages, temperature, max_tokens
     ):
         backend = StubLLMBackend()
-        result = _run(backend.chat(messages, temperature=temperature, max_tokens=max_tokens))
+        result = _run(
+            backend.chat(
+                messages,
+                temperature=temperature,
+                max_tokens=max_tokens,
+            )
+        )
         assert isinstance(result, ChatResponse)
 
     @given(messages=st.lists(FUZZ_MESSAGE, min_size=1, max_size=10))

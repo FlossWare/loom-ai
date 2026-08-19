@@ -230,12 +230,8 @@ async def test_register_and_list_operations():
 async def test_replace_existing_operation():
     """Registering an operation with an existing name replaces it."""
     loop = InMemoryAgentLoop()
-    op_v1 = AgentOperation(
-        name="search", operation_type="tool_call", config={"v": 1}
-    )
-    op_v2 = AgentOperation(
-        name="search", operation_type="tool_call", config={"v": 2}
-    )
+    op_v1 = AgentOperation(name="search", operation_type="tool_call", config={"v": 1})
+    op_v2 = AgentOperation(name="search", operation_type="tool_call", config={"v": 2})
     loop.register_agent_operation("agent-1", op_v1)
     loop.register_agent_operation("agent-1", op_v2)
 
@@ -334,9 +330,7 @@ async def test_select_tools_ignores_unknown_names():
 async def test_execute_tool_dispatches_to_provider():
     """execute_tool delegates to the configured ToolProvider."""
     provider = StubToolProvider()
-    provider.set_result(
-        "calc", ToolResult(tool_name="calc", output=42)
-    )
+    provider.set_result("calc", ToolResult(tool_name="calc", output=42))
     loop = InMemoryAgentLoop(tool_provider=provider)
 
     result = await loop.execute_tool("calc", {"expr": "6*7"})
@@ -429,14 +423,16 @@ async def test_step_multiple_tool_calls():
     loop.register_agent_operation(
         "agent-1",
         AgentOperation(
-            name="op_a", operation_type="tool_call",
+            name="op_a",
+            operation_type="tool_call",
             config={"tool_name": "a", "arguments": {}},
         ),
     )
     loop.register_agent_operation(
         "agent-1",
         AgentOperation(
-            name="op_b", operation_type="tool_call",
+            name="op_b",
+            operation_type="tool_call",
             config={"tool_name": "b", "arguments": {}},
         ),
     )

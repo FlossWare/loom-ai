@@ -27,7 +27,7 @@ async def test_chat_stream_yields_then_raises():
     client = LoomClient(ClientConfig(base_url="http://example.test", timeout=5))
 
     lines = [
-        b'data: {"delta": "Hello"}\n',
+        b'data: {"choices": [{"delta": {"content": "Hello"}}]}\n',
         b"data: [DONE]\n",
     ]
 
