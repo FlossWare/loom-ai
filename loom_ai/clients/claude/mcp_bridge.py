@@ -277,7 +277,45 @@ def _negotiate_protocol(params: dict) -> str:
     )
 
 
+def _on_initialize(msg_id: int | str | None, params: dict) -> bool:
+    try:
+        version = _negotiate_protocol(params)
+    except ValueError as exc:
+        _respond_error(msg_id, _INVALID_PARAMS, str(exc))
+        return True
+    _respond(
+        msg_id,
+        {
+            "protocolVersion": version,
+            "capabilities": {"tools": {"listChanged": False}},
+            "serverInfo": {"name": "loom-ai", "version": "1.0.0"},
+        },
+    )
+    return True
+
+
+def _on_tools_call(msg_id: int | str | None, params: dict) -> bool:
+    tool_name = params.get("name", "")
+    tool_args = params.get("arguments", {})
+    if not isinstance(tool_name, str) or not tool_name:
+        _respond_error(msg_id, _INVALID_PARAMS, "tool name required")
+        return True
+    args = tool_args if isinstance(tool_args, dict) else {}
+    try:
+        content = _handle_tool_call(tool_name, args)
+        _respond(msg_id, {"content": content})
+    except ValueError as exc:
+        _respond_error(msg_id, _INVALID_PARAMS, str(exc))
+    except RuntimeError as exc:
+        _respond_error(msg_id, _INTERNAL_ERROR, str(exc))
+    except Exception as exc:
+        logger.exception("tool call failed")
+        _respond_error(msg_id, _INTERNAL_ERROR, type(exc).__name__)
+    return True
+
+
 def _dispatch(msg: dict) -> bool:
+    """Handle one JSON-RPC message. Returns False to stop the loop."""
     method = msg.get("method", "")
     msg_id = msg.get("id")
     params = msg.get("params") or {}
@@ -285,47 +323,21 @@ def _dispatch(msg: dict) -> bool:
         params = {}
 
     if method == "initialize":
-        try:
-            version = _negotiate_protocol(params)
-        except ValueError as exc:
-            _respond_error(msg_id, _INVALID_PARAMS, str(exc))
-            return True
-        _respond(
-            msg_id,
-            {
-                "protocolVersion": version,
-                "capabilities": {"tools": {"listChanged": False}},
-                "serverInfo": {"name": "loom-ai", "version": "1.0.0"},
-            },
-        )
-    elif method == "notifications/initialized":
-        pass
-    elif method == "tools/list":
+        return _on_initialize(msg_id, params)
+    if method == "notifications/initialized":
+        return True
+    if method == "tools/list":
         _respond(msg_id, {"tools": _TOOLS})
-    elif method == "tools/call":
-        tool_name = params.get("name", "")
-        tool_args = params.get("arguments", {})
-        if not isinstance(tool_name, str) or not tool_name:
-            _respond_error(msg_id, _INVALID_PARAMS, "tool name required")
-            return True
-        try:
-            content = _handle_tool_call(
-                tool_name, tool_args if isinstance(tool_args, dict) else {}
-            )
-            _respond(msg_id, {"content": content})
-        except ValueError as exc:
-            _respond_error(msg_id, _INVALID_PARAMS, str(exc))
-        except RuntimeError as exc:
-            _respond_error(msg_id, _INTERNAL_ERROR, str(exc))
-        except Exception as exc:
-            logger.exception("tool call failed")
-            _respond_error(msg_id, _INTERNAL_ERROR, type(exc).__name__)
-    elif method == "shutdown":
+        return True
+    if method == "tools/call":
+        return _on_tools_call(msg_id, params)
+    if method == "shutdown":
         _respond(msg_id, {})
         return False
-    elif method == "ping":
+    if method == "ping":
         _respond(msg_id, {})
-    elif msg_id is not None:
+        return True
+    if msg_id is not None:
         _respond_error(msg_id, _METHOD_NOT_FOUND, f"Method not found: {method}")
     return True
 
