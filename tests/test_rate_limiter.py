@@ -11,8 +11,8 @@ from unittest.mock import patch
 
 from loom_ai.backends.rate_limiter import (
     ProviderLimits,
-    RateLimitInfo,
     RateLimiter,
+    RateLimitInfo,
 )
 
 # -- helpers ----------------------------------------------------------------
@@ -274,9 +274,7 @@ async def test_provider_specific_limits():
 
 async def test_update_headers_isolated_per_provider():
     limiter = _limiter(rpm=60)
-    await limiter.update_from_headers(
-        "openai", RateLimitInfo(remaining=1)
-    )
+    await limiter.update_from_headers("openai", RateLimitInfo(remaining=1))
 
     bucket_openai = limiter._get_request_bucket("openai")
     bucket_anthropic = limiter._get_request_bucket("anthropic")
@@ -291,9 +289,7 @@ async def test_update_headers_isolated_per_provider():
 async def test_concurrent_acquires_respect_capacity():
     limiter = _limiter(rpm=5)
 
-    results = await asyncio.gather(
-        *[limiter.acquire("openai") for _ in range(5)]
-    )
+    results = await asyncio.gather(*[limiter.acquire("openai") for _ in range(5)])
     assert all(w == 0.0 for w in results)
 
     bucket = limiter._get_request_bucket("openai")
@@ -317,9 +313,7 @@ async def test_concurrent_record_tokens():
     limiter = _limiter(rpm=60, tpm=10000)
     limiter._get_token_bucket("openai")
 
-    await asyncio.gather(
-        *[limiter.record_tokens("openai", 100) for _ in range(10)]
-    )
+    await asyncio.gather(*[limiter.record_tokens("openai", 100) for _ in range(10)])
 
     bucket = limiter._get_token_bucket("openai")
     assert bucket.tokens <= 9001.0

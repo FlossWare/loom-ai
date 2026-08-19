@@ -19,9 +19,7 @@ import urllib.request
 
 logger = logging.getLogger(__name__)
 
-_LOOM_URL = os.environ.get(
-    "LOOM_URL", "http://127.0.0.1:5000"
-).rstrip("/")
+_LOOM_URL = os.environ.get("LOOM_URL", "http://127.0.0.1:5000").rstrip("/")
 _LOOM_KEY = os.environ.get("LOOM_API_KEY", "")
 
 _TOOLS = [
@@ -46,9 +44,7 @@ _TOOLS = [
     },
     {
         "name": "loom_store",
-        "description": (
-            "Store a document in the loom-ai knowledge base."
-        ),
+        "description": ("Store a document in the loom-ai knowledge base."),
         "inputSchema": {
             "type": "object",
             "properties": {
@@ -81,9 +77,7 @@ _TOOLS = [
 ]
 
 
-def _api_request(
-    method: str, path: str, body: dict | None = None
-) -> dict:
+def _api_request(method: str, path: str, body: dict | None = None) -> dict:
     url = f"{_LOOM_URL}{path}"
     data = json.dumps(body).encode() if body is not None else None
     headers: dict[str, str] = {
@@ -92,9 +86,7 @@ def _api_request(
     }
     if _LOOM_KEY:
         headers["Authorization"] = f"Bearer {_LOOM_KEY}"
-    req = urllib.request.Request(
-        url, data=data, headers=headers, method=method
-    )
+    req = urllib.request.Request(url, data=data, headers=headers, method=method)
     try:
         with urllib.request.urlopen(req, timeout=30) as resp:
             return json.loads(resp.read())
@@ -107,19 +99,17 @@ def _api_request(
         return {"error": str(exc)}
 
 
-def _handle_tool_call(
-    name: str, arguments: dict
-) -> list[dict]:
+def _handle_tool_call(name: str, arguments: dict) -> list[dict]:
     try:
         if name == "loom_search":
             q = urllib.parse.quote(arguments["query"])
             limit = int(arguments.get("limit", 10))
-            result = _api_request(
-                "GET", f"/search/text?q={q}&limit={limit}"
-            )
+            result = _api_request("GET", f"/search/text?q={q}&limit={limit}")
         elif name == "loom_store":
             result = _api_request(
-                "POST", "/knowledge/documents", {
+                "POST",
+                "/knowledge/documents",
+                {
                     "title": arguments["title"],
                     "content": arguments["content"],
                     "category": arguments.get("category", ""),
@@ -128,7 +118,9 @@ def _handle_tool_call(
             )
         elif name == "loom_consensus":
             result = _api_request(
-                "POST", "/consensus/synthesize", {
+                "POST",
+                "/consensus/synthesize",
+                {
                     "prompt": arguments["prompt"],
                     "models": arguments["models"],
                 },
@@ -138,9 +130,7 @@ def _handle_tool_call(
     except (KeyError, TypeError) as exc:
         result = {"error": f"Missing required argument: {exc}"}
 
-    return [
-        {"type": "text", "text": json.dumps(result, indent=2)}
-    ]
+    return [{"type": "text", "text": json.dumps(result, indent=2)}]
 
 
 def _write_message(data: dict) -> None:
@@ -177,22 +167,18 @@ def _read_message() -> dict | None:
             continue
 
 
-def _respond(
-    msg_id: int | str | None, result: dict
-) -> None:
+def _respond(msg_id: int | str | None, result: dict) -> None:
+    _write_message({"jsonrpc": "2.0", "id": msg_id, "result": result})
+
+
+def _respond_error(msg_id: int | str | None, code: int, message: str) -> None:
     _write_message(
-        {"jsonrpc": "2.0", "id": msg_id, "result": result}
+        {
+            "jsonrpc": "2.0",
+            "id": msg_id,
+            "error": {"code": code, "message": message},
+        }
     )
-
-
-def _respond_error(
-    msg_id: int | str | None, code: int, message: str
-) -> None:
-    _write_message({
-        "jsonrpc": "2.0",
-        "id": msg_id,
-        "error": {"code": code, "message": message},
-    })
 
 
 def _dispatch(msg: dict) -> bool:
@@ -202,16 +188,19 @@ def _dispatch(msg: dict) -> bool:
     params = msg.get("params", {})
 
     if method == "initialize":
-        _respond(msg_id, {
-            "protocolVersion": "2024-11-05",
-            "capabilities": {
-                "tools": {"listChanged": False},
+        _respond(
+            msg_id,
+            {
+                "protocolVersion": "2024-11-05",
+                "capabilities": {
+                    "tools": {"listChanged": False},
+                },
+                "serverInfo": {
+                    "name": "loom-ai",
+                    "version": "1.0.0",
+                },
             },
-            "serverInfo": {
-                "name": "loom-ai",
-                "version": "1.0.0",
-            },
-        })
+        )
     elif method == "notifications/initialized":
         pass
     elif method == "tools/list":
@@ -226,7 +215,8 @@ def _dispatch(msg: dict) -> bool:
         return False
     elif msg_id is not None:
         _respond_error(
-            msg_id, -32601,
+            msg_id,
+            -32601,
             f"Method not found: {method}",
         )
     return True

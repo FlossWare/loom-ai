@@ -47,10 +47,12 @@ def generate_env(
     model: str = "gpt-4o-mini",
 ) -> str:
     """Generate shell exports for Aider."""
-    return "\n".join([
-        f"export OPENAI_API_BASE={shlex.quote(f'{loom_url}/llm')}",
-        f"export OPENAI_API_KEY={shlex.quote(api_key or 'loom-ai')}",
-    ])
+    return "\n".join(
+        [
+            f"export OPENAI_API_BASE={shlex.quote(f'{loom_url}/llm')}",
+            f"export OPENAI_API_KEY={shlex.quote(api_key or 'loom-ai')}",
+        ]
+    )
 
 
 def generate_cmd(
@@ -72,11 +74,13 @@ def generate_yaml(
     model: str = "gpt-4o-mini",
 ) -> str:
     """Generate .aider.conf.yml content."""
-    return "\n".join([
-        f"openai-api-base: {loom_url}/llm",
-        f"openai-api-key: {api_key or 'loom-ai'}",
-        f"model: openai/{model}",
-    ])
+    return "\n".join(
+        [
+            f"openai-api-base: {loom_url}/llm",
+            f"openai-api-key: {api_key or 'loom-ai'}",
+            f"model: openai/{model}",
+        ]
+    )
 
 
 def main() -> None:
@@ -91,11 +95,16 @@ def main() -> None:
     elif "--yaml" in sys.argv:
         print(generate_yaml(loom_url, api_key, model))
     else:
-        print(json.dumps({
-            "env": generate_env(loom_url, api_key, model),
-            "cmd": generate_cmd(loom_url, api_key, model),
-            "yaml": generate_yaml(loom_url, api_key, model),
-        }, indent=2))
+        print(
+            json.dumps(
+                {
+                    "env": generate_env(loom_url, api_key, model),
+                    "cmd": generate_cmd(loom_url, api_key, model),
+                    "yaml": generate_yaml(loom_url, api_key, model),
+                },
+                indent=2,
+            )
+        )
 
 
 if __name__ == "__main__":

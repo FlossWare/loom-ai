@@ -284,7 +284,9 @@ async function boot() {
             modelSel.appendChild(o);
           });
         }
-      } catch (_) {}
+      } catch (_) {
+        console.warn("Failed to load model list");
+      }
     }
   } catch (e) {
     setStatus(false, "offline");

@@ -65,7 +65,9 @@ def _make_parser() -> argparse.ArgumentParser:
     chat_p.add_argument("-s", "--system", default=None, help="System prompt")
     chat_p.add_argument("--stream", action="store_true", help="Stream response")
     chat_p.add_argument(
-        "--json", action="store_true", dest="json_output",
+        "--json",
+        action="store_true",
+        dest="json_output",
         help="Output raw JSON",
     )
 
@@ -75,7 +77,8 @@ def _make_parser() -> argparse.ArgumentParser:
     cons_p.add_argument("--models", required=True, help="Comma-separated model list")
     cons_p.add_argument("--arbiter", default=None, help="Arbiter model")
     cons_p.add_argument(
-        "--tool", default="design",
+        "--tool",
+        default="design",
         choices=["design", "review", "implement"],
     )
     cons_p.add_argument("-t", "--temperature", type=float, default=0.7)
@@ -159,9 +162,7 @@ def _read_message(args: argparse.Namespace) -> str:
     return message
 
 
-def _build_messages(
-    message: str, system: str | None
-) -> list[dict[str, str]]:
+def _build_messages(message: str, system: str | None) -> list[dict[str, str]]:
     messages: list[dict[str, str]] = []
     if system:
         messages.append({"role": "system", "content": system})
@@ -177,7 +178,8 @@ async def _cmd_chat(client: AnyClient, args: argparse.Namespace) -> None:
     if args.stream:
         try:
             async for token in client.chat_stream(
-                messages, model=model,
+                messages,
+                model=model,
                 temperature=args.temperature,
                 max_tokens=args.max_tokens,
             ):
@@ -188,7 +190,8 @@ async def _cmd_chat(client: AnyClient, args: argparse.Namespace) -> None:
             sys.exit(1)
     else:
         resp = await client.chat(
-            messages, model=model,
+            messages,
+            model=model,
             temperature=args.temperature,
             max_tokens=args.max_tokens,
         )
@@ -253,9 +256,7 @@ async def _cmd_docs(client: AnyClient, args: argparse.Namespace) -> None:
         content = args.content
         if args.file:
             try:
-                content = await asyncio.to_thread(
-                    pathlib.Path(args.file).read_text
-                )
+                content = await asyncio.to_thread(pathlib.Path(args.file).read_text)
             except (FileNotFoundError, PermissionError) as exc:
                 print(f"Error reading file: {exc}", file=sys.stderr)
                 sys.exit(1)
@@ -312,21 +313,16 @@ async def _repl_models(client: AnyClient, current: str) -> None:
 
 async def _repl_consensus(client: AnyClient) -> None:
     try:
-        prompt = (
-            await asyncio.to_thread(input, "prompt> ")
-        ).strip()
+        prompt = (await asyncio.to_thread(input, "prompt> ")).strip()
         model_str = (
-            await asyncio.to_thread(
-                input, "models (comma-separated)> "
-            )
+            await asyncio.to_thread(input, "models (comma-separated)> ")
         ).strip()
         if prompt and model_str:
-            models = [
-                m.strip() for m in model_str.split(",")
-            ]
+            models = [m.strip() for m in model_str.split(",")]
             print("Gathering consensus...", file=sys.stderr)
             resp = await client.consensus_synthesize(
-                prompt, models,
+                prompt,
+                models,
             )
             synthesis = resp.get("synthesis", {})
             print(f"\n{synthesis.get('content', '')}")
@@ -352,10 +348,13 @@ async def _repl_chat(
         messages.insert(-1, msg)
     try:
         resp = await client.chat(
-            messages, model=model or None, temperature=0.7,
+            messages,
+            model=model or None,
+            temperature=0.7,
         )
         content = resp.get(
-            "content", resp.get("response", ""),
+            "content",
+            resp.get("response", ""),
         )
         print(f"\nloom> {content}\n")
         history.append({"role": "user", "content": line})
@@ -378,8 +377,7 @@ async def _repl(client: AnyClient) -> None:
         print(f"LLM backend: {llm}")
     except Exception as exc:
         print(
-            f"Warning: could not connect to "
-            f"{client.base_url}: {exc}",
+            f"Warning: could not connect to {client.base_url}: {exc}",
             file=sys.stderr,
         )
 
@@ -397,9 +395,7 @@ async def _repl(client: AnyClient) -> None:
 
     while True:
         try:
-            line = (
-                await asyncio.to_thread(input, "you> ")
-            ).strip()
+            line = (await asyncio.to_thread(input, "you> ")).strip()
         except (EOFError, KeyboardInterrupt):
             print()
             break
@@ -424,7 +420,11 @@ async def _repl(client: AnyClient) -> None:
             await _repl_consensus(client)
         else:
             await _repl_chat(
-                client, line, history, system_prompt, model,
+                client,
+                line,
+                history,
+                system_prompt,
+                model,
             )
 
 

@@ -99,9 +99,7 @@ class TestGraphFuzz:
         _run(backend.add_node(GraphNode(id=n1_id, label="A", properties={})))
         _run(backend.add_node(GraphNode(id=n2_id, label="B", properties={})))
 
-        edge = GraphEdge(
-            id=edge_id, source=n1_id, target=n2_id, label=edge_label
-        )
+        edge = GraphEdge(id=edge_id, source=n1_id, target=n2_id, label=edge_label)
         result_id = _run(backend.add_edge(edge))
         assert result_id == edge_id
 
@@ -117,7 +115,7 @@ class TestGraphFuzz:
         edge = GraphEdge(
             id=edge_id, source="no-such-node", target="target", label=edge_label
         )
-        with pytest.raises(ValueError):  # NOSONAR — single invocation: _run is a sync wrapper
+        with pytest.raises(ValueError):
             _run(backend.add_edge(edge))
 
     @given(node_id=FUZZ_ID)
@@ -147,7 +145,11 @@ class TestGraphFuzz:
     @given(
         props=st.dictionaries(
             keys=st.text(min_size=1, max_size=50),
-            values=st.one_of(st.text(max_size=200), st.integers(), st.floats(allow_nan=False)),
+            values=st.one_of(
+                st.text(max_size=200),
+                st.integers(),
+                st.floats(allow_nan=False),
+            ),
             max_size=20,
         )
     )
@@ -166,8 +168,7 @@ class TestGraphConcurrency:
     async def test_concurrent_add_nodes(self):
         backend = MemoryGraphBackend()
         nodes = [
-            GraphNode(id=f"cn-{i}", label="Conc", properties={})
-            for i in range(50)
+            GraphNode(id=f"cn-{i}", label="Conc", properties={}) for i in range(50)
         ]
 
         await asyncio.gather(*(backend.add_node(n) for n in nodes))
@@ -178,9 +179,7 @@ class TestGraphConcurrency:
     async def test_concurrent_add_and_delete_nodes(self):
         backend = MemoryGraphBackend()
         for i in range(20):
-            await backend.add_node(
-                GraphNode(id=f"cad-{i}", label="T", properties={})
-            )
+            await backend.add_node(GraphNode(id=f"cad-{i}", label="T", properties={}))
 
         async def add_more():
             for i in range(20, 40):

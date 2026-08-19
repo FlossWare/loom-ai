@@ -223,9 +223,12 @@ class LoomConfigValidator:
     ) -> None:
         if raw is None:
             if spec.required:
-                errors.append(ValidationError(
-                    field=spec.name, message="required but not set",
-                ))
+                errors.append(
+                    ValidationError(
+                        field=spec.name,
+                        message="required but not set",
+                    )
+                )
             else:
                 fallback = env_defaults.get(spec.name, spec.default)
                 if fallback is not None:
@@ -233,11 +236,16 @@ class LoomConfigValidator:
             return
 
         if spec.choices and raw not in spec.choices:
-            errors.append(ValidationError(
-                field=spec.name,
-                message=f"invalid value {raw!r}; valid options: {', '.join(spec.choices)}",
-                value=raw,
-            ))
+            errors.append(
+                ValidationError(
+                    field=spec.name,
+                    message=(
+                        f"invalid value {raw!r};"
+                        f" valid options: {', '.join(spec.choices)}"
+                    ),
+                    value=raw,
+                )
+            )
             return
 
         if spec.value_type is int:
@@ -262,7 +270,11 @@ class LoomConfigValidator:
 
         for spec in self._fields:
             self._validate_field(
-                spec, source.get(spec.name), env_defaults, errors, resolved,
+                spec,
+                source.get(spec.name),
+                env_defaults,
+                errors,
+                resolved,
             )
 
         self._check_dependencies(resolved, source, errors)
@@ -297,20 +309,24 @@ class LoomConfigValidator:
         if secrets == "dotenv":
             secrets_file = source.get("LOOM_SECRETS_FILE", ".env")
             if not secrets_file:
-                errors.append(ValidationError(
-                    field="LOOM_SECRETS_FILE",
-                    message=(
-                        "LOOM_SECRETS=dotenv requires a non-empty "
-                        "LOOM_SECRETS_FILE path"
-                    ),
-                ))
+                errors.append(
+                    ValidationError(
+                        field="LOOM_SECRETS_FILE",
+                        message=(
+                            "LOOM_SECRETS=dotenv requires a non-empty "
+                            "LOOM_SECRETS_FILE path"
+                        ),
+                    )
+                )
 
         llm_url = resolved.get("LOOM_LLM_BASE_URL")
         if llm_url is not None and not llm_url:
-            errors.append(ValidationError(
-                field="LOOM_LLM_BASE_URL",
-                message="must be a non-empty URL when set",
-            ))
+            errors.append(
+                ValidationError(
+                    field="LOOM_LLM_BASE_URL",
+                    message="must be a non-empty URL when set",
+                )
+            )
 
     def _check_environment_warnings(
         self,
@@ -340,11 +356,13 @@ class LoomConfigValidator:
         except ValueError:
             return
         if port < 1 or port > 65535:
-            errors.append(ValidationError(
-                field="LOOM_PORT",
-                message=f"port {port} outside valid range 1-65535",
-                value=raw,
-            ))
+            errors.append(
+                ValidationError(
+                    field="LOOM_PORT",
+                    message=f"port {port} outside valid range 1-65535",
+                    value=raw,
+                )
+            )
 
 
 def validate_env(

@@ -56,7 +56,9 @@ def generate_full_config(
     return {
         "models": [generate_model_config(loom_url, api_key, model)],
         "tabAutocompleteModel": generate_model_config(
-            loom_url, api_key, model,
+            loom_url,
+            api_key,
+            model,
             title="loom-ai-autocomplete",
         ),
     }
