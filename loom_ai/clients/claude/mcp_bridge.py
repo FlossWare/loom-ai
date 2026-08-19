@@ -5,6 +5,10 @@ Run as ``python -m loom_ai.clients.claude.mcp_bridge`` or reference in
 claude_desktop_config.json as an MCP server.
 
 Protocol: JSON-RPC 2.0 over stdin/stdout with Content-Length framing.
+
+Supported MCP protocol versions: 2024-11-05, 2025-03-26.
+The server negotiates by echoing the client's version if supported,
+otherwise falling back to the latest supported version.
 """
 
 from __future__ import annotations
@@ -18,6 +22,9 @@ import urllib.parse
 import urllib.request
 
 logger = logging.getLogger(__name__)
+
+_SUPPORTED_VERSIONS = ["2024-11-05", "2025-03-26"]
+_LATEST_VERSION = _SUPPORTED_VERSIONS[-1]
 
 _LOOM_URL = os.environ.get(
     "LOOM_URL", "http://127.0.0.1:5000"
@@ -80,6 +87,16 @@ _TOOLS = [
     },
 ]
 
+_TYPE_CHECKS: dict[str, type] = {
+    "string": str,
+    "integer": int,
+    "array": list,
+}
+
+
+class _ToolError(Exception):
+    """Transport or tool-execution error (distinct from successful results)."""
+
 
 def _api_request(
     method: str, path: str, body: dict | None = None
@@ -100,17 +117,42 @@ def _api_request(
             return json.loads(resp.read())
     except urllib.error.HTTPError as exc:
         body_text = exc.read(4096).decode(errors="replace")
-        return {"error": f"HTTP {exc.code}: {body_text}"}
+        raise _ToolError(f"HTTP {exc.code}: {body_text}") from exc
     except urllib.error.URLError as exc:
-        return {"error": f"Connection failed: {exc.reason}"}
+        raise _ToolError(f"Connection failed: {exc.reason}") from exc
     except Exception as exc:
-        return {"error": str(exc)}
+        raise _ToolError(str(exc)) from exc
+
+
+def _validate_arguments(name: str, arguments: dict) -> None:
+    """Validate tool arguments against the schema in _TOOLS."""
+    if not isinstance(arguments, dict):
+        raise _ToolError("Arguments must be a key-value object")
+
+    tool_def = next((t for t in _TOOLS if t["name"] == name), None)
+    if tool_def is None:
+        raise _ToolError(f"Unknown tool: {name}")
+
+    schema = tool_def.get("inputSchema", {})
+    properties = schema.get("properties", {})
+    for req_field in schema.get("required", []):
+        if req_field not in arguments:
+            raise _ToolError(f"Missing required argument: {req_field}")
+        expected_type = properties.get(req_field, {}).get("type")
+        if expected_type in _TYPE_CHECKS:
+            if not isinstance(arguments[req_field], _TYPE_CHECKS[expected_type]):
+                raise _ToolError(
+                    f"Argument '{req_field}' must be {expected_type}"
+                )
 
 
 def _handle_tool_call(
     name: str, arguments: dict
-) -> list[dict]:
+) -> dict:
+    """Execute a tool call. Returns MCP-format result dict with content list."""
     try:
+        _validate_arguments(name, arguments)
+
         if name == "loom_search":
             q = urllib.parse.quote(arguments["query"])
             limit = int(arguments.get("limit", 10))
@@ -134,13 +176,20 @@ def _handle_tool_call(
                 },
             )
         else:
-            result = {"error": f"Unknown tool: {name}"}
-    except (KeyError, TypeError) as exc:
-        result = {"error": f"Missing required argument: {exc}"}
+            raise _ToolError(f"Unknown tool: {name}")
 
-    return [
-        {"type": "text", "text": json.dumps(result, indent=2)}
-    ]
+        return {
+            "content": [
+                {"type": "text", "text": json.dumps(result, indent=2)}
+            ],
+        }
+    except _ToolError as exc:
+        return {
+            "content": [
+                {"type": "text", "text": str(exc)}
+            ],
+            "isError": True,
+        }
 
 
 def _write_message(data: dict) -> None:
@@ -152,8 +201,15 @@ def _write_message(data: dict) -> None:
     sys.stdout.buffer.flush()
 
 
-def _read_message() -> dict | None:
-    """Read a Content-Length–framed JSON-RPC message from stdin."""
+_PARSE_ERROR = "parse_error"
+
+
+def _read_message() -> dict | str | None:
+    """Read a Content-Length-framed JSON-RPC message from stdin.
+
+    Returns the parsed dict, None on EOF, or _PARSE_ERROR after sending
+    a JSON-RPC error response (the caller should skip and read again).
+    """
     buf = sys.stdin.buffer
     while True:
         header_line = buf.readline()
@@ -161,18 +217,34 @@ def _read_message() -> dict | None:
             return None
         header = header_line.decode("utf-8").strip()
         if header.startswith("Content-Length:"):
-            length = int(header.split(":", 1)[1].strip())
+            try:
+                length = int(header.split(":", 1)[1].strip())
+                if length <= 0:
+                    raise ValueError("must be positive")
+            except (ValueError, IndexError):
+                _respond_error(
+                    None, -32700,
+                    f"Parse error: invalid Content-Length in '{header}'",
+                )
+                return _PARSE_ERROR
             while True:
                 sep = buf.readline()
                 if sep.strip() == b"":
                     break
             body = buf.read(length)
-            if not body:
-                return None
+            if len(body) < length:
+                _respond_error(
+                    None, -32700,
+                    f"Parse error: expected {length} bytes, got {len(body)}",
+                )
+                return _PARSE_ERROR
             try:
                 return json.loads(body)
-            except json.JSONDecodeError:
-                return None
+            except json.JSONDecodeError as exc:
+                _respond_error(
+                    None, -32700, f"Parse error: {exc.msg}"
+                )
+                return _PARSE_ERROR
         elif header == "":
             continue
 
@@ -197,13 +269,32 @@ def _respond_error(
 
 def _dispatch(msg: dict) -> bool:
     """Handle one JSON-RPC message. Returns False to stop the loop."""
-    method = msg.get("method", "")
     msg_id = msg.get("id")
+
+    if "method" not in msg:
+        _respond_error(
+            msg_id, -32600, "Invalid Request: missing 'method'"
+        )
+        return True
+
+    method = msg["method"]
     params = msg.get("params", {})
 
     if method == "initialize":
+        client_version = params.get("protocolVersion")
+        if client_version in _SUPPORTED_VERSIONS:
+            negotiated = client_version
+        else:
+            negotiated = _LATEST_VERSION
+            if client_version:
+                logger.warning(
+                    "Unsupported protocol version '%s', "
+                    "falling back to '%s'",
+                    client_version, _LATEST_VERSION,
+                )
+
         _respond(msg_id, {
-            "protocolVersion": "2024-11-05",
+            "protocolVersion": negotiated,
             "capabilities": {
                 "tools": {"listChanged": False},
             },
@@ -219,8 +310,8 @@ def _dispatch(msg: dict) -> bool:
     elif method == "tools/call":
         tool_name = params.get("name", "")
         tool_args = params.get("arguments", {})
-        content = _handle_tool_call(tool_name, tool_args)
-        _respond(msg_id, {"content": content})
+        result = _handle_tool_call(tool_name, tool_args)
+        _respond(msg_id, result)
     elif method == "shutdown":
         _respond(msg_id, {})
         return False
@@ -233,9 +324,17 @@ def _dispatch(msg: dict) -> bool:
 
 
 def main() -> None:
+    logging.basicConfig(
+        level=os.environ.get("LOG_LEVEL", "WARNING").upper(),
+        stream=sys.stderr,
+    )
     while True:
         msg = _read_message()
-        if msg is None or not _dispatch(msg):
+        if msg is None:
+            break
+        if msg is _PARSE_ERROR:
+            continue
+        if not _dispatch(msg):
             break
 
 
