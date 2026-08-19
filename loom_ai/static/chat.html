@@ -11,7 +11,7 @@
     --surface2: #242424;
     --border: #333;
     --text: #e8e8e8;
-    --muted: #9a9a9a;
+    --muted: #b0b0b0;
     --accent: #d97757;
     --accent-dim: #b45c3f;
     --danger: #e85d5d;
@@ -20,6 +20,7 @@
     --mono: ui-monospace, "Cascadia Code", "SF Mono", Menlo, monospace;
   }
   * { box-sizing: border-box; margin: 0; padding: 0; }
+  .sr-only { position: absolute; width: 1px; height: 1px; padding: 0; margin: -1px; overflow: hidden; clip: rect(0,0,0,0); border: 0; }
   html, body { height: 100%; }
   body {
     font-family: var(--font);
@@ -87,7 +88,7 @@
     flex: 1;
     min-width: 0;
     white-space: pre-wrap;
-    word-break: break-word;
+    overflow-wrap: break-word;
   }
   .msg .body pre {
     background: var(--surface2);
@@ -238,6 +239,7 @@
       <label><input type="checkbox" id="stream" checked/> stream</label>
     </div>
     <div class="composer">
+      <label for="input" class="sr-only">Message</label>
       <textarea id="input" rows="1" placeholder="Message Loom…" autofocus></textarea>
       <button id="send" title="Send" aria-label="Send">
         <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M5 12h14M13 6l6 6-6 6"/></svg>
@@ -246,7 +248,7 @@
     <p class="hint">Enter to send · Shift+Enter for newline · Auth via LOOM_API_KEY if set</p>
   </div>
 </footer>
-<script>
+<script type="module">
 const API_KEY = new URLSearchParams(location.search).get("key") || localStorage.getItem("loom_api_key") || "";
 const messagesEl = document.getElementById("messages");
 const input = document.getElementById("input");
@@ -264,7 +266,10 @@ function headers() {
 }
 
 function setStatus(ok, text) {
-  document.getElementById("dot").className = "dot " + (ok === true ? "ok" : ok === false ? "err" : "");
+  let cls = "";
+  if (ok === true) cls = "ok";
+  else if (ok === false) cls = "err";
+  document.getElementById("dot").className = "dot " + cls;
   document.getElementById("statusText").textContent = text;
 }
 
@@ -284,7 +289,7 @@ async function boot() {
             modelSel.appendChild(o);
           });
         }
-      } catch (_) {}
+      } catch (_) { /* model list unavailable — non-critical */ }
     }
   } catch (e) {
     setStatus(false, "offline");
@@ -292,7 +297,7 @@ async function boot() {
 }
 
 function escapeHtml(s) {
-  return s.replace(/&/g,"&amp;").replace(/</g,"&lt;").replace(/>/g,"&gt;");
+  return s.replaceAll("&","&amp;").replaceAll("<","&lt;").replaceAll(">","&gt;");
 }
 
 function renderMarkdownLite(text) {
@@ -330,6 +335,55 @@ function autosize() {
 }
 input.addEventListener("input", autosize);
 
+async function chatNonStream(payload) {
+  const r = await fetch("/llm/chat", {
+    method: "POST",
+    headers: headers(),
+    body: JSON.stringify(payload),
+  });
+  if (!r.ok) throw new Error(await r.text() || r.statusText);
+  const j = await r.json();
+  return j.content || j.response || JSON.stringify(j);
+}
+
+async function chatStream(payload, bodyEl) {
+  const r = await fetch("/llm/chat/stream", {
+    method: "POST",
+    headers: headers(),
+    body: JSON.stringify(payload),
+  });
+  if (!r.ok) {
+    const err = await r.text();
+    throw new Error(err || r.statusText);
+  }
+  const reader = r.body.getReader();
+  const dec = new TextDecoder();
+  let acc = "";
+  bodyEl.textContent = "";
+  while (true) {
+    const { done, value } = await reader.read();
+    if (done) break;
+    const chunk = dec.decode(value, { stream: true });
+    for (const line of chunk.split("\n")) {
+      if (!line.startsWith("data: ")) continue;
+      const data = line.slice(6);
+      if (data === "[DONE]") continue;
+      try {
+        const j = JSON.parse(data);
+        acc += j.delta || j.content || "";
+      } catch { acc += data; }
+      bodyEl.innerHTML = renderMarkdownLite(acc);
+      messagesEl.scrollTop = messagesEl.scrollHeight;
+    }
+  }
+  if (!acc) throw new Error("empty stream");
+  return acc;
+}
+
+function showError(bodyEl, err) {
+  bodyEl.innerHTML = `<span style="color:var(--danger)">Error: ${escapeHtml(String(err.message || err))}</span>`;
+}
+
 async function send() {
   const text = input.value.trim();
   if (!text || sendBtn.disabled) return;
@@ -349,73 +403,21 @@ async function send() {
   if (modelSel.value) payload.model = modelSel.value;
 
   try {
-    if (streamChk.checked) {
-      const r = await fetch("/llm/chat/stream", {
-        method: "POST",
-        headers: headers(),
-        body: JSON.stringify(payload),
-      });
-      if (!r.ok) {
-        const err = await r.text();
-        throw new Error(err || r.statusText);
-      }
-      const reader = r.body.getReader();
-      const dec = new TextDecoder();
-      let acc = "";
-      bodyEl.textContent = "";
-      while (true) {
-        const { done, value } = await reader.read();
-        if (done) break;
-        const chunk = dec.decode(value, { stream: true });
-        for (const line of chunk.split("\n")) {
-          if (line.startsWith("data: ")) {
-            const data = line.slice(6);
-            if (data === "[DONE]") continue;
-            try {
-              const j = JSON.parse(data);
-              const delta = j.delta || j.content || "";
-              acc += delta;
-              bodyEl.innerHTML = renderMarkdownLite(acc);
-              messagesEl.scrollTop = messagesEl.scrollHeight;
-            } catch {
-              acc += data;
-              bodyEl.innerHTML = renderMarkdownLite(acc);
-            }
-          }
-        }
-      }
-      if (!acc) throw new Error("empty stream");
-      history.push({ role: "assistant", content: acc });
-    } else {
-      const r = await fetch("/llm/chat", {
-        method: "POST",
-        headers: headers(),
-        body: JSON.stringify(payload),
-      });
-      if (!r.ok) throw new Error(await r.text() || r.statusText);
-      const j = await r.json();
-      const content = j.content || j.response || JSON.stringify(j);
-      bodyEl.innerHTML = renderMarkdownLite(content);
-      history.push({ role: "assistant", content });
-    }
+    const content = streamChk.checked
+      ? await chatStream(payload, bodyEl)
+      : await chatNonStream(payload);
+    bodyEl.innerHTML = renderMarkdownLite(content);
+    history.push({ role: "assistant", content });
   } catch (e) {
-    if (String(e.message).includes("404") || String(e).includes("empty stream")) {
+    const isRetryable = String(e.message).includes("404") || String(e).includes("empty stream");
+    if (isRetryable) {
       try {
-        const r = await fetch("/llm/chat", {
-          method: "POST",
-          headers: headers(),
-          body: JSON.stringify(payload),
-        });
-        if (!r.ok) throw new Error(await r.text() || r.statusText);
-        const j = await r.json();
-        const content = j.content || j.response || JSON.stringify(j);
+        const content = await chatNonStream(payload);
         bodyEl.innerHTML = renderMarkdownLite(content);
         history.push({ role: "assistant", content });
-      } catch (e2) {
-        bodyEl.innerHTML = `<span style="color:var(--danger)">Error: ${escapeHtml(String(e2.message || e2))}</span>`;
-      }
+      } catch (fallbackError) { showError(bodyEl, fallbackError); }
     } else {
-      bodyEl.innerHTML = `<span style="color:var(--danger)">Error: ${escapeHtml(String(e.message || e))}</span>`;
+      showError(bodyEl, e);
     }
   } finally {
     sendBtn.disabled = false;
@@ -432,13 +434,13 @@ input.addEventListener("keydown", (e) => {
 });
 document.querySelectorAll(".suggestions button").forEach(btn => {
   btn.addEventListener("click", () => {
-    input.value = btn.getAttribute("data-q");
+    input.value = btn.dataset.q;
     autosize();
     send();
   });
 });
 
-boot();
+await boot();
 </script>
 </body>
 </html>
