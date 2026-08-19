@@ -21,52 +21,62 @@ except ImportError as _exc:
     ) from _exc
 
 if TYPE_CHECKING:
-    from loom_ai.models import GraphEdge, GraphNode
+    from loom_ai.models_phase4 import (
+        Claim,
+        KnowledgeEntity,
+        KnowledgeRelationship,
+        SubgraphResult,
+    )
 
-_SAFE_ID = re.compile(r"^[\w.-]+$")
+_SAFE_RID = re.compile(r"^#\d+:\d+$")
 
 
 def _escape(value: str) -> str:
+    """Escape single quotes for OrientDB SQL string literals."""
     return value.replace("\\", "\\\\").replace("'", "\\'")
 
 
-def _safe_id(value: str) -> str:
-    if not _SAFE_ID.match(value):
-        raise ValueError(f"unsafe graph identifier: {value!r}")
-    return value
+def _validate_rid(rid: str) -> str:
+    """Validate an OrientDB record ID (#cluster:position)."""
+    if not _SAFE_RID.match(rid):
+        raise ValueError(f"Invalid OrientDB record ID: {rid!r}")
+    return rid
 
 
 class OrientDBGraphBackend:
     """OrientDB-backed knowledge graph.
 
-    Satisfies :class:`~loom_ai.contracts_phase4.KnowledgeGraph` via structural
-    subtyping.
+    Satisfies :class:`~loom_ai.contracts_phase4.KnowledgeGraph` via
+    structural subtyping.
     """
 
-    def __init__(self, client: object, *, db_name: str = "loom") -> None:
+    def __init__(self, *, client: pyorient.OrientDB, db_name: str) -> None:
         self._client = client
         self._db_name = db_name
 
+    async def close(self) -> None:
+        """Close the underlying OrientDB connection."""
+        await asyncio.to_thread(self._client.shutdown)
+
     @classmethod
     async def from_env(cls) -> OrientDBGraphBackend:
-        host = os.environ.get("LOOM_ORIENTDB_HOST", "localhost")
-        port = int(os.environ.get("LOOM_ORIENTDB_PORT", "2424"))
-        user = os.environ.get("LOOM_ORIENTDB_USER", "root")
-        password = os.environ.get("LOOM_ORIENTDB_PASSWORD", "")
-        db_name = os.environ.get("LOOM_ORIENTDB_DB", "loom")
+        """Build from environment variables (all blocking I/O runs in a thread)."""
 
-        def _connect() -> object:
+        def _connect() -> OrientDBGraphBackend:
+            host = os.environ.get("ORIENTDB_HOST", "localhost")
+            port = int(os.environ.get("ORIENTDB_PORT", "2424"))
+            user = os.environ.get("ORIENTDB_USER", "root")
+            password = os.environ.get("ORIENTDB_PASSWORD", "")
+            db_name = os.environ.get("ORIENTDB_DB", "loom_ai")
             client = pyorient.OrientDB(host, port)
             client.connect(user, password)
-            if not client.db_exists(db_name):
-                client.db_create(db_name, pyorient.DB_TYPE_GRAPH)
-            client.db_open(db_name, user, password)
-            return client
+            if client.db_exists(db_name):
+                client.db_open(db_name, user, password)
+            return cls(client=client, db_name=db_name)
 
-        client = await asyncio.to_thread(_connect)
-        return cls(client, db_name=db_name)
+        return await asyncio.to_thread(_connect)
 
-    async def add_node(self, entity: GraphNode) -> str:
+    async def add_entity(self, entity: KnowledgeEntity) -> str:
         label = _escape(entity.label)
         etype = _escape(entity.entity_type)
         cmd = (
@@ -75,56 +85,70 @@ class OrientDBGraphBackend:
         )
         result = await asyncio.to_thread(self._client.command, cmd)
         rid = str(result[0]._rid) if result else entity.id or ""
+        entity.id = rid
         return rid
 
-    async def get_node(self, node_id: str) -> GraphNode | None:
-        from loom_ai.models import GraphNode
-
-        rid = _safe_id(node_id)
-        result = await asyncio.to_thread(
-            self._client.command, f"SELECT FROM {rid}"
+    async def get_entity(self, entity_id: str) -> KnowledgeEntity | None:
+        _validate_rid(entity_id)
+        results = await asyncio.to_thread(
+            self._client.command,
+            f"SELECT FROM KnowledgeEntity WHERE @rid = {entity_id}",
         )
-        if not result:
+        if not results:
             return None
-        row = result[0]
-        return GraphNode(
-            id=str(row._rid),
-            label=getattr(row, "label", ""),
-            entity_type=getattr(row, "entity_type", ""),
-            properties={},
+        from loom_ai.models_phase4 import KnowledgeEntity as KE
+
+        rec = results[0]
+        return KE(
+            id=str(rec._rid),
+            label=rec.label,
+            entity_type=rec.entity_type,
         )
 
-    async def get_neighbors(
-        self, node_id: str, *, edge_label: str | None = None
-    ) -> list[GraphNode]:
-        from loom_ai.models import GraphNode
-
-        rid = _safe_id(node_id)
-        if edge_label:
-            el = _escape(edge_label)
-            query = f"SELECT expand(out('{el}')) FROM {rid}"
-        else:
-            query = f"SELECT expand(out()) FROM {rid}"
-        result = await asyncio.to_thread(self._client.command, query)
-        nodes: list[GraphNode] = []
-        for row in result or []:
-            nodes.append(
-                GraphNode(
-                    id=str(row._rid),
-                    label=getattr(row, "label", ""),
-                    entity_type=getattr(row, "entity_type", ""),
-                    properties={},
-                )
-            )
-        return nodes
-
-    async def add_edge(self, edge: GraphEdge) -> str:
-        src = _safe_id(edge.source)
-        tgt = _safe_id(edge.target)
-        label = _escape(edge.label)
-        cmd = f"CREATE EDGE {label} FROM {src} TO {tgt}"
+    async def add_relationship(self, relationship: KnowledgeRelationship) -> str:
+        _validate_rid(relationship.source_id)
+        _validate_rid(relationship.target_id)
+        rtype = _escape(relationship.relation_type)
+        cmd = (
+            f"CREATE EDGE KnowledgeRelationship FROM {relationship.source_id} "
+            f"TO {relationship.target_id} SET relation_type = '{rtype}'"
+        )
         result = await asyncio.to_thread(self._client.command, cmd)
-        return str(result[0]._rid) if result else edge.id or ""
+        rid = str(result[0]._rid) if result else relationship.id or ""
+        relationship.id = rid
+        return rid
 
-    async def close(self) -> None:
-        await asyncio.to_thread(self._client.close)
+    async def add_claim(self, claim: Claim) -> str:
+        subject = _escape(claim.subject_id)
+        predicate = _escape(claim.predicate)
+        value = _escape(claim.value)
+        cmd = (
+            f"INSERT INTO Claim SET subject_id = '{subject}', "
+            f"predicate = '{predicate}', value = '{value}'"
+        )
+        result = await asyncio.to_thread(self._client.command, cmd)
+        rid = str(result[0]._rid) if result else claim.id or ""
+        claim.id = rid
+        return rid
+
+    async def search_entities(
+        self,
+        query: str,
+        *,
+        entity_type: str | None = None,
+        limit: int = 10,
+    ) -> list[KnowledgeEntity]:
+        from loom_ai.models_phase4 import KnowledgeEntity as KE
+
+        escaped_q = _escape(query)
+        where = f"WHERE label LIKE '%{escaped_q}%'"
+        if entity_type:
+            where += f" AND entity_type = '{_escape(entity_type)}'"
+        results = await asyncio.to_thread(
+            self._client.command,
+            f"SELECT FROM KnowledgeEntity {where} LIMIT {limit}",
+        )
+        return [
+            KE(id=str(r._rid), label=r.label, entity_type=r.entity_type)
+            for r in results
+        ]
