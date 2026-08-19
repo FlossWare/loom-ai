@@ -6,12 +6,14 @@ claude_desktop_config.json as an MCP server.
 
 Protocol: JSON-RPC 2.0 over stdin/stdout with Content-Length framing.
 
-Supported MCP protocol versions (negotiation via ``initialize``)::
+Implemented MCP protocol compatibility set (negotiation via ``initialize``)::
 
-    - 2024-11-05 (legacy)
-    - 2025-03-26 (current family)
+    - 2024-11-05
+    - 2025-03-26
 
-Unsupported client versions receive a JSON-RPC error; the bridge stays up.
+These are the versions this bridge implements, not a claim about the
+latest upstream MCP revision. Unsupported client versions receive a
+JSON-RPC error; the bridge stays up.
 Malformed Content-Length / JSON produce protocol errors, not silent EOF.
 """
 
@@ -240,13 +242,9 @@ def _read_message() -> dict | None:
             try:
                 length = int(header.split(":", 1)[1].strip())
             except ValueError as exc:
-                raise _FramingError(
-                    f"invalid Content-Length: {header!r}"
-                ) from exc
+                raise _FramingError(f"invalid Content-Length: {header!r}") from exc
             if length < 0 or length > _MAX_CONTENT_LENGTH:
-                raise _FramingError(
-                    f"Content-Length out of range: {length}"
-                )
+                raise _FramingError(f"Content-Length out of range: {length}")
 
     if length is None:
         return _read_message()
