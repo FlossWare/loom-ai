@@ -472,7 +472,7 @@ class InMemoryCapabilityBackend:
     async def health(self, name: str | None = None) -> dict[str, bool]:
         if name is not None:
             return {name: name in self._capabilities}
-        return {n: True for n in self._capabilities}
+        return dict.fromkeys(self._capabilities, True)
 
     async def supports(self, name: str) -> bool:
         return name in self._capabilities

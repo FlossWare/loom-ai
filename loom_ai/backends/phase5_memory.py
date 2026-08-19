@@ -77,7 +77,7 @@ class InMemoryEvalSuite:
         dataset: EvalDataset,
         *,
         model: str | None = None,
-        evaluators: list[str] | None = None,
+        _evaluators: list[str] | None = None,
         config: dict | None = None,
     ) -> EvalRunResult:
         self._datasets[dataset.id] = dataset
