@@ -199,6 +199,36 @@ def _write_message(data: dict) -> None:
 _PARSE_ERROR = "parse_error"
 
 
+def _parse_content_length(header: str) -> int:
+    """Extract and validate Content-Length value. Raises ValueError on bad input."""
+    length = int(header.split(":", 1)[1].strip())
+    if length <= 0:
+        raise ValueError("must be positive")
+    if length > _MAX_MESSAGE_SIZE:
+        raise ValueError("exceeds maximum message size")
+    return length
+
+
+def _read_framed_body(buf, length: int) -> dict | str:
+    """Read and parse a JSON body of exactly *length* bytes."""
+    while True:
+        sep = buf.readline()
+        if sep.strip() == b"":
+            break
+    body = buf.read(length)
+    if len(body) < length:
+        _respond_error(
+            None, -32700,
+            f"Parse error: expected {length} bytes, got {len(body)}",
+        )
+        return _PARSE_ERROR
+    try:
+        return json.loads(body)
+    except json.JSONDecodeError as exc:
+        _respond_error(None, -32700, f"Parse error: {exc.msg}")
+        return _PARSE_ERROR
+
+
 def _read_message() -> dict | str | None:
     """Read a Content-Length-framed JSON-RPC message from stdin.
 
@@ -211,39 +241,19 @@ def _read_message() -> dict | str | None:
         if not header_line:
             return None
         header = header_line.decode("utf-8").strip()
-        if header.startswith("Content-Length:"):
-            try:
-                length = int(header.split(":", 1)[1].strip())
-                if length <= 0:
-                    raise ValueError("must be positive")
-                if length > _MAX_MESSAGE_SIZE:
-                    raise ValueError("exceeds maximum message size")
-            except (ValueError, IndexError):
-                _respond_error(
-                    None,
-                    -32700,
-                    f"Parse error: invalid Content-Length in '{header}'",
-                )
-                return _PARSE_ERROR
-            while True:
-                sep = buf.readline()
-                if sep.strip() == b"":
-                    break
-            body = buf.read(length)
-            if len(body) < length:
-                _respond_error(
-                    None,
-                    -32700,
-                    f"Parse error: expected {length} bytes, got {len(body)}",
-                )
-                return _PARSE_ERROR
-            try:
-                return json.loads(body)
-            except json.JSONDecodeError as exc:
-                _respond_error(None, -32700, f"Parse error: {exc.msg}")
-                return _PARSE_ERROR
-        elif header == "":
+        if not header:
             continue
+        if not header.startswith("Content-Length:"):
+            continue
+        try:
+            length = _parse_content_length(header)
+        except (ValueError, IndexError):
+            _respond_error(
+                None, -32700,
+                f"Parse error: invalid Content-Length in '{header}'",
+            )
+            return _PARSE_ERROR
+        return _read_framed_body(buf, length)
 
 
 def _respond(msg_id: int | str | None, result: dict) -> None:
@@ -260,6 +270,37 @@ def _respond_error(msg_id: int | str | None, code: int, message: str) -> None:
     )
 
 
+def _on_initialize(msg_id, params):
+    client_version = params.get("protocolVersion")
+    supported = client_version in _SUPPORTED_VERSIONS
+    negotiated = client_version if supported else _LATEST_VERSION
+    if client_version and not supported:
+        logger.warning(
+            "Unsupported protocol version '%s', falling back to '%s'",
+            client_version, _LATEST_VERSION,
+        )
+    _respond(msg_id, {
+        "protocolVersion": negotiated,
+        "capabilities": {"tools": {"listChanged": False}},
+        "serverInfo": {"name": "loom-ai", "version": "1.0.0"},
+    })
+
+
+def _on_tools_call(msg_id, params):
+    tool_name = params.get("name", "")
+    tool_args = params.get("arguments", {})
+    result = _handle_tool_call(tool_name, tool_args)
+    _respond(msg_id, result)
+
+
+_METHOD_HANDLERS = {
+    "initialize": _on_initialize,
+    "notifications/initialized": lambda _id, _p: None,
+    "tools/list": lambda msg_id, _p: _respond(msg_id, {"tools": _TOOLS}),
+    "tools/call": _on_tools_call,
+}
+
+
 def _dispatch(msg: dict) -> bool:
     """Handle one JSON-RPC message. Returns False to stop the loop."""
     msg_id = msg.get("id")
@@ -269,52 +310,15 @@ def _dispatch(msg: dict) -> bool:
         return True
 
     method = msg["method"]
-    params = msg.get("params", {})
-
-    if method == "initialize":
-        client_version = params.get("protocolVersion")
-        if client_version in _SUPPORTED_VERSIONS:
-            negotiated = client_version
-        else:
-            negotiated = _LATEST_VERSION
-            if client_version:
-                logger.warning(
-                    "Unsupported protocol version '%s', falling back to '%s'",
-                    client_version,
-                    _LATEST_VERSION,
-                )
-
-        _respond(
-            msg_id,
-            {
-                "protocolVersion": negotiated,
-                "capabilities": {
-                    "tools": {"listChanged": False},
-                },
-                "serverInfo": {
-                    "name": "loom-ai",
-                    "version": "1.0.0",
-                },
-            },
-        )
-    elif method == "notifications/initialized":
-        pass
-    elif method == "tools/list":
-        _respond(msg_id, {"tools": _TOOLS})
-    elif method == "tools/call":
-        tool_name = params.get("name", "")
-        tool_args = params.get("arguments", {})
-        result = _handle_tool_call(tool_name, tool_args)
-        _respond(msg_id, result)
-    elif method == "shutdown":
+    if method == "shutdown":
         _respond(msg_id, {})
         return False
+
+    handler = _METHOD_HANDLERS.get(method)
+    if handler is not None:
+        handler(msg_id, msg.get("params", {}))
     elif msg_id is not None:
-        _respond_error(
-            msg_id,
-            -32601,
-            f"Method not found: {method}",
-        )
+        _respond_error(msg_id, -32601, f"Method not found: {method}")
     return True
 
 
