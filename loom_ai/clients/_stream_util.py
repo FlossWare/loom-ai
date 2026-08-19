@@ -6,9 +6,37 @@ import asyncio
 import json
 import logging
 import urllib.request
-from typing import Any
 
 logger = logging.getLogger(__name__)
+
+
+def _delta_from_chunk(chunk: dict) -> str:
+    """Extract a text delta from an SSE JSON payload."""
+    if "error" in chunk and not chunk.get("choices"):
+        raise RuntimeError(str(chunk.get("error") or "stream error"))
+    choice = chunk.get("choices", [{}])[0]
+    delta = choice.get("delta", {}).get("content", "")
+    if delta:
+        return str(delta)
+    raw = chunk.get("delta")
+    return str(raw) if raw else ""
+
+
+def _handle_data_line(
+    payload: str,
+    queue: asyncio.Queue,
+    loop: asyncio.AbstractEventLoop,
+) -> bool:
+    """Process one SSE data payload. Return False to stop the stream."""
+    if payload == "[DONE]":
+        return False
+    try:
+        delta = _delta_from_chunk(json.loads(payload))
+    except json.JSONDecodeError:
+        return True
+    if delta:
+        loop.call_soon_threadsafe(queue.put_nowait, delta)
+    return True
 
 
 def run_stream_producer(
@@ -24,21 +52,8 @@ def run_stream_producer(
                 line = raw_line.decode(errors="replace").strip()
                 if not line.startswith("data: "):
                     continue
-                payload = line[6:]
-                if payload == "[DONE]":
+                if not _handle_data_line(line[6:], queue, loop):
                     break
-                try:
-                    chunk = json.loads(payload)
-                except json.JSONDecodeError:
-                    continue
-                if "error" in chunk and not chunk.get("choices"):
-                    raise RuntimeError(str(chunk.get("error") or "stream error"))
-                choice = chunk.get("choices", [{}])[0]
-                delta = choice.get("delta", {}).get("content", "")
-                if not delta and "delta" in chunk:
-                    delta = chunk.get("delta") or ""
-                if delta:
-                    loop.call_soon_threadsafe(queue.put_nowait, delta)
     except Exception as exc:
         logger.exception("Stream error: %s", exc)
         loop.call_soon_threadsafe(queue.put_nowait, exc)
@@ -46,9 +61,7 @@ def run_stream_producer(
         loop.call_soon_threadsafe(queue.put_nowait, None)
 
 
-async def iterate_stream_queue(
-    queue: asyncio.Queue,
-):
+async def iterate_stream_queue(queue: asyncio.Queue):
     """Yield tokens; re-raise any BaseException placed on the queue."""
     while True:
         item = await queue.get()
