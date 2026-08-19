@@ -346,6 +346,16 @@ async function chatNonStream(payload) {
   return j.content || j.response || JSON.stringify(j);
 }
 
+function parseSseLine(line) {
+  if (!line.startsWith("data: ")) return null;
+  const data = line.slice(6);
+  if (data === "[DONE]") return null;
+  try {
+    const j = JSON.parse(data);
+    return j.delta || j.content || "";
+  } catch { return data; }
+}
+
 async function chatStream(payload, bodyEl) {
   const r = await fetch("/llm/chat/stream", {
     method: "POST",
@@ -365,13 +375,9 @@ async function chatStream(payload, bodyEl) {
     if (done) break;
     const chunk = dec.decode(value, { stream: true });
     for (const line of chunk.split("\n")) {
-      if (!line.startsWith("data: ")) continue;
-      const data = line.slice(6);
-      if (data === "[DONE]") continue;
-      try {
-        const j = JSON.parse(data);
-        acc += j.delta || j.content || "";
-      } catch { acc += data; }
+      const delta = parseSseLine(line);
+      if (delta === null) continue;
+      acc += delta;
       bodyEl.innerHTML = renderMarkdownLite(acc);
       messagesEl.scrollTop = messagesEl.scrollHeight;
     }
