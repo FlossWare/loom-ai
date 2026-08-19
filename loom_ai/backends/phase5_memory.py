@@ -84,9 +84,7 @@ class InMemoryEvalSuite:
         run_id = str(uuid.uuid4())
         start = time.monotonic()
 
-        matches = sum(
-            1 for case in dataset.cases if case.input == case.expected
-        )
+        matches = sum(1 for case in dataset.cases if case.input == case.expected)
         total = len(dataset.cases) or 1
         accuracy = matches / total
 
@@ -181,9 +179,7 @@ class InMemoryGenAITelemetry:
         window_minutes: int = 60,
     ) -> TelemetrySummary:
         cutoff = time.time() - (window_minutes * 60)
-        window_spans = [
-            attrs for ts, attrs in self._spans.values() if ts >= cutoff
-        ]
+        window_spans = [attrs for ts, attrs in self._spans.values() if ts >= cutoff]
 
         if not window_spans:
             return TelemetrySummary()
@@ -216,7 +212,9 @@ class InMemoryGenAITelemetry:
         operation: str | None = None,
     ) -> list[dict]:
         entries = sorted(
-            self._spans.items(), key=lambda x: x[1][0], reverse=True,
+            self._spans.items(),
+            key=lambda x: x[1][0],
+            reverse=True,
         )
         results: list[dict] = []
         for span_id, (ts, attrs) in entries:
@@ -225,7 +223,8 @@ class InMemoryGenAITelemetry:
             d = asdict(attrs)
             d["span_id"] = span_id
             d["recorded_at"] = datetime.fromtimestamp(
-                ts, tz=timezone.utc,
+                ts,
+                tz=timezone.utc,
             ).isoformat()
             results.append(d)
             if len(results) >= limit:
@@ -261,15 +260,12 @@ class InMemoryInferenceRouter:
         *,
         capabilities: ModelCapabilities | None = None,
         preferred_model: str | None = None,
-        budget_usd: float | None = None,
+        _budget_usd: float | None = None,
     ) -> InferenceEndpoint:
-        _ = budget_usd
         candidates = [ep for ep in self._endpoints.values() if ep.healthy]
 
         if preferred_model:
-            preferred = [
-                ep for ep in candidates if ep.model_id == preferred_model
-            ]
+            preferred = [ep for ep in candidates if ep.model_id == preferred_model]
             if preferred:
                 candidates = preferred
 
@@ -324,7 +320,7 @@ class InMemoryInferenceRouter:
         *,
         success: bool,
         latency_ms: float,
-        tokens_used: int = 0,
+        _tokens_used: int = 0,
     ) -> None:
         self._outcomes.setdefault(endpoint_id, []).append(
             (success, latency_ms),
@@ -334,18 +330,20 @@ class InMemoryInferenceRouter:
             outcomes = self._outcomes[endpoint_id]
             ep.latency_ms = sum(lat for _, lat in outcomes) / len(outcomes)
             # Mark unhealthy after 5+ failures in the last 10 outcomes
-            recent_failures = sum(
-                1 for ok, _ in outcomes[-10:] if not ok
-            )
+            recent_failures = sum(1 for ok, _ in outcomes[-10:] if not ok)
             ep.healthy = recent_failures < 5
 
     async def get_decision_log(
-        self, *, limit: int = 20,
+        self,
+        *,
+        limit: int = 20,
     ) -> list[RoutingDecision]:
         return list(reversed(self._decisions[-limit:]))
 
     async def list_endpoints(
-        self, *, healthy_only: bool = False,
+        self,
+        *,
+        healthy_only: bool = False,
     ) -> list[InferenceEndpoint]:
         endpoints = list(self._endpoints.values())
         if healthy_only:
@@ -423,8 +421,13 @@ class InMemoryAgentLifecycleRuntime:
         if cp is None:
             raise ValueError(f"unknown checkpoint: {checkpoint_id}")
         run_id = str(uuid.uuid4())
-        state = deepcopy(cp.state) if cp.state else AgentLifecycleState(
-            agent_id=cp.agent_id, step=cp.step,
+        state = (
+            deepcopy(cp.state)
+            if cp.state
+            else AgentLifecycleState(
+                agent_id=cp.agent_id,
+                step=cp.step,
+            )
         )
         state.status = "running"
         self._states[run_id] = state
@@ -467,7 +470,10 @@ class InMemoryAgentLifecycleRuntime:
         return self._states.get(run_id)
 
     async def get_events(
-        self, run_id: str, *, limit: int = 50,
+        self,
+        run_id: str,
+        *,
+        limit: int = 50,
     ) -> list[AgentEvent]:
         events = self._events.get(run_id, [])
         return events[-limit:]
@@ -495,13 +501,15 @@ class InMemoryAgentMemory:
 
         if entry.scope not in self._scopes:
             self._scopes[entry.scope] = MemoryScope(
-                scope=entry.scope, agent_id=entry.agent_id,
+                scope=entry.scope,
+                agent_id=entry.agent_id,
             )
         return entry_id
 
     @staticmethod
     def _matches_query(
-        entry: AgentMemoryEntry, query: MemoryQuery,
+        entry: AgentMemoryEntry,
+        query: MemoryQuery,
     ) -> bool:
         if entry.superseded_by is not None:
             return False
@@ -629,6 +637,17 @@ class InMemoryOutputValidator:
         errors = self._check_schema(output, schema.schema)
         return ValidationResult(valid=not errors, errors=errors)
 
+    @staticmethod
+    def _fill_missing_fields(output: dict, schema: dict) -> None:
+        for field_name in schema.get("required", []):
+            if field_name not in output:
+                prop_type = (
+                    schema.get("properties", {})
+                    .get(field_name, {})
+                    .get("type", "string")
+                )
+                output[field_name] = _TYPE_DEFAULTS.get(prop_type, "")
+
     async def repair(
         self,
         output: Any,
@@ -641,28 +660,15 @@ class InMemoryOutputValidator:
         for attempt in range(max_attempts):
             errors = self._check_schema(output, schema.schema)
             if not errors:
+                detail = f"repaired after {attempt} attempts" if attempt else ""
                 return output, ValidationResult(
                     valid=True,
                     repaired=attempt > 0,
-                    repair_detail=(
-                        f"repaired after {attempt} attempts"
-                        if attempt > 0
-                        else ""
-                    ),
+                    repair_detail=detail,
                 )
-
             if not isinstance(output, dict):
                 output = {}
-
-            for field_name in schema.schema.get("required", []):
-                if field_name not in output:
-                    prop_type = (
-                        schema.schema
-                        .get("properties", {})
-                        .get(field_name, {})
-                        .get("type", "string")
-                    )
-                    output[field_name] = _TYPE_DEFAULTS.get(prop_type, "")
+            self._fill_missing_fields(output, schema.schema)
 
         errors = self._check_schema(output, schema.schema)
         return output, ValidationResult(

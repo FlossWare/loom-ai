@@ -59,9 +59,7 @@ class InMemoryEvalCapabilityRegistry:
         self._capabilities: dict[str, EvalCapabilityDescriptor] = {}
         self._providers: dict[str, list[CapabilityProvider]] = {}
 
-    async def register_capability(
-        self, capability: EvalCapabilityDescriptor
-    ) -> None:
+    async def register_capability(self, capability: EvalCapabilityDescriptor) -> None:
         self._capabilities[capability.id] = capability
         self._providers.setdefault(capability.id, [])
 
@@ -90,9 +88,7 @@ class InMemoryEvalCapabilityRegistry:
     ) -> None:
         self._providers.setdefault(capability_id, []).append(provider)
 
-    async def list_providers(
-        self, capability_id: str
-    ) -> list[CapabilityProvider]:
+    async def list_providers(self, capability_id: str) -> list[CapabilityProvider]:
         return list(self._providers.get(capability_id, []))
 
 
@@ -134,9 +130,7 @@ class InMemoryCapabilitySelector:
                 filtered.append(p)
             chain = filtered
         if not chain:
-            raise RuntimeError(
-                f"No provider available for capability {capability_id}"
-            )
+            raise RuntimeError(f"No provider available for capability {capability_id}")
         return chain[0]
 
     async def health_state(
@@ -182,9 +176,7 @@ class InMemoryCapabilitySelector:
             error_rate=error_rate,
         )
 
-    async def fallback_chain(
-        self, capability_id: str
-    ) -> list[CapabilityProvider]:
+    async def fallback_chain(self, capability_id: str) -> list[CapabilityProvider]:
         providers = await self._registry.list_providers(capability_id)
         scored: list[tuple[int, CapabilityProvider]] = []
         for p in providers:
@@ -245,12 +237,8 @@ class InMemoryInteractionEvaluator:
                 )
             )
 
-        scores.sort(
-            key=lambda s: s.scores.get("engagement", 0), reverse=True
-        )
-        return [
-            replace(s, rank=i + 1) for i, s in enumerate(scores)
-        ]
+        scores.sort(key=lambda s: s.scores.get("engagement", 0), reverse=True)
+        return [replace(s, rank=i + 1) for i, s in enumerate(scores)]
 
 
 # ══════════════════════════════════════════════════════════════════════════
@@ -264,21 +252,13 @@ class InMemorySkillEstimator:
     def __init__(self) -> None:
         self._posteriors: dict[tuple[str, str], tuple[float, float]] = {}
 
-    def _key(
-        self, agent_id: str, capability: str | None
-    ) -> tuple[str, str]:
+    def _key(self, agent_id: str, capability: str | None) -> tuple[str, str]:
         return (agent_id, capability or "_global")
 
-    def _get_ab(
-        self, agent_id: str, capability: str | None
-    ) -> tuple[float, float]:
-        return self._posteriors.get(
-            self._key(agent_id, capability), (1.0, 1.0)
-        )
+    def _get_ab(self, agent_id: str, capability: str | None) -> tuple[float, float]:
+        return self._posteriors.get(self._key(agent_id, capability), (1.0, 1.0))
 
-    def _build_estimate(
-        self, agent_id: str, capability: str | None
-    ) -> SkillEstimate:
+    def _build_estimate(self, agent_id: str, capability: str | None) -> SkillEstimate:
         alpha, beta_param = self._get_ab(agent_id, capability)
         total = alpha + beta_param
         mean = alpha / total
@@ -327,16 +307,12 @@ class InMemorySkillEstimator:
         self, *, capability: str | None = None, limit: int = 10
     ) -> list[SkillEstimate]:
         target_cap = capability or "_global"
-        agents = {
-            k[0] for k in self._posteriors if k[1] == target_cap
-        }
+        agents = {k[0] for k in self._posteriors if k[1] == target_cap}
         estimates = [self._build_estimate(a, capability) for a in agents]
         estimates.sort(key=lambda e: e.mean, reverse=True)
         return estimates[:limit]
 
-    async def update_from_tournament(
-        self, results: list[PairwiseOutcome]
-    ) -> None:
+    async def update_from_tournament(self, results: list[PairwiseOutcome]) -> None:
         for outcome in results:
             await self.record_outcome(outcome)
 
@@ -386,9 +362,7 @@ class InMemoryEvaluationEnvironment:
         new_public[f"last_action_{agent_id}"] = action.action_type
         new_public["step"] = next_step
         terminal = next_step >= self._max_steps
-        available = (
-            [] if terminal else list(self._state.available_actions)
-        )
+        available = [] if terminal else list(self._state.available_actions)
         self._state = replace(
             self._state,
             step_number=next_step,
@@ -413,17 +387,15 @@ class InMemoryEvaluationEnvironment:
             info={"agent_id": agent_id},
         )
 
-    async def get_state(
-        self, *, agent_id: str | None = None
-    ) -> EnvironmentState:
+    async def get_state(self, *, agent_id: str | None = None) -> EnvironmentState:
         if agent_id is not None:
             public = {
                 k: v
                 for k, v in self._state.public_state.items()
-                if not k.startswith("last_action_")
-                or k == f"last_action_{agent_id}"
+                if not k.startswith("last_action_") or k == f"last_action_{agent_id}"
             }
-            return replace(self._state, public_state=public)
+            filtered: EnvironmentState = replace(self._state, public_state=public)
+            return filtered
         return self._state
 
     async def is_terminal(self) -> bool:
@@ -479,9 +451,8 @@ class InMemoryTournamentRunner:
         self,
         candidates: list[TournamentCandidate],
         *,
-        task: str,
+        _task: str,
     ) -> list[JudgeVerdict]:
-        _ = task
         if not candidates:
             return []
 
@@ -499,9 +470,7 @@ class InMemoryTournamentRunner:
             )
 
         verdicts.sort(key=lambda v: v.score, reverse=True)
-        return [
-            replace(v, rank=i + 1) for i, v in enumerate(verdicts)
-        ]
+        return [replace(v, rank=i + 1) for i, v in enumerate(verdicts)]
 
 
 # ══════════════════════════════════════════════════════════════════════════
@@ -530,16 +499,12 @@ class InMemoryInferenceOptimizer:
         param_map: dict[str, InferenceParameters] = {}
         for params, reward in history:
             sig = (
-                f"t={params.temperature},"
-                f"p={params.top_p},"
-                f"fp={params.frequency_penalty}"
+                f"t={params.temperature},p={params.top_p},fp={params.frequency_penalty}"
             )
             groups.setdefault(sig, []).append(reward)
             param_map[sig] = params
 
-        best_sig = max(
-            groups, key=lambda s: sum(groups[s]) / len(groups[s])
-        )
+        best_sig = max(groups, key=lambda s: sum(groups[s]) / len(groups[s]))
         best = param_map[best_sig]
         if model:
             best = replace(best, model=model)
@@ -552,16 +517,12 @@ class InMemoryInferenceOptimizer:
         reward: float,
         task_context: str,
     ) -> None:
-        self._history.setdefault(task_context, []).append(
-            (parameters, reward)
-        )
+        self._history.setdefault(task_context, []).append((parameters, reward))
         if parameters.model:
             self._model_params[parameters.model] = parameters
 
     async def effective_parameters(self, model: str) -> InferenceParameters:
-        return self._model_params.get(
-            model, InferenceParameters(model=model)
-        )
+        return self._model_params.get(model, InferenceParameters(model=model))
 
 
 # ══════════════════════════════════════════════════════════════════════════
@@ -602,9 +563,7 @@ class InMemoryOutputNormalizer:
             model=model,
         )
 
-    async def compare(
-        self, outputs: list[NormalizedOutput]
-    ) -> ComparisonResult:
+    async def compare(self, outputs: list[NormalizedOutput]) -> ComparisonResult:
         n = len(outputs)
         matrix: list[list[float]] = []
         for i in range(n):
@@ -616,9 +575,7 @@ class InMemoryOutputNormalizer:
                     a_chars = set(outputs[i].normalized)
                     b_chars = set(outputs[j].normalized)
                     union = a_chars | b_chars
-                    overlap = (
-                        len(a_chars & b_chars) / len(union) if union else 1.0
-                    )
+                    overlap = len(a_chars & b_chars) / len(union) if union else 1.0
                     row.append(round(overlap, 4))
             matrix.append(row)
         return ComparisonResult(
@@ -671,9 +628,7 @@ class InMemoryConsensusStrategy:
     async def list_strategies(self) -> list[str]:
         return list(self._STRATEGIES)
 
-    def _majority_vote(
-        self, candidates: list[ConsensusCandidate]
-    ) -> ConsensusDecision:
+    def _majority_vote(self, candidates: list[ConsensusCandidate]) -> ConsensusDecision:
         counts: Counter[str] = Counter()
         content_to_ids: dict[str, list[str]] = {}
         for c in candidates:
@@ -686,16 +641,11 @@ class InMemoryConsensusStrategy:
             strategy="majority_vote",
             selected_content=winner_content,
             confidence=confidence,
-            rationale=(
-                f"Selected by majority vote "
-                f"({winner_count}/{len(candidates)})"
-            ),
+            rationale=(f"Selected by majority vote ({winner_count}/{len(candidates)})"),
             candidate_ids=content_to_ids[winner_content],
         )
 
-    def _weighted_vote(
-        self, candidates: list[ConsensusCandidate]
-    ) -> ConsensusDecision:
+    def _weighted_vote(self, candidates: list[ConsensusCandidate]) -> ConsensusDecision:
         weighted: dict[str, float] = {}
         content_to_ids: dict[str, list[str]] = {}
         for c in candidates:
@@ -704,9 +654,7 @@ class InMemoryConsensusStrategy:
 
         winner_content = max(weighted, key=weighted.__getitem__)
         total_weight = sum(c.weight for c in candidates)
-        confidence = (
-            weighted[winner_content] / total_weight if total_weight else 0.0
-        )
+        confidence = weighted[winner_content] / total_weight if total_weight else 0.0
         return ConsensusDecision(
             strategy="weighted_vote",
             selected_content=winner_content,
@@ -718,16 +666,12 @@ class InMemoryConsensusStrategy:
             candidate_ids=content_to_ids[winner_content],
         )
 
-    def _judge(
-        self, candidates: list[ConsensusCandidate]
-    ) -> ConsensusDecision:
+    def _judge(self, candidates: list[ConsensusCandidate]) -> ConsensusDecision:
         best = max(candidates, key=lambda c: c.score)
         return ConsensusDecision(
             strategy="judge",
             selected_content=best.content,
             confidence=best.score,
-            rationale=(
-                f"Selected candidate with highest score ({best.score:.4f})"
-            ),
+            rationale=(f"Selected candidate with highest score ({best.score:.4f})"),
             candidate_ids=[best.id],
         )
