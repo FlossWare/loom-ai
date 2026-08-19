@@ -267,6 +267,7 @@ try:
         consensus: str
         tools: str
         resources: str
+        router: str
 
     class HealthResponse(BaseModel):
         status: str
@@ -388,6 +389,52 @@ try:
 
     class RequeueResponse(BaseModel):
         requeued: int
+
+    # ── Router (Thompson Sampling) models ───────────────────────────
+
+    class RouterSelectRequest(BaseModel):
+        task_type: str
+        candidates: list[str] | None = None
+
+    class RouterSelectResponse(BaseModel):
+        model: str
+        task_type: str
+
+    class RouterOutcomeRequest(BaseModel):
+        model: str
+        task_type: str
+        reward: float = Field(ge=0.0, le=1.0)
+
+    class RouterOutcomeResponse(BaseModel):
+        recorded: bool
+
+    class RouterRegisterRequest(BaseModel):
+        provider_name: str
+        models: list[str]
+        priority: int = 0
+
+    class RouterRegisterResponse(BaseModel):
+        provider_name: str
+        models_registered: int
+
+    class RouterProfileRequest(BaseModel):
+        model: str
+        capabilities: list[str] = Field(default_factory=list)
+        strengths: dict[str, float] = Field(default_factory=dict)
+
+    class RouterProfileResponse(BaseModel):
+        model: str
+        capabilities: list[str]
+
+    class RouterPerformanceResponse(BaseModel):
+        arms: dict[str, dict]
+
+    class RouterModelsResponse(BaseModel):
+        models: list[dict]
+        count: int
+
+    class RouterHealthResponse(BaseModel):
+        providers: dict[str, dict]
 
 except ImportError:  # pydantic not installed (server extra not required)
     pass
@@ -803,6 +850,84 @@ def _mount_resources_routes(app: FastAPI, config: LoomConfig, auth_deps: list) -
     app.include_router(router)
 
 
+def _mount_router_routes(app: FastAPI, config: LoomConfig, auth_deps: list) -> None:
+    from fastapi import APIRouter, HTTPException
+
+    router_api = APIRouter(
+        prefix="/router", tags=["router"], dependencies=auth_deps,
+    )
+
+    @router_api.post(
+        "/select",
+        response_model=RouterSelectResponse,
+        responses={400: {"description": "Invalid task type or candidates"}},
+    )
+    async def router_select(body: RouterSelectRequest):
+        try:
+            model = await config.router.select(
+                body.task_type, candidates=body.candidates,
+            )
+        except ValueError as exc:
+            raise HTTPException(status_code=400, detail=str(exc))
+        return {"model": model, "task_type": body.task_type}
+
+    @router_api.post("/outcome", response_model=RouterOutcomeResponse)
+    async def router_outcome(body: RouterOutcomeRequest):
+        await config.router.record_outcome(
+            body.model, body.task_type, reward=body.reward,
+        )
+        return {"recorded": True}
+
+    @router_api.get(
+        "/performance", response_model=RouterPerformanceResponse,
+    )
+    async def router_performance(task_type: str | None = None):
+        arms = await config.router.performance(task_type=task_type)
+        return {"arms": arms}
+
+    @router_api.get("/models", response_model=RouterModelsResponse)
+    async def router_models():
+        models = await config.router.list_available_models()
+        return {
+            "models": [m.__dict__ for m in models],
+            "count": len(models),
+        }
+
+    @router_api.get("/health", response_model=RouterHealthResponse)
+    async def router_health():
+        health = await config.router.provider_health()
+        return {"providers": {k: v.__dict__ for k, v in health.items()}}
+
+    @router_api.post("/register", response_model=RouterRegisterResponse)
+    async def router_register(body: RouterRegisterRequest):
+        await config.router.register_provider(
+            body.provider_name,
+            None,
+            models=body.models,
+            priority=body.priority,
+        )
+        return {
+            "provider_name": body.provider_name,
+            "models_registered": len(body.models),
+        }
+
+    @router_api.post("/profile", response_model=RouterProfileResponse)
+    async def router_profile(body: RouterProfileRequest):
+        from loom_ai.backends.adaptive_router import ModelCapabilityProfile
+
+        config.router.set_profile(
+            body.model,
+            ModelCapabilityProfile(
+                model=body.model,
+                capabilities=body.capabilities,
+                strengths=body.strengths,
+            ),
+        )
+        return {"model": body.model, "capabilities": body.capabilities}
+
+    app.include_router(router_api)
+
+
 def _mount_graph_routes(app: FastAPI, config: LoomConfig, auth_deps: list) -> None:
     from fastapi import APIRouter, HTTPException
 
@@ -954,6 +1079,7 @@ def create_app(config: LoomConfig) -> FastAPI:
             "consensus": _backend_name(config.consensus),
             "tools": _backend_name(config.tools),
             "resources": _backend_name(config.resources),
+            "router": _backend_name(config.router),
         }
         return {"status": "healthy", "backends": backends}
 
@@ -1000,6 +1126,9 @@ def create_app(config: LoomConfig) -> FastAPI:
 
     if config.graph is not None:
         _mount_graph_routes(app, config, auth_deps)
+
+    if config.router is not None:
+        _mount_router_routes(app, config, auth_deps)
 
     return app
 

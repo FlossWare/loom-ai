@@ -24,8 +24,11 @@ async def test_concurrent_document_stores():
     storage = MemoryStorageBackend()
     docs = [
         Document(
-            id=f"doc-{i}", title=f"Doc {i}", content=f"body {i}",
-            url="", category="test",
+            id=f"doc-{i}",
+            title=f"Doc {i}",
+            content=f"body {i}",
+            url="",
+            category="test",
         )
         for i in range(50)
     ]
@@ -56,9 +59,7 @@ async def test_concurrent_chunk_stores():
         for i in range(30)
     ]
 
-    await asyncio.gather(
-        *(storage.store_chunks("d-1", [c]) for c in chunks)
-    )
+    await asyncio.gather(*(storage.store_chunks("d-1", [c]) for c in chunks))
 
     count = await storage.count_chunks()
     assert count == 30
@@ -94,9 +95,7 @@ async def test_concurrent_enqueue():
         [QueueItem(id=f"q-{batch}-{i}", payload={"b": batch, "i": i}) for i in range(5)]
         for batch in range(10)
     ]
-    counts = await asyncio.gather(
-        *(queue.enqueue("work", batch) for batch in batches)
-    )
+    counts = await asyncio.gather(*(queue.enqueue("work", batch) for batch in batches))
     assert sum(counts) == 50
 
     status = await queue.status("work")
@@ -180,9 +179,7 @@ async def test_concurrent_text_searches():
         await search.index(chunk, [float(i), 0.0])
 
     queries = [f"topic-{i}" for i in range(10)]
-    results = await asyncio.gather(
-        *(search.text_search(q, limit=5) for q in queries)
-    )
+    results = await asyncio.gather(*(search.text_search(q, limit=5) for q in queries))
 
     for i, result_list in enumerate(results):
         assert len(result_list) >= 1
@@ -275,9 +272,7 @@ async def test_concurrent_neighbor_reads():
             )
         )
 
-    results = await asyncio.gather(
-        *(graph.get_neighbors("hub") for _ in range(20))
-    )
+    results = await asyncio.gather(*(graph.get_neighbors("hub") for _ in range(20)))
 
     for neighbors in results:
         assert len(neighbors) == 10
@@ -333,8 +328,11 @@ async def test_no_data_corruption_under_interleaved_writes():
 
     async def write_cycle(i: int):
         doc = Document(
-            id=f"ic-{i}", title=f"IC {i}",
-            content=f"interleaved {i}", url="", category="",
+            id=f"ic-{i}",
+            title=f"IC {i}",
+            content=f"interleaved {i}",
+            url="",
+            category="",
         )
         await storage.store_document(doc)
 

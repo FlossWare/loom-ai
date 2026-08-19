@@ -68,19 +68,11 @@ class LocalClient:
             "status": "healthy",
             "mode": "local",
             "backends": {
-                "llm": (
-                    "configured" if self._cfg.llm else "none"
-                ),
-                "storage": type(
-                    self._cfg.storage
-                ).__name__,
-                "search": type(
-                    self._cfg.search
-                ).__name__,
+                "llm": ("configured" if self._cfg.llm else "none"),
+                "storage": type(self._cfg.storage).__name__,
+                "search": type(self._cfg.search).__name__,
                 "graph": (
-                    type(self._cfg.graph).__name__
-                    if self._cfg.graph
-                    else "disabled"
+                    type(self._cfg.graph).__name__ if self._cfg.graph else "disabled"
                 ),
             },
         }
@@ -105,10 +97,7 @@ class LocalClient:
     ) -> dict[str, Any]:
         if not self._cfg.llm:
             raise RuntimeError("No LLM backend configured")
-        msgs = [
-            ChatMessage(role=m["role"], content=m["content"])
-            for m in messages
-        ]
+        msgs = [ChatMessage(role=m["role"], content=m["content"]) for m in messages]
         resp = await self._cfg.llm.chat(
             msgs,
             model=model,
@@ -127,10 +116,7 @@ class LocalClient:
     ) -> AsyncIterator[str]:
         if not self._cfg.llm:
             raise RuntimeError("No LLM backend configured")
-        msgs = [
-            ChatMessage(role=m["role"], content=m["content"])
-            for m in messages
-        ]
+        msgs = [ChatMessage(role=m["role"], content=m["content"]) for m in messages]
         async for token in self._cfg.llm.chat_stream(
             msgs,
             model=model,
@@ -150,12 +136,11 @@ class LocalClient:
     ) -> dict[str, Any]:
         if not self._cfg.consensus:
             raise RuntimeError("No consensus engine configured")
-        msgs = [
-            ChatMessage(role=m["role"], content=m["content"])
-            for m in messages
-        ]
+        msgs = [ChatMessage(role=m["role"], content=m["content"]) for m in messages]
         responses, failed = await self._cfg.consensus.gather(
-            msgs, models=models, temperature=temperature,
+            msgs,
+            models=models,
+            temperature=temperature,
         )
         return {
             "responses": [_asdict(r) for r in responses],
@@ -190,16 +175,15 @@ class LocalClient:
         return {
             "documents": await self._cfg.storage.count_documents(),
             "chunks": await self._cfg.storage.count_chunks(),
-            "embeddings": (
-                await self._cfg.storage.count_embeddings()
-            ),
+            "embeddings": (await self._cfg.storage.count_embeddings()),
         }
 
     async def list_documents(
         self, *, limit: int = 20, offset: int = 0
     ) -> dict[str, Any]:
         docs = await self._cfg.storage.list_documents(
-            limit=limit, offset=offset,
+            limit=limit,
+            offset=offset,
         )
         return {"documents": [_asdict(d) for d in docs]}
 
@@ -225,11 +209,10 @@ class LocalClient:
 
     # ── Search ───────────────────────────────────────────────────
 
-    async def search_text(
-        self, query: str, *, limit: int = 10
-    ) -> dict[str, Any]:
+    async def search_text(self, query: str, *, limit: int = 10) -> dict[str, Any]:
         results = await self._cfg.search.text_search(
-            query, limit=limit,
+            query,
+            limit=limit,
         )
         return {
             "results": [_asdict(r) for r in results],
@@ -239,7 +222,8 @@ class LocalClient:
         self, vector: list[float], *, limit: int = 10
     ) -> dict[str, Any]:
         results = await self._cfg.search.semantic_search(
-            vector, limit=limit,
+            vector,
+            limit=limit,
         )
         return {"results": [_asdict(r) for r in results]}
 
@@ -252,8 +236,10 @@ class LocalClient:
         text_weight: float = 0.5,
     ) -> dict[str, Any]:
         results = await self._cfg.search.hybrid_search(
-            query, vector,
-            limit=limit, text_weight=text_weight,
+            query,
+            vector,
+            limit=limit,
+            text_weight=text_weight,
         )
         return {"results": [_asdict(r) for r in results]}
 
@@ -270,19 +256,17 @@ class LocalClient:
 
     # ── Queue / Pipeline ─────────────────────────────────────────
 
-    async def queue_status(
-        self, queue_name: str
-    ) -> dict[str, Any]:
+    async def queue_status(self, queue_name: str) -> dict[str, Any]:
         return await self._cfg.queue.status(queue_name)
 
-    async def enqueue(
-        self, queue_name: str, payload: dict
-    ) -> dict[str, Any]:
+    async def enqueue(self, queue_name: str, payload: dict) -> dict[str, Any]:
         item = QueueItem(
-            id=uuid.uuid4().hex, payload=payload,
+            id=uuid.uuid4().hex,
+            payload=payload,
         )
         count = await self._cfg.queue.enqueue(
-            queue_name, [item],
+            queue_name,
+            [item],
         )
         return {"enqueued": count, "item_id": item.id}
 
@@ -305,9 +289,7 @@ class LocalClient:
         nid = await self._cfg.graph.add_node(node)
         return {"id": nid, "label": label}
 
-    async def get_node(
-        self, node_id: str
-    ) -> dict[str, Any]:
+    async def get_node(self, node_id: str) -> dict[str, Any]:
         if not self._cfg.graph:
             raise RuntimeError(_NO_GRAPH)
         node = await self._cfg.graph.get_node(node_id)
@@ -324,7 +306,8 @@ class LocalClient:
         if not self._cfg.graph:
             raise RuntimeError(_NO_GRAPH)
         nodes = await self._cfg.graph.get_neighbors(
-            node_id, edge_label=edge_label,
+            node_id,
+            edge_label=edge_label,
         )
         return {"neighbors": [_asdict(n) for n in nodes]}
 
@@ -363,7 +346,8 @@ class LocalClient:
         if not self._cfg.tools:
             raise RuntimeError("Tools not configured")
         result = await self._cfg.tools.call_tool(
-            name, arguments or {},
+            name,
+            arguments or {},
         )
         return _asdict(result)
 
@@ -375,9 +359,7 @@ class LocalClient:
         resources = await self._cfg.resources.list_resources()
         return [_asdict(r) for r in resources]
 
-    async def read_resource(
-        self, uri: str
-    ) -> dict[str, Any]:
+    async def read_resource(self, uri: str) -> dict[str, Any]:
         if not self._cfg.resources:
             raise RuntimeError("Resources not configured")
         content = await self._cfg.resources.read_resource(uri)

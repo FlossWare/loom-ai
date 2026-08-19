@@ -14,6 +14,7 @@ from __future__ import annotations
 import os
 from dataclasses import dataclass
 
+from loom_ai.backends.adaptive_router import AdaptiveModelRouter
 from loom_ai.consensus import ConsensusEngine
 from loom_ai.protocols import (
     EmbeddingBackend,
@@ -44,6 +45,8 @@ class LoomConfig:
     consensus: Optional multi-model consensus engine wrapping *llm*.
     tools:     Optional MCP tool provider (``None`` when unconfigured).
     resources: Optional MCP resource provider (``None`` when unconfigured).
+    router:    Optional adaptive model router with Thompson Sampling
+               (``None`` when unconfigured).
     """
 
     storage: StorageBackend
@@ -56,6 +59,7 @@ class LoomConfig:
     consensus: ConsensusEngine | None = None
     tools: ToolProvider | None = None
     resources: ResourceProvider | None = None
+    router: AdaptiveModelRouter | None = None
 
     # ── Factory ──────────────────────────────────────────────────────
 
@@ -110,6 +114,9 @@ class LoomConfig:
             ),
             resources=cls._build_resources(
                 os.environ.get("LOOM_RESOURCES", "disabled"),
+            ),
+            router=cls._build_router(
+                os.environ.get("LOOM_ROUTER", "disabled"),
             ),
         )
 
@@ -303,4 +310,15 @@ class LoomConfig:
             return MemoryResourceProvider()
         raise ValueError(
             f"Unknown resources backend: {kind!r}.  Valid options: disabled, memory"
+        )
+
+    @staticmethod
+    def _build_router(kind: str) -> AdaptiveModelRouter | None:
+        if kind == "disabled":
+            return None
+        if kind == "adaptive":
+            return AdaptiveModelRouter()
+        raise ValueError(
+            f"Unknown router backend: {kind!r}.  "
+            f"Valid options: disabled, adaptive"
         )

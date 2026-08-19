@@ -14,19 +14,20 @@ from loom_ai.clients.local_client import LocalClient, _asdict
 
 def _clean_env() -> dict[str, str]:
     """Return env dict with remote-mode vars stripped."""
-    return {
-        k: v for k, v in os.environ.items()
-        if k not in ("LOOM_URL", "LOOM_HOST")
-    }
+    return {k: v for k, v in os.environ.items() if k not in ("LOOM_URL", "LOOM_HOST")}
 
 
 def _clean_env_no_llm() -> dict[str, str]:
     """Return env dict with remote and LLM vars stripped."""
     return {
-        k: v for k, v in os.environ.items()
-        if k not in (
-            "LOOM_URL", "LOOM_HOST",
-            "LOOM_LLM_BASE_URL", "LOOM_LLM_API_KEY",
+        k: v
+        for k, v in os.environ.items()
+        if k
+        not in (
+            "LOOM_URL",
+            "LOOM_HOST",
+            "LOOM_LLM_BASE_URL",
+            "LOOM_LLM_API_KEY",
         )
     }
 
@@ -74,17 +75,13 @@ class TestAsDict:
 class TestGetClient:
     @pytest.mark.asyncio
     async def test_returns_loom_client_when_url_set(self):
-        with patch.dict(
-            os.environ, {"LOOM_URL": "http://example:5000"}
-        ):
+        with patch.dict(os.environ, {"LOOM_URL": "http://example:5000"}):
             client = await get_client()
         assert isinstance(client, LoomClient)
 
     @pytest.mark.asyncio
     async def test_returns_loom_client_when_host_set(self):
-        with patch.dict(
-            os.environ, {"LOOM_HOST": "myhost"}, clear=False
-        ):
+        with patch.dict(os.environ, {"LOOM_HOST": "myhost"}, clear=False):
             client = await get_client()
         assert isinstance(client, LoomClient)
 
@@ -132,25 +129,17 @@ class TestLocalClientLLM:
 
     @pytest.mark.asyncio
     async def test_chat_raises_without_llm(self):
-        with patch.dict(
-            os.environ, _clean_env_no_llm(), clear=True
-        ):
+        with patch.dict(os.environ, _clean_env_no_llm(), clear=True):
             client = await LocalClient.create()
         with pytest.raises(RuntimeError, match="No LLM"):
-            await client.chat(
-                [{"role": "user", "content": "hi"}]
-            )
+            await client.chat([{"role": "user", "content": "hi"}])
 
     @pytest.mark.asyncio
     async def test_chat_stream_raises_without_llm(self):
-        with patch.dict(
-            os.environ, _clean_env_no_llm(), clear=True
-        ):
+        with patch.dict(os.environ, _clean_env_no_llm(), clear=True):
             client = await LocalClient.create()
         with pytest.raises(RuntimeError, match="No LLM"):
-            async for _ in client.chat_stream(
-                [{"role": "user", "content": "hi"}]
-            ):
+            async for _ in client.chat_stream([{"role": "user", "content": "hi"}]):
                 pass
 
 
@@ -160,9 +149,7 @@ class TestLocalClientLLM:
 class TestLocalClientConsensus:
     @pytest.mark.asyncio
     async def test_gather_raises_without_consensus(self):
-        with patch.dict(
-            os.environ, _clean_env_no_llm(), clear=True
-        ):
+        with patch.dict(os.environ, _clean_env_no_llm(), clear=True):
             client = await LocalClient.create()
         with pytest.raises(RuntimeError, match="No consensus"):
             await client.consensus_gather(
@@ -172,13 +159,12 @@ class TestLocalClientConsensus:
 
     @pytest.mark.asyncio
     async def test_synthesize_raises_without_consensus(self):
-        with patch.dict(
-            os.environ, _clean_env_no_llm(), clear=True
-        ):
+        with patch.dict(os.environ, _clean_env_no_llm(), clear=True):
             client = await LocalClient.create()
         with pytest.raises(RuntimeError, match="No consensus"):
             await client.consensus_synthesize(
-                "prompt", models=["m1"],
+                "prompt",
+                models=["m1"],
             )
 
 
@@ -198,7 +184,8 @@ class TestLocalClientStorage:
     async def test_store_and_list_documents(self):
         client = await _make_local_client()
         resp = await client.store_document(
-            "Test Doc", "Test content",
+            "Test Doc",
+            "Test content",
             category="testing",
         )
         assert "id" in resp
@@ -206,9 +193,7 @@ class TestLocalClientStorage:
 
         docs_resp = await client.list_documents()
         assert "documents" in docs_resp
-        titles = [
-            d["title"] for d in docs_resp["documents"]
-        ]
+        titles = [d["title"] for d in docs_resp["documents"]]
         assert "Test Doc" in titles
 
 
@@ -233,7 +218,9 @@ class TestLocalClientSearch:
     async def test_search_hybrid(self):
         client = await _make_local_client()
         resp = await client.search_hybrid(
-            "test", [0.1, 0.2], text_weight=0.6,
+            "test",
+            [0.1, 0.2],
+            text_weight=0.6,
         )
         assert "results" in resp
 
@@ -263,7 +250,8 @@ class TestLocalClientQueue:
     async def test_enqueue_and_status(self):
         client = await _make_local_client()
         resp = await client.enqueue(
-            "test-queue", {"task": "process"},
+            "test-queue",
+            {"task": "process"},
         )
         assert "enqueued" in resp
         assert "item_id" in resp
@@ -280,21 +268,13 @@ class TestLocalClientGraph:
     async def test_graph_raises_when_disabled(self):
         client = await _make_local_client()
         if not client._cfg.graph:
-            with pytest.raises(
-                RuntimeError, match="Graph backend"
-            ):
+            with pytest.raises(RuntimeError, match="Graph backend"):
                 await client.add_node("test")
-            with pytest.raises(
-                RuntimeError, match="Graph backend"
-            ):
+            with pytest.raises(RuntimeError, match="Graph backend"):
                 await client.get_node("x")
-            with pytest.raises(
-                RuntimeError, match="Graph backend"
-            ):
+            with pytest.raises(RuntimeError, match="Graph backend"):
                 await client.get_neighbors("x")
-            with pytest.raises(
-                RuntimeError, match="Graph backend"
-            ):
+            with pytest.raises(RuntimeError, match="Graph backend"):
                 await client.add_edge("a", "b", "rel")
 
     @pytest.mark.asyncio
@@ -304,7 +284,8 @@ class TestLocalClientGraph:
             client = await LocalClient.create()
 
         node_resp = await client.add_node(
-            "person", node_id="n1",
+            "person",
+            node_id="n1",
             properties={"name": "Alice"},
         )
         assert node_resp["id"] == "n1"
@@ -315,7 +296,10 @@ class TestLocalClientGraph:
 
         await client.add_node("person", node_id="n2")
         edge_resp = await client.add_edge(
-            "n1", "n2", "knows", edge_id="e1",
+            "n1",
+            "n2",
+            "knows",
+            edge_id="e1",
         )
         assert edge_resp["id"] == "e1"
 
@@ -338,18 +322,14 @@ class TestLocalClientGraph:
 class TestLocalClientTools:
     @pytest.mark.asyncio
     async def test_list_tools_empty_when_disabled(self):
-        with patch.dict(
-            os.environ, _clean_env_no_llm(), clear=True
-        ):
+        with patch.dict(os.environ, _clean_env_no_llm(), clear=True):
             client = await LocalClient.create()
         tools = await client.list_tools()
         assert tools == []
 
     @pytest.mark.asyncio
     async def test_call_tool_raises_when_disabled(self):
-        with patch.dict(
-            os.environ, _clean_env_no_llm(), clear=True
-        ):
+        with patch.dict(os.environ, _clean_env_no_llm(), clear=True):
             client = await LocalClient.create()
         with pytest.raises(RuntimeError, match="Tools"):
             await client.call_tool("some_tool")
@@ -361,18 +341,14 @@ class TestLocalClientTools:
 class TestLocalClientResources:
     @pytest.mark.asyncio
     async def test_list_resources_empty_when_disabled(self):
-        with patch.dict(
-            os.environ, _clean_env_no_llm(), clear=True
-        ):
+        with patch.dict(os.environ, _clean_env_no_llm(), clear=True):
             client = await LocalClient.create()
         resources = await client.list_resources()
         assert resources == []
 
     @pytest.mark.asyncio
     async def test_read_resource_raises_when_disabled(self):
-        with patch.dict(
-            os.environ, _clean_env_no_llm(), clear=True
-        ):
+        with patch.dict(os.environ, _clean_env_no_llm(), clear=True):
             client = await LocalClient.create()
         with pytest.raises(RuntimeError, match="Resources"):
             await client.read_resource("file:///test")

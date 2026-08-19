@@ -119,9 +119,7 @@ class TestSearchFuzz:
         chunk = Chunk(id="h-1", document_id="d-1", content="sample text", chunk_index=0)
         _run(backend.index(chunk, vector))
 
-        results = _run(
-            backend.hybrid_search(query, vector, text_weight=text_weight)
-        )
+        results = _run(backend.hybrid_search(query, vector, text_weight=text_weight))
         assert isinstance(results, list)
 
     @given(doc_id=FUZZ_ID)
@@ -202,5 +200,9 @@ class TestSearchConcurrency:
         await asyncio.gather(index_more(), delete_doc_a())
 
         remaining_a = await backend.text_search("a-")
-        remaining_a = [r for r in remaining_a if r.chunk_id.startswith("cid-") and not r.chunk_id.startswith("cid-new")]
+        remaining_a = [
+            r
+            for r in remaining_a
+            if r.chunk_id.startswith("cid-") and not r.chunk_id.startswith("cid-new")
+        ]
         assert len(remaining_a) == 0
