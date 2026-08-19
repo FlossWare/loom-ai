@@ -25,7 +25,6 @@ if TYPE_CHECKING:
         Claim,
         KnowledgeEntity,
         KnowledgeRelationship,
-        SubgraphResult,
     )
 
 _SAFE_RID = re.compile(r"^#\d+:\d+$")
