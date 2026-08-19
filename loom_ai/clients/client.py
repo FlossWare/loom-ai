@@ -108,35 +108,26 @@ class LoomClient:
 
         def _do() -> dict[str, Any]:
             try:
-                with urllib.request.urlopen(
-                    req, timeout=self._config.timeout
-                ) as resp:
+                with urllib.request.urlopen(req, timeout=self._config.timeout) as resp:
                     raw = resp.read()
                     if not raw:
                         return {}
                     return json.loads(raw)
             except urllib.error.HTTPError as exc:
-                error_body = exc.read(
-                    1024 * 64
-                ).decode(errors="replace")
+                error_body = exc.read(1024 * 64).decode(errors="replace")
                 logger.exception(
                     "HTTP %d from %s: %s",
-                    exc.code, url, error_body,
+                    exc.code,
+                    url,
+                    error_body,
                 )
                 raise RuntimeError(
-                    f"loom-ai API error {exc.code}: "
-                    f"{error_body}"
+                    f"loom-ai API error {exc.code}: {error_body}"
                 ) from exc
             except urllib.error.URLError as exc:
-                raise RuntimeError(
-                    f"loom-ai connection failed: "
-                    f"{exc.reason}"
-                ) from exc
+                raise RuntimeError(f"loom-ai connection failed: {exc.reason}") from exc
             except json.JSONDecodeError as exc:
-                raise RuntimeError(
-                    f"loom-ai returned invalid JSON: "
-                    f"{exc}"
-                ) from exc
+                raise RuntimeError(f"loom-ai returned invalid JSON: {exc}") from exc
 
         return await asyncio.to_thread(_do)
 
@@ -205,7 +196,7 @@ class LoomClient:
             url, data=data, headers=self._headers(), method="POST"
         )
 
-        queue: asyncio.Queue[str | None] = asyncio.Queue()
+        queue: asyncio.Queue[str | BaseException | None] = asyncio.Queue()
         loop = asyncio.get_running_loop()
 
         def _stream() -> None:
@@ -219,18 +210,14 @@ class LoomClient:
                                 break
                             try:
                                 chunk = json.loads(payload)
-                                choice = chunk.get(
-                                    "choices", [{}]
-                                )[0]
-                                delta = choice.get(
-                                    "delta", {}
-                                ).get("content", "")
+                                choice = chunk.get("choices", [{}])[0]
+                                delta = choice.get("delta", {}).get("content", "")
                                 if delta:
                                     loop.call_soon_threadsafe(queue.put_nowait, delta)
                             except json.JSONDecodeError:
                                 continue
             except Exception as exc:
-                logger.exception("Stream error: %s", exc)
+                loop.call_soon_threadsafe(queue.put_nowait, exc)
             finally:
                 loop.call_soon_threadsafe(queue.put_nowait, None)
 
@@ -240,6 +227,8 @@ class LoomClient:
             token = await queue.get()
             if token is None:
                 break
+            if isinstance(token, BaseException):
+                raise token
             yield token
 
     # ── Consensus ────────────────────────────────────────────────────────
@@ -251,11 +240,14 @@ class LoomClient:
         *,
         temperature: float = 0.7,
     ) -> dict[str, Any]:
-        return await self._post("/consensus/gather", {
-            "messages": messages,
-            "models": models,
-            "temperature": temperature,
-        })
+        return await self._post(
+            "/consensus/gather",
+            {
+                "messages": messages,
+                "models": models,
+                "temperature": temperature,
+            },
+        )
 
     async def consensus_synthesize(
         self,
@@ -288,7 +280,8 @@ class LoomClient:
     ) -> dict[str, Any]:
         return await self._get(
             "/knowledge/documents",
-            limit=str(limit), offset=str(offset),
+            limit=str(limit),
+            offset=str(offset),
         )
 
     async def store_document(
@@ -300,13 +293,16 @@ class LoomClient:
         category: str = "",
         metadata: dict | None = None,
     ) -> dict[str, Any]:
-        return await self._post("/knowledge/documents", {
-            "title": title,
-            "content": content,
-            "url": url,
-            "category": category,
-            "metadata": metadata or {},
-        })
+        return await self._post(
+            "/knowledge/documents",
+            {
+                "title": title,
+                "content": content,
+                "url": url,
+                "category": category,
+                "metadata": metadata or {},
+            },
+        )
 
     # ── Search ───────────────────────────────────────────────────────────
 
@@ -316,10 +312,13 @@ class LoomClient:
     async def search_semantic(
         self, vector: list[float], *, limit: int = 10
     ) -> dict[str, Any]:
-        return await self._post("/search/semantic", {
-            "vector": vector,
-            "limit": limit,
-        })
+        return await self._post(
+            "/search/semantic",
+            {
+                "vector": vector,
+                "limit": limit,
+            },
+        )
 
     async def search_hybrid(
         self,
@@ -329,12 +328,15 @@ class LoomClient:
         limit: int = 10,
         text_weight: float = 0.5,
     ) -> dict[str, Any]:
-        return await self._post("/search/hybrid", {
-            "query": query,
-            "vector": vector,
-            "limit": limit,
-            "text_weight": text_weight,
-        })
+        return await self._post(
+            "/search/hybrid",
+            {
+                "query": query,
+                "vector": vector,
+                "limit": limit,
+                "text_weight": text_weight,
+            },
+        )
 
     # ── Secrets ──────────────────────────────────────────────────────────
 

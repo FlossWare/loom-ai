@@ -398,6 +398,10 @@ except ImportError:  # pydantic not installed (server extra not required)
 # ---------------------------------------------------------------------------
 
 _NOT_FOUND_RESPONSES: dict = {404: {"description": "Not found"}}
+_NOT_FOUND_BAD_REQUEST_RESPONSES: dict = {
+    400: {"description": "Missing required header"},
+    404: {"description": "Not found"},
+}
 
 
 def _backend_name(backend: object | None) -> str:
@@ -639,7 +643,7 @@ def _mount_secrets_routes(app: FastAPI, config: LoomConfig, auth_deps: list) -> 
     @router.post(
         "/{name}/reveal",
         response_model=GetSecretResponse,
-        responses=_NOT_FOUND_RESPONSES,
+        responses=_NOT_FOUND_BAD_REQUEST_RESPONSES,
     )
     async def reveal_secret(
         name: str,

@@ -11,7 +11,7 @@
     --surface2: #242424;
     --border: #333;
     --text: #e8e8e8;
-    --muted: #9a9a9a;
+    --muted: #b0b0b0;
     --accent: #d97757;
     --accent-dim: #b45c3f;
     --danger: #e85d5d;
@@ -87,7 +87,7 @@
     flex: 1;
     min-width: 0;
     white-space: pre-wrap;
-    word-break: break-word;
+    overflow-wrap: break-word;
   }
   .msg .body pre {
     background: var(--surface2);
@@ -238,7 +238,7 @@
       <label><input type="checkbox" id="stream" checked/> stream</label>
     </div>
     <div class="composer">
-      <textarea id="input" rows="1" placeholder="Message Loom…" autofocus></textarea>
+      <textarea id="input" rows="1" placeholder="Message Loom…" autofocus aria-label="Message input"></textarea>
       <button id="send" title="Send" aria-label="Send">
         <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M5 12h14M13 6l6 6-6 6"/></svg>
       </button>
@@ -246,7 +246,7 @@
     <p class="hint">Enter to send · Shift+Enter for newline · Auth via LOOM_API_KEY if set</p>
   </div>
 </footer>
-<script>
+<script type="module">
 const API_KEY = new URLSearchParams(location.search).get("key") || localStorage.getItem("loom_api_key") || "";
 const messagesEl = document.getElementById("messages");
 const input = document.getElementById("input");
@@ -264,35 +264,18 @@ function headers() {
 }
 
 function setStatus(ok, text) {
-  document.getElementById("dot").className = "dot " + (ok === true ? "ok" : ok === false ? "err" : "");
+  let dotClass = "";
+  if (ok === true) {
+    dotClass = "ok";
+  } else if (ok === false) {
+    dotClass = "err";
+  }
+  document.getElementById("dot").className = "dot " + dotClass;
   document.getElementById("statusText").textContent = text;
 }
 
-async function boot() {
-  try {
-    const r = await fetch("/health", { headers: headers() });
-    const j = await r.json();
-    setStatus(true, (j.backends && j.backends.llm) || "healthy");
-    if (j.backends && j.backends.llm && j.backends.llm !== "None") {
-      try {
-        const m = await fetch("/llm/models", { headers: headers() });
-        if (m.ok) {
-          const mj = await m.json();
-          (mj.models || []).forEach(name => {
-            const o = document.createElement("option");
-            o.value = name; o.textContent = name;
-            modelSel.appendChild(o);
-          });
-        }
-      } catch (_) {}
-    }
-  } catch (e) {
-    setStatus(false, "offline");
-  }
-}
-
 function escapeHtml(s) {
-  return s.replace(/&/g,"&amp;").replace(/</g,"&lt;").replace(/>/g,"&gt;");
+  return s.replaceAll("&", "&amp;").replaceAll("<", "&lt;").replaceAll(">", "&gt;");
 }
 
 function renderMarkdownLite(text) {
@@ -328,94 +311,116 @@ function autosize() {
   input.style.height = "auto";
   input.style.height = Math.min(input.scrollHeight, 160) + "px";
 }
-input.addEventListener("input", autosize);
 
-async function send() {
-  const text = input.value.trim();
-  if (!text || sendBtn.disabled) return;
-  input.value = "";
-  autosize();
-  sendBtn.disabled = true;
-  addMsg("user", text);
-  history.push({ role: "user", content: text });
-
-  const bodyEl = addMsg("assistant", "", { streaming: true });
+function buildPayload() {
   const msgs = [];
   const sys = systemInp.value.trim();
   if (sys) msgs.push({ role: "system", content: sys });
   history.forEach(m => msgs.push(m));
-
   const payload = { messages: msgs, temperature: 0.7 };
   if (modelSel.value) payload.model = modelSel.value;
+  return payload;
+}
+
+function showError(bodyElement, error) {
+  bodyElement.innerHTML = `<span style="color:var(--danger)">Error: ${escapeHtml(String(error.message || error))}</span>`;
+}
+
+function isRetryableError(error) {
+  const msg = String(error.message || error);
+  return msg.includes("404") || msg.includes("empty stream");
+}
+
+async function processStreamChunk(decodedChunk, currentAcc, bodyElement) {
+  for (const line of decodedChunk.split("\n")) {
+    if (line.startsWith("data: ")) {
+      const data = line.slice(6);
+      if (data === "[DONE]") continue;
+      try {
+        const j = JSON.parse(data);
+        const delta = j.delta || j.content || "";
+        currentAcc += delta;
+        bodyElement.innerHTML = renderMarkdownLite(currentAcc);
+        messagesEl.scrollTop = messagesEl.scrollHeight;
+      } catch (parseError) {
+        console.warn("Failed to parse stream chunk:", parseError);
+        currentAcc += data;
+        bodyElement.innerHTML = renderMarkdownLite(currentAcc);
+      }
+    }
+  }
+  return currentAcc;
+}
+
+async function sendStreaming(payload, bodyElement) {
+  const r = await fetch("/llm/chat/stream", {
+    method: "POST",
+    headers: headers(),
+    body: JSON.stringify(payload),
+  });
+  if (!r.ok) {
+    const err = await r.text();
+    throw new Error(err || r.statusText);
+  }
+  const reader = r.body.getReader();
+  const dec = new TextDecoder();
+  let acc = "";
+  bodyElement.textContent = "";
+  while (true) {
+    const { done, value } = await reader.read();
+    if (done) break;
+    const chunk = dec.decode(value, { stream: true });
+    acc = await processStreamChunk(chunk, acc, bodyElement);
+  }
+  if (!acc) throw new Error("empty stream");
+  return acc;
+}
+
+async function sendNonStreaming(payload, bodyElement) {
+  const r = await fetch("/llm/chat", {
+    method: "POST",
+    headers: headers(),
+    body: JSON.stringify(payload),
+  });
+  if (!r.ok) throw new Error(await r.text() || r.statusText);
+  const j = await r.json();
+  const content = j.content || j.response || JSON.stringify(j);
+  bodyElement.innerHTML = renderMarkdownLite(content);
+  return content;
+}
+
+async function send() {
+  const text = input.value.trim();
+  if (!text || sendBtn.disabled) return;
+
+  input.value = "";
+  autosize();
+  sendBtn.disabled = true;
+
+  addMsg("user", text);
+  history.push({ role: "user", content: text });
+
+  const bodyEl = addMsg("assistant", "", { streaming: true });
+  const payload = buildPayload();
 
   try {
+    let assistantContent;
     if (streamChk.checked) {
-      const r = await fetch("/llm/chat/stream", {
-        method: "POST",
-        headers: headers(),
-        body: JSON.stringify(payload),
-      });
-      if (!r.ok) {
-        const err = await r.text();
-        throw new Error(err || r.statusText);
-      }
-      const reader = r.body.getReader();
-      const dec = new TextDecoder();
-      let acc = "";
-      bodyEl.textContent = "";
-      while (true) {
-        const { done, value } = await reader.read();
-        if (done) break;
-        const chunk = dec.decode(value, { stream: true });
-        for (const line of chunk.split("\n")) {
-          if (line.startsWith("data: ")) {
-            const data = line.slice(6);
-            if (data === "[DONE]") continue;
-            try {
-              const j = JSON.parse(data);
-              const delta = j.delta || j.content || "";
-              acc += delta;
-              bodyEl.innerHTML = renderMarkdownLite(acc);
-              messagesEl.scrollTop = messagesEl.scrollHeight;
-            } catch {
-              acc += data;
-              bodyEl.innerHTML = renderMarkdownLite(acc);
-            }
-          }
-        }
-      }
-      if (!acc) throw new Error("empty stream");
-      history.push({ role: "assistant", content: acc });
+      assistantContent = await sendStreaming(payload, bodyEl);
     } else {
-      const r = await fetch("/llm/chat", {
-        method: "POST",
-        headers: headers(),
-        body: JSON.stringify(payload),
-      });
-      if (!r.ok) throw new Error(await r.text() || r.statusText);
-      const j = await r.json();
-      const content = j.content || j.response || JSON.stringify(j);
-      bodyEl.innerHTML = renderMarkdownLite(content);
-      history.push({ role: "assistant", content });
+      assistantContent = await sendNonStreaming(payload, bodyEl);
     }
+    history.push({ role: "assistant", content: assistantContent });
   } catch (e) {
-    if (String(e.message).includes("404") || String(e).includes("empty stream")) {
+    if (isRetryableError(e)) {
       try {
-        const r = await fetch("/llm/chat", {
-          method: "POST",
-          headers: headers(),
-          body: JSON.stringify(payload),
-        });
-        if (!r.ok) throw new Error(await r.text() || r.statusText);
-        const j = await r.json();
-        const content = j.content || j.response || JSON.stringify(j);
-        bodyEl.innerHTML = renderMarkdownLite(content);
-        history.push({ role: "assistant", content });
-      } catch (e2) {
-        bodyEl.innerHTML = `<span style="color:var(--danger)">Error: ${escapeHtml(String(e2.message || e2))}</span>`;
+        const assistantContent = await sendNonStreaming(payload, bodyEl);
+        history.push({ role: "assistant", content: assistantContent });
+      } catch (error_) {
+        showError(bodyEl, error_);
       }
     } else {
-      bodyEl.innerHTML = `<span style="color:var(--danger)">Error: ${escapeHtml(String(e.message || e))}</span>`;
+      showError(bodyEl, e);
     }
   } finally {
     sendBtn.disabled = false;
@@ -424,6 +429,7 @@ async function send() {
 }
 
 sendBtn.addEventListener("click", send);
+input.addEventListener("input", autosize);
 input.addEventListener("keydown", (e) => {
   if (e.key === "Enter" && !e.shiftKey) {
     e.preventDefault();
@@ -432,13 +438,34 @@ input.addEventListener("keydown", (e) => {
 });
 document.querySelectorAll(".suggestions button").forEach(btn => {
   btn.addEventListener("click", () => {
-    input.value = btn.getAttribute("data-q");
+    input.value = btn.dataset.q;
     autosize();
     send();
   });
 });
 
-boot();
+try {
+  const r = await fetch("/health", { headers: headers() });
+  const j = await r.json();
+  setStatus(true, (j.backends && j.backends.llm) || "healthy");
+  if (j.backends && j.backends.llm && j.backends.llm !== "None") {
+    try {
+      const m = await fetch("/llm/models", { headers: headers() });
+      if (m.ok) {
+        const mj = await m.json();
+        (mj.models || []).forEach(name => {
+          const o = document.createElement("option");
+          o.value = name; o.textContent = name;
+          modelSel.appendChild(o);
+        });
+      }
+    } catch (e) {
+      console.warn("Failed to fetch LLM models:", e);
+    }
+  }
+} catch (e) {
+  setStatus(false, "offline");
+}
 </script>
 </body>
 </html>
