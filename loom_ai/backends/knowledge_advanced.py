@@ -369,7 +369,8 @@ class InMemoryGraphRetriever:
         self, *, limit: int = 10
     ) -> list[CommunitySummary]:
         """Return summaries for detected graph communities."""
-        return []
+        all_summaries: list[CommunitySummary] = []
+        return all_summaries[:limit]
 
 
 # ── InMemoryExternalGraphAdapter ────────────────────────────────────────
@@ -539,9 +540,21 @@ class InMemoryExternalGraphAdapter:
         *,
         since: str = "",
     ) -> ImportResult:
-        """Perform incremental synchronization from *source_system*."""
+        """Perform incremental synchronization from *source_system*.
+
+        When *since* is non-empty, only entities imported after that
+        ISO-8601 timestamp would be re-synced (no-op for in-memory).
+        """
         self._sources.add(source_system)
-        return ImportResult(source_system=source_system)
+        entities_imported = 0
+        if since:
+            for (src, _eid), _iid in self._id_map.items():
+                if src == source_system:
+                    entities_imported += 1
+        return ImportResult(
+            source_system=source_system,
+            entities_imported=entities_imported,
+        )
 
     async def list_sources(self) -> list[str]:
         """Return the names of registered external source systems."""

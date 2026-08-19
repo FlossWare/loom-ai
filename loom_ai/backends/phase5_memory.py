@@ -844,9 +844,7 @@ class InMemoryProgramOptimizer:
                 best_variant = variant
 
         baseline = 0.5
-        improvement = (
-            ((best_score - baseline) / baseline * 100.0) if baseline else 0.0
-        )
+        improvement = (best_score - baseline) / baseline * 100.0
 
         return OptimizationResult(
             target_id=target_id,
