@@ -231,6 +231,19 @@ _TOOLS: list[dict] = [
         "description": "Check loom-ai server health",
         "inputSchema": {"type": "object", "properties": {}},
     },
+    {
+        "name": "loom_resolve_issue",
+        "description": "Resolve a GitHub issue end-to-end using the DemoAgent",
+        "inputSchema": {
+            "type": "object",
+            "properties": {
+                "issue_number": _int_prop("GitHub issue number"),
+                "workspace": _str_prop("Repo workspace path"),
+                "issue_text": _str_prop("Issue description text"),
+            },
+            "required": ["issue_number"],
+        },
+    },
 ]
 
 
@@ -299,6 +312,37 @@ def _dispatch_secret_get(args: dict) -> dict:
     except urllib.error.HTTPError as exc:
         text = exc.read(4096).decode(errors="replace")
         raise _ToolError(f"HTTP {exc.code}: {text}") from exc
+
+
+def _dispatch_resolve_issue(args: dict) -> dict:
+    import asyncio as _asyncio
+
+    from loom_ai.demo_agent import DemoAgent
+
+    async def _run() -> dict:
+        workspace = args.get("workspace", os.getcwd())
+        agent = await DemoAgent.create(workspace=workspace)
+        result = await agent.run(
+            issue_number=args.get("issue_number"),
+            issue_text=args.get("issue_text", ""),
+            auto_pr=True,
+        )
+        return {
+            "success": result.success,
+            "error": result.error,
+            "plan": result.plan,
+            "pr_url": result.pr_url,
+        }
+
+    try:
+        return _asyncio.run(_run())
+    except Exception as exc:
+        return {
+            "success": False,
+            "error": str(exc),
+            "plan": "",
+            "pr_url": "",
+        }
 
 
 def _dispatch_search(args: dict) -> dict:
@@ -382,6 +426,7 @@ _DISPATCH_TABLE = {
     ),
     "loom_router_stats": lambda a: _api("GET", "/router/performance"),
     "loom_health": lambda a: _api("GET", "/health"),
+    "loom_resolve_issue": _dispatch_resolve_issue,
 }
 
 
