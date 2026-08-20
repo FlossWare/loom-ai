@@ -1,7 +1,7 @@
 """In-memory worker registry for loom-ai.
 
 Provides a dict-backed implementation of the
-:class:`~loom_ai.contracts_phase3.WorkerRegistry` protocol.  All data
+:class:`~loom_ai.contracts_session.WorkerRegistry` protocol.  All data
 is ephemeral -- nothing survives process exit.  No external dependencies.
 
 Classes
@@ -13,13 +13,13 @@ from __future__ import annotations
 
 from datetime import datetime, timezone
 
-from loom_ai.models_phase3 import DiversityReport, WorkerInfo, WorkerStatus
+from loom_ai.models_session import DiversityReport, WorkerInfo, WorkerStatus
 
 
 class InMemoryWorkerRegistry:
     """Dict-backed worker registry with health and diversity analysis.
 
-    Satisfies :class:`~loom_ai.contracts_phase3.WorkerRegistry` via
+    Satisfies :class:`~loom_ai.contracts_session.WorkerRegistry` via
     structural subtyping -- no inheritance required.
 
     Workers are stored by their ``id`` field.  Health checks default to

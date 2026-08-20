@@ -39,25 +39,25 @@ from loom_ai.config_validator import (
     validate_env,
 )
 from loom_ai.consensus import ConsensusEngine, ConsensusResult
-from loom_ai.contracts_execution import (
-    ExecutionObserver,
-    ExecutionPipeline,
-    ExecutionStep,
-)
-from loom_ai.contracts_phase1 import (
+from loom_ai.contracts_core import (
     ConversationManager,
     ModelRouter,
     PersistentMemoryBackend,
     StructuredOutputMixin,
 )
-from loom_ai.contracts_phase2 import (
-    ObservabilityBackend,
-    WorkflowEngine,
+from loom_ai.contracts_execution import (
+    ExecutionObserver,
+    ExecutionPipeline,
+    ExecutionStep,
 )
-from loom_ai.contracts_phase3 import (
+from loom_ai.contracts_session import (
     EvaluationHarness,
     SessionInitializer,
     WorkerRegistry,
+)
+from loom_ai.contracts_workflow import (
+    ObservabilityBackend,
+    WorkflowEngine,
 )
 from loom_ai.execution import (
     CyclicDependencyError,

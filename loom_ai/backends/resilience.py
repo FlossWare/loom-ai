@@ -1,6 +1,6 @@
 """Circuit-breaker resilience policy for LLM providers.
 
-Implements the :class:`~loom_ai.contracts_phase2.ResiliencePolicy` protocol
+Implements the :class:`~loom_ai.contracts_workflow.ResiliencePolicy` protocol
 via structural subtyping.  Uses only the standard library -- zero external
 dependencies.
 
@@ -19,7 +19,7 @@ import time
 from dataclasses import dataclass
 from datetime import datetime, timezone
 
-from loom_ai.models_phase2 import CircuitState
+from loom_ai.models_workflow import CircuitState
 
 
 @dataclass
@@ -36,7 +36,7 @@ class _ProviderState:
 class CircuitBreakerPolicy:
     """Classic three-state circuit breaker.
 
-    Satisfies :class:`~loom_ai.contracts_phase2.ResiliencePolicy` via
+    Satisfies :class:`~loom_ai.contracts_workflow.ResiliencePolicy` via
     structural subtyping.
 
     Parameters

@@ -17,13 +17,13 @@ namespace. This is the **recommended and stable** import path.
 ## Versioning and compatibility
 
 - **Phase modules are implementation artifacts.** The files
-  `contracts_phase1.py` through `contracts_phase9.py`, `contracts_api.py`,
+  `contracts_core.py` through `contracts_context.py`, `contracts_api.py`,
   and `protocols.py` may be reorganized, merged, or renamed in future
   releases. They are not an API commitment.
 - **The `loom_ai.contracts` facade is the stable import path.** Import
   from it to avoid breakage when internal modules change.
 - **Old import paths still work.** Existing code that imports from
-  `loom_ai.protocols` or individual phase modules will continue to work.
+  `loom_ai.protocols` or individual domain modules will continue to work.
   The facade is additive -- it does not change or remove the underlying
   modules.
 - **Structural subtyping.** Protocols use `typing.Protocol` with
@@ -58,13 +58,13 @@ routing, execution patterns, RAG ingestion, and knowledge pipelines.
 
 | Protocol | Source | Purpose | Stability | Backends |
 |----------|--------|---------|-----------|----------|
-| `StructuredOutputMixin` | `contracts_phase1` | Schema-validated LLM output with retries | stable | `StructuredOutputBackend` |
-| `ConversationManager` | `contracts_phase1` | Multi-turn session management | stable | `InMemoryConversationManager` |
-| `PersistentMemoryBackend` | `contracts_phase1` | Named memory storage and recall across sessions | stable | `InMemoryPersistentMemory`, `PostgresqlPersistentMemory` |
-| `ModelRouter` | `contracts_phase1` | Provider-aware routing with fallback and cost | stable | `SimpleModelRouter`, `AdaptiveModelRouter` |
-| `ExecutionPattern` | `contracts_phase1` | Pluggable multi-model execution strategies | stable | `ConsensusPattern`, `CascadePattern`, `MapReducePattern` |
-| `ChunkingStrategy` | `contracts_phase1` | Synchronous text-chunking for RAG ingestion | stable | `TokenChunker` |
-| `KnowledgePipeline` | `contracts_phase1` | End-to-end RAG ingestion and retrieval | stable | `InMemoryKnowledgePipeline`, `PostgresqlKnowledgeStore` |
+| `StructuredOutputMixin` | `contracts_core` | Schema-validated LLM output with retries | stable | `StructuredOutputBackend` |
+| `ConversationManager` | `contracts_core` | Multi-turn session management | stable | `InMemoryConversationManager` |
+| `PersistentMemoryBackend` | `contracts_core` | Named memory storage and recall across sessions | stable | `InMemoryPersistentMemory`, `PostgresqlPersistentMemory` |
+| `ModelRouter` | `contracts_core` | Provider-aware routing with fallback and cost | stable | `SimpleModelRouter`, `AdaptiveModelRouter` |
+| `ExecutionPattern` | `contracts_core` | Pluggable multi-model execution strategies | stable | `ConsensusPattern`, `CascadePattern`, `MapReducePattern` |
+| `ChunkingStrategy` | `contracts_core` | Synchronous text-chunking for RAG ingestion | stable | `TokenChunker` |
+| `KnowledgePipeline` | `contracts_core` | End-to-end RAG ingestion and retrieval | stable | `InMemoryKnowledgePipeline`, `PostgresqlKnowledgeStore` |
 
 ## Infrastructure (8 protocols)
 
@@ -73,14 +73,14 @@ tracking, transcript storage, resilience, and observability.
 
 | Protocol | Source | Purpose | Stability | Backends |
 |----------|--------|---------|-----------|----------|
-| `WorkflowEngine` | `contracts_phase2` | Execute, resume, and inspect multi-phase workflows | stable | `SimpleWorkflowEngine` |
-| `WorkflowStorageBackend` | `contracts_phase2` | Persistence for workflow executions and worker results | stable | `InMemoryWorkflowStorage` |
-| `LearningExtractor` | `contracts_phase2` | Detect feedback, record experiences, extract learnings | stable | `SimpleLearningExtractor` |
-| `StrategySelector` | `contracts_phase2` | Thompson-Sampling strategy selection | stable | `ThompsonSamplingSelector` |
-| `BudgetTracker` | `contracts_phase2` | Track token usage and cost against budgets | stable | `InMemoryBudgetTracker`, `CostTracker` |
-| `TranscriptStore` | `contracts_phase2` | Persist and search conversation transcripts | stable | `InMemoryTranscriptStore` |
-| `ResiliencePolicy` | `contracts_phase2` | Circuit-breaker and rate-limiting for LLM providers | stable | `CircuitBreakerPolicy`, `ResilientProvider` |
-| `ObservabilityBackend` | `contracts_phase2` | Metrics, structured logging, and distributed tracing | stable | `InMemoryObservability`, `PrometheusExporter`, `ExecutionTelemetry` |
+| `WorkflowEngine` | `contracts_workflow` | Execute, resume, and inspect multi-phase workflows | stable | `SimpleWorkflowEngine` |
+| `WorkflowStorageBackend` | `contracts_workflow` | Persistence for workflow executions and worker results | stable | `InMemoryWorkflowStorage` |
+| `LearningExtractor` | `contracts_workflow` | Detect feedback, record experiences, extract learnings | stable | `SimpleLearningExtractor` |
+| `StrategySelector` | `contracts_workflow` | Thompson-Sampling strategy selection | stable | `ThompsonSamplingSelector` |
+| `BudgetTracker` | `contracts_workflow` | Track token usage and cost against budgets | stable | `InMemoryBudgetTracker`, `CostTracker` |
+| `TranscriptStore` | `contracts_workflow` | Persist and search conversation transcripts | stable | `InMemoryTranscriptStore` |
+| `ResiliencePolicy` | `contracts_workflow` | Circuit-breaker and rate-limiting for LLM providers | stable | `CircuitBreakerPolicy`, `ResilientProvider` |
+| `ObservabilityBackend` | `contracts_workflow` | Metrics, structured logging, and distributed tracing | stable | `InMemoryObservability`, `PrometheusExporter`, `ExecutionTelemetry` |
 
 ## Session and Control (6 protocols)
 
@@ -89,12 +89,12 @@ evaluation, feedback loop detection, and human-in-the-loop.
 
 | Protocol | Source | Purpose | Stability | Backends |
 |----------|--------|---------|-----------|----------|
-| `SessionInitializer` | `contracts_phase3` | Bootstrap orchestration session with fleet context | stable | `SimpleSessionInitializer` |
-| `WorkerRegistry` | `contracts_phase3` | Registry for managing fleet worker nodes | stable | `InMemoryWorkerRegistry` |
-| `CachePolicy` | `contracts_phase3` | Prompt-caching strategy for provider-specific hints | stable | `PromptCachePolicy` |
-| `EvaluationHarness` | `contracts_phase3` | Multi-model adversarial evaluation of outputs | stable | `SimpleEvaluationHarness` |
-| `FeedbackLoopDetector` | `contracts_phase3` | Detect self-referential feedback loops in the fleet | stable | `SimpleFeedbackLoopDetector` |
-| `HumanInTheLoop` | `contracts_phase3` | Request human input during orchestration | stable | `AutoApproveHumanInTheLoop`, `CallbackHumanInTheLoop` |
+| `SessionInitializer` | `contracts_session` | Bootstrap orchestration session with fleet context | stable | `SimpleSessionInitializer` |
+| `WorkerRegistry` | `contracts_session` | Registry for managing fleet worker nodes | stable | `InMemoryWorkerRegistry` |
+| `CachePolicy` | `contracts_session` | Prompt-caching strategy for provider-specific hints | stable | `PromptCachePolicy` |
+| `EvaluationHarness` | `contracts_session` | Multi-model adversarial evaluation of outputs | stable | `SimpleEvaluationHarness` |
+| `FeedbackLoopDetector` | `contracts_session` | Detect self-referential feedback loops in the fleet | stable | `SimpleFeedbackLoopDetector` |
+| `HumanInTheLoop` | `contracts_session` | Request human input during orchestration | stable | `AutoApproveHumanInTheLoop`, `CallbackHumanInTheLoop` |
 
 ## Knowledge Graph (5 protocols)
 
@@ -103,11 +103,11 @@ external graph ingestion, and belief/evidence management.
 
 | Protocol | Source | Purpose | Stability | Backends |
 |----------|--------|---------|-----------|----------|
-| `KnowledgeGraph` | `contracts_phase4` | Core entity, relationship, and claim operations | experimental | `InMemoryKnowledgeGraph` |
-| `TemporalKnowledgeStore` | `contracts_phase4` | Temporal validity and historical queries | experimental | `InMemoryTemporalKnowledgeStore` |
-| `GraphRetriever` | `contracts_phase4` | Graph-enhanced retrieval (local/global/hybrid) | experimental | `InMemoryGraphRetriever` |
-| `ExternalGraphAdapter` | `contracts_phase4` | External graph and code graph ingestion | experimental | `InMemoryExternalGraphAdapter` |
-| `BeliefManager` | `contracts_phase4` | Belief, evidence, contradiction, and consensus | experimental | `InMemoryBeliefManager` |
+| `KnowledgeGraph` | `contracts_graph` | Core entity, relationship, and claim operations | experimental | `InMemoryKnowledgeGraph` |
+| `TemporalKnowledgeStore` | `contracts_graph` | Temporal validity and historical queries | experimental | `InMemoryTemporalKnowledgeStore` |
+| `GraphRetriever` | `contracts_graph` | Graph-enhanced retrieval (local/global/hybrid) | experimental | `InMemoryGraphRetriever` |
+| `ExternalGraphAdapter` | `contracts_graph` | External graph and code graph ingestion | experimental | `InMemoryExternalGraphAdapter` |
+| `BeliefManager` | `contracts_graph` | Belief, evidence, contradiction, and consensus | experimental | `InMemoryBeliefManager` |
 
 ## Advanced Evaluation and Telemetry (8 protocols)
 
@@ -117,14 +117,14 @@ and program optimization.
 
 | Protocol | Source | Purpose | Stability | Backends |
 |----------|--------|---------|-----------|----------|
-| `EvalSuite` | `contracts_phase5` | Dataset-driven evaluation and regression testing | experimental | `InMemoryEvalSuite` |
-| `GenAITelemetry` | `contracts_phase5` | GenAI-specific observability with semantic spans | experimental | `InMemoryGenAITelemetry` |
-| `InferenceRouter` | `contracts_phase5` | Capability-aware model routing with adaptive selection | experimental | `InMemoryInferenceRouter` |
-| `AgentLifecycleRuntime` | `contracts_phase5` | Agent lifecycle, state, and durable execution | experimental | `InMemoryAgentLifecycleRuntime` |
-| `AgentMemory` | `contracts_phase5` | Persistent, scoped, typed agent memory | experimental | `InMemoryAgentMemory` |
-| `OutputValidator` | `contracts_phase5` | Schema-driven output validation and tool auth | experimental | `InMemoryOutputValidator` |
-| `SecurityGate` | `contracts_phase5` | AI security, authorization, and trust boundaries | experimental | `InMemorySecurityGate` |
-| `ProgramOptimizer` | `contracts_phase5` | Evaluation-driven prompt/model/strategy optimization | experimental | `InMemoryProgramOptimizer` |
+| `EvalSuite` | `contracts_inference` | Dataset-driven evaluation and regression testing | experimental | `InMemoryEvalSuite` |
+| `GenAITelemetry` | `contracts_inference` | GenAI-specific observability with semantic spans | experimental | `InMemoryGenAITelemetry` |
+| `InferenceRouter` | `contracts_inference` | Capability-aware model routing with adaptive selection | experimental | `InMemoryInferenceRouter` |
+| `AgentLifecycleRuntime` | `contracts_inference` | Agent lifecycle, state, and durable execution | experimental | `InMemoryAgentLifecycleRuntime` |
+| `AgentMemory` | `contracts_inference` | Persistent, scoped, typed agent memory | experimental | `InMemoryAgentMemory` |
+| `OutputValidator` | `contracts_inference` | Schema-driven output validation and tool auth | experimental | `InMemoryOutputValidator` |
+| `SecurityGate` | `contracts_inference` | AI security, authorization, and trust boundaries | experimental | `InMemorySecurityGate` |
+| `ProgramOptimizer` | `contracts_inference` | Evaluation-driven prompt/model/strategy optimization | experimental | `InMemoryProgramOptimizer` |
 
 ## Agent Architecture (7 protocols)
 
@@ -133,13 +133,13 @@ trajectory capture, executable environments, and capability taxonomy.
 
 | Protocol | Source | Purpose | Stability | Backends |
 |----------|--------|---------|-----------|----------|
-| `AgentLoop` | `contracts_phase6` | Re-entrant agent loop with pause/resume/cancel | experimental | `InMemoryAgentLoop` |
-| `RecipeExecutor` | `contracts_phase6` | Portable, declarative agent recipe execution | experimental | `InMemoryRecipeExecutor` |
-| `ACPAdapter` | `contracts_phase6` | ACP agent interoperability and session management | experimental | `InMemoryACPAdapter` |
-| `ContextAssembler` | `contracts_phase6` | Context construction, budgeting, and compaction | experimental | `InMemoryContextAssembler` |
-| `TrajectoryStore` | `contracts_phase6` | Trajectory capture, replay, and curation | experimental | `InMemoryTrajectoryStore` |
-| `AgentEnvironment` | `contracts_phase6` | Executable environment lifecycle and observation | experimental | `InMemoryAgentEnvironment` |
-| `AgentCapabilityRegistry` | `contracts_phase6` | Agent/model capability taxonomy and matching | experimental | `InMemoryAgentCapabilityRegistry` |
+| `AgentLoop` | `contracts_agent` | Re-entrant agent loop with pause/resume/cancel | experimental | `InMemoryAgentLoop` |
+| `RecipeExecutor` | `contracts_agent` | Portable, declarative agent recipe execution | experimental | `InMemoryRecipeExecutor` |
+| `ACPAdapter` | `contracts_agent` | ACP agent interoperability and session management | experimental | `InMemoryACPAdapter` |
+| `ContextAssembler` | `contracts_agent` | Context construction, budgeting, and compaction | experimental | `InMemoryContextAssembler` |
+| `TrajectoryStore` | `contracts_agent` | Trajectory capture, replay, and curation | experimental | `InMemoryTrajectoryStore` |
+| `AgentEnvironment` | `contracts_agent` | Executable environment lifecycle and observation | experimental | `InMemoryAgentEnvironment` |
+| `AgentCapabilityRegistry` | `contracts_agent` | Agent/model capability taxonomy and matching | experimental | `InMemoryAgentCapabilityRegistry` |
 
 ## Provider Discovery (4 protocols)
 
@@ -148,10 +148,10 @@ enforcement, and catalog synchronization.
 
 | Protocol | Source | Purpose | Stability | Backends |
 |----------|--------|---------|-----------|----------|
-| `ProviderRegistry` | `contracts_phase7` | Dynamic provider and model discovery | experimental | `InMemoryProviderRegistry` |
-| `ProviderCapabilityRegistry` | `contracts_phase7` | Rate limits, quotas, pricing metadata | experimental | `InMemoryProviderCapabilityRegistry` |
-| `PolicyRegistry` | `contracts_phase7` | Provider policy, privacy, and eligibility | experimental | `InMemoryPolicyRegistry` |
-| `CatalogSynchronizer` | `contracts_phase7` | Model catalog sync and staleness detection | experimental | `InMemoryCatalogSynchronizer` |
+| `ProviderRegistry` | `contracts_provider` | Dynamic provider and model discovery | experimental | `InMemoryProviderRegistry` |
+| `ProviderCapabilityRegistry` | `contracts_provider` | Rate limits, quotas, pricing metadata | experimental | `InMemoryProviderCapabilityRegistry` |
+| `PolicyRegistry` | `contracts_provider` | Provider policy, privacy, and eligibility | experimental | `InMemoryPolicyRegistry` |
+| `CatalogSynchronizer` | `contracts_provider` | Model catalog sync and staleness detection | experimental | `InMemoryCatalogSynchronizer` |
 
 ## Competitive Evaluation (9 protocols)
 
@@ -161,15 +161,15 @@ inference optimization, output normalization, and consensus strategies.
 
 | Protocol | Source | Purpose | Stability | Backends |
 |----------|--------|---------|-----------|----------|
-| `EvalCapabilityRegistry` | `contracts_phase8` | Capability registry and discovery for evaluation | experimental | `InMemoryEvalCapabilityRegistry` |
-| `CapabilitySelector` | `contracts_phase8` | Capability health, fallback, and backend selection | experimental | `InMemoryCapabilitySelector` |
-| `InteractionEvaluator` | `contracts_phase8` | Multi-agent interaction evaluation | experimental | `InMemoryInteractionEvaluator` |
-| `SkillEstimator` | `contracts_phase8` | Bayesian agent capability and skill estimation | experimental | `InMemorySkillEstimator` |
-| `EvaluationEnvironment` | `contracts_phase8` | Dynamic multi-agent evaluation environment | experimental | `InMemoryEvaluationEnvironment` |
-| `TournamentRunner` | `contracts_phase8` | Multi-model competitive evaluation | experimental | `InMemoryTournamentRunner` |
-| `InferenceOptimizer` | `contracts_phase8` | Adaptive inference parameter optimization | experimental | `InMemoryInferenceOptimizer` |
-| `OutputNormalizer` | `contracts_phase8` | Model output normalization and semantic comparison | experimental | `InMemoryOutputNormalizer` |
-| `ConsensusStrategy` | `contracts_phase8` | Pluggable consensus/ensemble/voting strategies | experimental | `InMemoryConsensusStrategy` |
+| `EvalCapabilityRegistry` | `contracts_capability` | Capability registry and discovery for evaluation | experimental | `InMemoryEvalCapabilityRegistry` |
+| `CapabilitySelector` | `contracts_capability` | Capability health, fallback, and backend selection | experimental | `InMemoryCapabilitySelector` |
+| `InteractionEvaluator` | `contracts_capability` | Multi-agent interaction evaluation | experimental | `InMemoryInteractionEvaluator` |
+| `SkillEstimator` | `contracts_capability` | Bayesian agent capability and skill estimation | experimental | `InMemorySkillEstimator` |
+| `EvaluationEnvironment` | `contracts_capability` | Dynamic multi-agent evaluation environment | experimental | `InMemoryEvaluationEnvironment` |
+| `TournamentRunner` | `contracts_capability` | Multi-model competitive evaluation | experimental | `InMemoryTournamentRunner` |
+| `InferenceOptimizer` | `contracts_capability` | Adaptive inference parameter optimization | experimental | `InMemoryInferenceOptimizer` |
+| `OutputNormalizer` | `contracts_capability` | Model output normalization and semantic comparison | experimental | `InMemoryOutputNormalizer` |
+| `ConsensusStrategy` | `contracts_capability` | Pluggable consensus/ensemble/voting strategies | experimental | `InMemoryConsensusStrategy` |
 
 ## Pluggable Runtimes (10 protocols)
 
@@ -180,16 +180,16 @@ validation.
 
 | Protocol | Source | Purpose | Stability | Backends |
 |----------|--------|---------|-----------|----------|
-| `ModelEvaluationCandidate` | `contracts_phase9` | Provider-neutral model evaluation and profiling | experimental | `InMemoryModelEvaluationCandidate` |
-| `CanonicalSourceIndex` | `contracts_phase9` | Canonical-source vs derived-index lifecycle | experimental | `InMemoryCanonicalSourceIndex` |
-| `ContextCompressor` | `contracts_phase9` | Reversible, content-aware context compression | experimental | `InMemoryContextCompressor` |
-| `PromptCacheOptimizer` | `contracts_phase9` | Provider-neutral prompt-cache optimization | experimental | `InMemoryPromptCacheOptimizer` |
-| `PluggableAgentRuntime` | `contracts_phase9` | Interchangeable agent runtimes (Goose, Claude Code, etc.) | experimental | `InMemoryPluggableAgentRuntime` |
-| `ContextEngine` | `contracts_phase9` | Pluggable context-engineering middleware | experimental | `InMemoryContextEngine` |
-| `CapabilityBackend` | `contracts_phase9` | Pluggable capability and tool backend | experimental | `InMemoryCapabilityBackend` |
-| `EvaluationEngine` | `contracts_phase9` | Provider-neutral evaluation and tournament engine | experimental | `InMemoryEvaluationEngine` |
-| `HealthCheckPolicy` | `contracts_phase9` | Authenticated health-check semantics | experimental | `InMemoryHealthCheckPolicy` |
-| `RequestValidator` | `contracts_phase9` | REST API request/response validation | experimental | `InMemoryRequestValidator` |
+| `ModelEvaluationCandidate` | `contracts_context` | Provider-neutral model evaluation and profiling | experimental | `InMemoryModelEvaluationCandidate` |
+| `CanonicalSourceIndex` | `contracts_context` | Canonical-source vs derived-index lifecycle | experimental | `InMemoryCanonicalSourceIndex` |
+| `ContextCompressor` | `contracts_context` | Reversible, content-aware context compression | experimental | `InMemoryContextCompressor` |
+| `PromptCacheOptimizer` | `contracts_context` | Provider-neutral prompt-cache optimization | experimental | `InMemoryPromptCacheOptimizer` |
+| `PluggableAgentRuntime` | `contracts_context` | Interchangeable agent runtimes (Goose, Claude Code, etc.) | experimental | `InMemoryPluggableAgentRuntime` |
+| `ContextEngine` | `contracts_context` | Pluggable context-engineering middleware | experimental | `InMemoryContextEngine` |
+| `CapabilityBackend` | `contracts_context` | Pluggable capability and tool backend | experimental | `InMemoryCapabilityBackend` |
+| `EvaluationEngine` | `contracts_context` | Provider-neutral evaluation and tournament engine | experimental | `InMemoryEvaluationEngine` |
+| `HealthCheckPolicy` | `contracts_context` | Authenticated health-check semantics | experimental | `InMemoryHealthCheckPolicy` |
+| `RequestValidator` | `contracts_context` | REST API request/response validation | experimental | `InMemoryRequestValidator` |
 
 ## API (3 protocols)
 

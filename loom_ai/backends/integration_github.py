@@ -14,13 +14,13 @@ from __future__ import annotations
 import uuid
 from typing import Any
 
-from loom_ai.models_phase4 import (
+from loom_ai.models_context import CapabilityDescriptor, CapabilityResult
+from loom_ai.models_graph import (
     ExternalEntity,
     ExternalRelationship,
     ImportMapping,
     ImportResult,
 )
-from loom_ai.models_phase9 import CapabilityDescriptor, CapabilityResult
 
 try:
     import github as _github_lib  # type: ignore[import-untyped]

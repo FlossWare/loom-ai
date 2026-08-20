@@ -57,7 +57,7 @@ from __future__ import annotations
 from typing import TYPE_CHECKING, Protocol, runtime_checkable
 
 if TYPE_CHECKING:
-    from loom_ai.models_phase8 import (
+    from loom_ai.models_capability import (
         CapabilityHealthState,
         CapabilityProvider,
         ComparisonResult,

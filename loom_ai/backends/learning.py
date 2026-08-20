@@ -1,6 +1,6 @@
 """In-memory learning extractor backend for loom-ai.
 
-Implements the :class:`~loom_ai.contracts_phase2.LearningExtractor`
+Implements the :class:`~loom_ai.contracts_workflow.LearningExtractor`
 protocol via structural subtyping.  All state is held in plain dicts
 and lists -- no external dependencies.  Data is lost on process exit.
 
@@ -18,7 +18,7 @@ import uuid
 from datetime import datetime, timezone
 
 from loom_ai.models import ChatMessage
-from loom_ai.models_phase2 import FeedbackSignal, Learning
+from loom_ai.models_workflow import FeedbackSignal, Learning
 
 # ── Feedback-detection patterns ──────────────────────────────────────────
 #
@@ -100,13 +100,13 @@ def _extract_key_phrases(text: str) -> list[str]:
 
 
 class SimpleLearningExtractor:
-    """In-memory :class:`~loom_ai.contracts_phase2.LearningExtractor`.
+    """In-memory :class:`~loom_ai.contracts_workflow.LearningExtractor`.
 
     Stores experiences, feedback signals, and strategy rewards in plain
     Python data structures.  Suitable for testing and single-process
     deployments.
 
-    Satisfies :class:`~loom_ai.contracts_phase2.LearningExtractor` via
+    Satisfies :class:`~loom_ai.contracts_workflow.LearningExtractor` via
     structural subtyping -- no inheritance required.
     """
 
@@ -170,7 +170,7 @@ class SimpleLearningExtractor:
 
         Key phrases are extracted from both the task description and the
         outcome text.  Each phrase becomes a separate
-        :class:`~loom_ai.models_phase2.Learning`.
+        :class:`~loom_ai.models_workflow.Learning`.
         """
         experience = self._experiences.get(experience_id)
         if experience is None:

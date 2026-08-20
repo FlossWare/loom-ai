@@ -18,7 +18,7 @@ from __future__ import annotations
 import random
 from dataclasses import dataclass, field
 
-from loom_ai.models_phase1 import ModelInfo, ProviderStatus
+from loom_ai.models_core import ModelInfo, ProviderStatus
 
 # ---------------------------------------------------------------------------
 # Capability profile

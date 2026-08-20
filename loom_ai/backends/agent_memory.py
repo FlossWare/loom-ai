@@ -21,7 +21,7 @@ import uuid
 from datetime import datetime, timezone
 from typing import Any
 
-from loom_ai.models_phase6 import (
+from loom_ai.models_agent import (
     ACPEvent,
     ACPMessage,
     ACPSession,

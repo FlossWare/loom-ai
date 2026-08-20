@@ -1,8 +1,8 @@
 """Tests for the in-memory knowledge graph backend."""
 
 from loom_ai.backends.graph import InMemoryKnowledgeGraph, orientdb_available
-from loom_ai.contracts_phase4 import KnowledgeGraph
-from loom_ai.models_phase4 import (
+from loom_ai.contracts_graph import KnowledgeGraph
+from loom_ai.models_graph import (
     Claim,
     KnowledgeEntity,
     KnowledgeRelationship,

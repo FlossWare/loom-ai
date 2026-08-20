@@ -25,7 +25,7 @@ from dataclasses import asdict
 from datetime import datetime, timezone
 from typing import Any
 
-from loom_ai.models_phase5 import (
+from loom_ai.models_inference import (
     AgentEvent,
     AgentLifecycleState,
     AgentMemoryEntry,

@@ -41,7 +41,7 @@ class _JsonFormatter(logging.Formatter):
 class StructuredLoggingObservability:
     """Structured logging observability backend.
 
-    Satisfies :class:`~loom_ai.contracts_phase2.ObservabilityBackend` via
+    Satisfies :class:`~loom_ai.contracts_workflow.ObservabilityBackend` via
     structural subtyping -- no inheritance required.
 
     Parameters

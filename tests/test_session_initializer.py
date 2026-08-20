@@ -8,8 +8,8 @@ No external dependencies required.
 from __future__ import annotations
 
 from loom_ai.backends.session import SimpleSessionInitializer
-from loom_ai.contracts_phase3 import SessionInitializer
-from loom_ai.models_phase3 import SessionBriefing
+from loom_ai.contracts_session import SessionInitializer
+from loom_ai.models_session import SessionBriefing
 
 # ── helpers ──────────────────────────────────────────────────────────────
 

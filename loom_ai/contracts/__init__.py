@@ -6,10 +6,10 @@ re-exported here so that consumers can write::
 
     from loom_ai.contracts import StorageBackend, WorkflowEngine, ...
 
-The underlying phase modules (``contracts_phase1`` through
-``contracts_phase9``, ``contracts_api``, and ``protocols``) are
-implementation artifacts and may be reorganised in future releases.
-Import from this facade to avoid breakage.
+The underlying domain modules (``contracts_core``, ``contracts_workflow``,
+etc., plus ``contracts_api`` and ``protocols``) are implementation
+artifacts and may be reorganised in future releases.  Import from this
+facade to avoid breakage.
 
 Protocols use structural subtyping -- implementations do **not** need
 to import or inherit from these classes.  Any object whose methods
@@ -18,83 +18,9 @@ match the protocol signature satisfies the contract at runtime.
 
 from __future__ import annotations
 
-# ── REST API contracts (contracts_api.py) ────────────────────────────
-from loom_ai.contracts_api import (
-    ErrorHandler,
-    Middleware,
-    RequestLifecycle,
-)
-
-# ── Execution protocols (contracts_execution.py) ─────────────────────
-from loom_ai.contracts_execution import (
-    ExecutionObserver,
-    ExecutionPipeline,
-    ExecutionStep,
-)
-
-# ── Phase 1: Structured output, conversation, memory, routing, ──────
-# ──          patterns, RAG, streaming                            ──────
-from loom_ai.contracts_phase1 import (
-    ChunkingStrategy,
-    ConversationManager,
-    ExecutionPattern,
-    KnowledgePipeline,
-    ModelRouter,
-    PersistentMemoryBackend,
-    StructuredOutputMixin,
-)
-
-# ── Phase 2: Workflow, learning, strategy, budget, transcript, ───────
-# ──          resilience, observability                          ───────
-from loom_ai.contracts_phase2 import (
-    BudgetTracker,
-    LearningExtractor,
-    ObservabilityBackend,
-    ResiliencePolicy,
-    StrategySelector,
-    TranscriptStore,
-    WorkflowEngine,
-    WorkflowStorageBackend,
-)
-
-# ── Phase 3: Session, worker registry, cache, evaluation, ───────────
-# ──          feedback loops, human-in-the-loop             ───────────
-from loom_ai.contracts_phase3 import (
-    CachePolicy,
-    EvaluationHarness,
-    FeedbackLoopDetector,
-    HumanInTheLoop,
-    SessionInitializer,
-    WorkerRegistry,
-)
-
-# ── Phase 4: Knowledge graph, temporal, GraphRAG, external ──────────
-# ──          graph, belief management                      ──────────
-from loom_ai.contracts_phase4 import (
-    BeliefManager,
-    ExternalGraphAdapter,
-    GraphRetriever,
-    KnowledgeGraph,
-    TemporalKnowledgeStore,
-)
-
-# ── Phase 5: Eval suite, telemetry, inference routing, agent ────────
-# ──          lifecycle, agent memory, output validation,      ────────
-# ──          security, program optimization                   ────────
-from loom_ai.contracts_phase5 import (
-    AgentLifecycleRuntime,
-    AgentMemory,
-    EvalSuite,
-    GenAITelemetry,
-    InferenceRouter,
-    OutputValidator,
-    ProgramOptimizer,
-    SecurityGate,
-)
-
-# ── Phase 6: Agent loop, recipe, ACP, context assembler, ────────────
-# ──          trajectory, environment, capability registry ────────────
-from loom_ai.contracts_phase6 import (
+# ── Agent: agent loop, recipe, ACP, context assembler, ──────────────
+# ──        trajectory, environment, capability registry ──────────────
+from loom_ai.contracts_agent import (
     ACPAdapter,
     AgentCapabilityRegistry,
     AgentEnvironment,
@@ -104,20 +30,17 @@ from loom_ai.contracts_phase6 import (
     TrajectoryStore,
 )
 
-# ── Phase 7: Provider registry, capability registry, policy, ────────
-# ──          catalog synchronization                          ────────
-from loom_ai.contracts_phase7 import (
-    CatalogSynchronizer,
-    PolicyRegistry,
-    ProviderCapabilityRegistry,
-    ProviderRegistry,
+# ── REST API contracts (contracts_api.py) ────────────────────────────
+from loom_ai.contracts_api import (
+    ErrorHandler,
+    Middleware,
+    RequestLifecycle,
 )
 
-# ── Phase 8: Eval capability, capability selector, interaction ──────
-# ──          evaluator, skill estimator, evaluation env,        ──────
-# ──          tournament, inference optimizer, output normalizer, ─────
-# ──          consensus strategy                                  ─────
-from loom_ai.contracts_phase8 import (
+# ── Capability: eval capability, capability selector, interaction ────
+# ──             evaluator, skill estimator, evaluation env,       ────
+# ──             tournament, inference optimizer, output normalizer ────
+from loom_ai.contracts_capability import (
     CapabilitySelector,
     ConsensusStrategy,
     EvalCapabilityRegistry,
@@ -129,12 +52,11 @@ from loom_ai.contracts_phase8 import (
     TournamentRunner,
 )
 
-# ── Phase 9: Model evaluation, canonical source, context ────────────
-# ──          compressor, prompt cache, pluggable runtimes, ───────────
-# ──          context engine, capability backend,            ───────────
-# ──          evaluation engine, health check, request       ───────────
-# ──          validation                                     ───────────
-from loom_ai.contracts_phase9 import (
+# ── Context: model evaluation, canonical source, context ────────────
+# ──          compressor, prompt cache, pluggable runtimes, ──────────
+# ──          context engine, capability backend, evaluation ─────────
+# ──          engine, health check, request validation       ─────────
+from loom_ai.contracts_context import (
     CanonicalSourceIndex,
     CapabilityBackend,
     ContextCompressor,
@@ -145,6 +67,82 @@ from loom_ai.contracts_phase9 import (
     PluggableAgentRuntime,
     PromptCacheOptimizer,
     RequestValidator,
+)
+
+# ── Core: Structured output, conversation, memory, routing, ─────────
+# ──       patterns, RAG, streaming                           ─────────
+from loom_ai.contracts_core import (
+    ChunkingStrategy,
+    ConversationManager,
+    ExecutionPattern,
+    KnowledgePipeline,
+    ModelRouter,
+    PersistentMemoryBackend,
+    StructuredOutputMixin,
+)
+
+# ── Execution protocols (contracts_execution.py) ─────────────────────
+from loom_ai.contracts_execution import (
+    ExecutionObserver,
+    ExecutionPipeline,
+    ExecutionStep,
+)
+
+# ── Graph: Knowledge graph, temporal, GraphRAG, external, ───────────
+# ──        belief management                              ───────────
+from loom_ai.contracts_graph import (
+    BeliefManager,
+    ExternalGraphAdapter,
+    GraphRetriever,
+    KnowledgeGraph,
+    TemporalKnowledgeStore,
+)
+
+# ── Inference: eval suite, telemetry, inference routing, agent ───────
+# ──            lifecycle, agent memory, output validation,     ───────
+# ──            security, program optimization                  ───────
+from loom_ai.contracts_inference import (
+    AgentLifecycleRuntime,
+    AgentMemory,
+    EvalSuite,
+    GenAITelemetry,
+    InferenceRouter,
+    OutputValidator,
+    ProgramOptimizer,
+    SecurityGate,
+)
+
+# ── Provider: provider registry, capability registry, policy, ───────
+# ──           catalog synchronization                         ───────
+from loom_ai.contracts_provider import (
+    CatalogSynchronizer,
+    PolicyRegistry,
+    ProviderCapabilityRegistry,
+    ProviderRegistry,
+)
+
+# ── Session: worker registry, cache, evaluation, ────────────────────
+# ──          feedback loops, human-in-the-loop    ────────────────────
+from loom_ai.contracts_session import (
+    CachePolicy,
+    EvaluationHarness,
+    FeedbackLoopDetector,
+    HumanInTheLoop,
+    SessionInitializer,
+    WorkerRegistry,
+)
+
+# ── Workflow: learning, strategy, budget, transcript, ────────────────
+# ──           resilience, observability               ────────────────
+from loom_ai.contracts_workflow import (
+    BudgetTracker,
+    LearningExtractor,
+    ObservabilityBackend,
+    ResiliencePolicy,
+    StrategySelector,
+    TranscriptStore,
+    WorkflowEngine,
+    WorkflowStorageBackend,
 )
 
 # ── Core protocols (protocols.py) ────────────────────────────────────
@@ -175,7 +173,7 @@ __all__ = [
     "StorageBackend",
     "TaskRunner",
     "ToolProvider",
-    # Phase 1 -- 7
+    # Core -- 7
     "ChunkingStrategy",
     "ConversationManager",
     "ExecutionPattern",
@@ -183,7 +181,7 @@ __all__ = [
     "ModelRouter",
     "PersistentMemoryBackend",
     "StructuredOutputMixin",
-    # Phase 2 -- 8
+    # Workflow -- 8
     "BudgetTracker",
     "LearningExtractor",
     "ObservabilityBackend",
@@ -192,20 +190,20 @@ __all__ = [
     "TranscriptStore",
     "WorkflowEngine",
     "WorkflowStorageBackend",
-    # Phase 3 -- 6
+    # Session -- 6
     "CachePolicy",
     "EvaluationHarness",
     "FeedbackLoopDetector",
     "HumanInTheLoop",
     "SessionInitializer",
     "WorkerRegistry",
-    # Phase 4 -- 5
+    # Graph -- 5
     "BeliefManager",
     "ExternalGraphAdapter",
     "GraphRetriever",
     "KnowledgeGraph",
     "TemporalKnowledgeStore",
-    # Phase 5 -- 8
+    # Inference -- 8
     "AgentLifecycleRuntime",
     "AgentMemory",
     "EvalSuite",
@@ -214,7 +212,7 @@ __all__ = [
     "OutputValidator",
     "ProgramOptimizer",
     "SecurityGate",
-    # Phase 6 -- 7
+    # Agent -- 7
     "ACPAdapter",
     "AgentCapabilityRegistry",
     "AgentEnvironment",
@@ -222,12 +220,12 @@ __all__ = [
     "ContextAssembler",
     "RecipeExecutor",
     "TrajectoryStore",
-    # Phase 7 -- 4
+    # Provider -- 4
     "CatalogSynchronizer",
     "PolicyRegistry",
     "ProviderCapabilityRegistry",
     "ProviderRegistry",
-    # Phase 8 -- 9
+    # Capability -- 9
     "CapabilitySelector",
     "ConsensusStrategy",
     "EvalCapabilityRegistry",
@@ -237,7 +235,7 @@ __all__ = [
     "OutputNormalizer",
     "SkillEstimator",
     "TournamentRunner",
-    # Phase 9 -- 10
+    # Context -- 10
     "CanonicalSourceIndex",
     "CapabilityBackend",
     "ContextCompressor",

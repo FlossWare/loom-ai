@@ -3,9 +3,9 @@
 import pytest
 
 from loom_ai.backends.learning import SimpleLearningExtractor
-from loom_ai.contracts_phase2 import LearningExtractor
+from loom_ai.contracts_workflow import LearningExtractor
 from loom_ai.models import ChatMessage
-from loom_ai.models_phase2 import Learning
+from loom_ai.models_workflow import Learning
 
 # ── Protocol conformance ─────────────────────────────────────────────────
 

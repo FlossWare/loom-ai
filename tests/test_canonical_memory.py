@@ -6,7 +6,7 @@ from loom_ai.backends.conversation import InMemoryConversationManager
 from loom_ai.backends.scoped_memory import ScopedMemoryView
 from loom_ai.config import GraphLike
 from loom_ai.models import ChatMessage
-from loom_ai.models_phase1 import MemoryRecord
+from loom_ai.models_core import MemoryRecord
 
 
 class TestMemoryRecordCanonical:

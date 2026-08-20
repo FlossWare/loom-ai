@@ -25,7 +25,7 @@ from __future__ import annotations
 from typing import TYPE_CHECKING, Any, Protocol, runtime_checkable
 
 if TYPE_CHECKING:
-    from loom_ai.models_phase5 import (
+    from loom_ai.models_inference import (
         AgentEvent,
         AgentLifecycleState,
         AgentMemoryEntry,
@@ -62,7 +62,7 @@ if TYPE_CHECKING:
 class EvalSuite(Protocol):
     """Dataset-driven evaluation, metric computation, and regression testing.
 
-    Complements :class:`~loom_ai.contracts_phase3.EvaluationHarness` which
+    Complements :class:`~loom_ai.contracts_session.EvaluationHarness` which
     provides multi-model adversarial evaluation of individual outputs.
     ``EvalSuite`` operates at the *dataset* level -- running batches of
     evaluation cases, computing named metrics, and comparing runs to
@@ -104,7 +104,7 @@ class EvalSuite(Protocol):
 class GenAITelemetry(Protocol):
     """GenAI-specific observability with semantic span attributes.
 
-    Complements :class:`~loom_ai.contracts_phase2.ObservabilityBackend`
+    Complements :class:`~loom_ai.contracts_workflow.ObservabilityBackend`
     which provides general-purpose metrics, logging, and tracing.
     ``GenAITelemetry`` adds AI-operation-specific semantics: model/provider
     attribution, token and cost tracking per span, retrieval and tool-call
@@ -149,7 +149,7 @@ class GenAITelemetry(Protocol):
 class InferenceRouter(Protocol):
     """Capability-aware model routing with adaptive selection.
 
-    Complements :class:`~loom_ai.contracts_phase1.ModelRouter` which
+    Complements :class:`~loom_ai.contracts_core.ModelRouter` which
     provides provider-level routing, fallback, and cost estimation.
     ``InferenceRouter`` adds inference-backend abstraction, capability-based
     model selection, adaptive routing hooks (e.g. Thompson Sampling), and
@@ -199,7 +199,7 @@ class InferenceRouter(Protocol):
 class AgentLifecycleRuntime(Protocol):
     """Agent lifecycle management with durable execution semantics.
 
-    Complements :class:`~loom_ai.contracts_phase2.WorkflowEngine` which
+    Complements :class:`~loom_ai.contracts_workflow.WorkflowEngine` which
     handles multi-phase workflow execution and resumption.
     ``AgentLifecycleRuntime`` focuses on individual agent lifecycle -- explicit
     state management, checkpointing, handoffs between agents, tool-call
@@ -256,7 +256,7 @@ class AgentLifecycleRuntime(Protocol):
 class AgentMemory(Protocol):
     """Scoped, typed persistent memory for agents.
 
-    Complements :class:`~loom_ai.contracts_phase1.PersistentMemoryBackend`
+    Complements :class:`~loom_ai.contracts_core.PersistentMemoryBackend`
     which provides named key-value memory storage and recall.
     ``AgentMemory`` adds agent-specific semantics: typed memory categories
     (semantic, episodic, procedural, working), confidence scores, temporal
@@ -313,7 +313,7 @@ class AgentMemory(Protocol):
 class OutputValidator(Protocol):
     """Schema-driven output validation with repair and tool authorization.
 
-    Complements :class:`~loom_ai.contracts_phase1.StructuredOutputMixin`
+    Complements :class:`~loom_ai.contracts_core.StructuredOutputMixin`
     which provides schema-validated chat completion with retries, and
     :class:`~loom_ai.protocols.ToolProvider` which provides tool
     listing and invocation.  ``OutputValidator`` separates validation,
@@ -423,7 +423,7 @@ class SecurityGate(Protocol):
 class ProgramOptimizer(Protocol):
     """Evaluation-driven optimization of prompts, models, and strategies.
 
-    Complements :class:`~loom_ai.contracts_phase2.StrategySelector` which
+    Complements :class:`~loom_ai.contracts_workflow.StrategySelector` which
     provides Thompson-Sampling strategy selection for task routing.
     ``ProgramOptimizer`` generalises optimization to arbitrary targets
     (prompts, retrieval strategies, model selection, workflows), integrates

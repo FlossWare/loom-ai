@@ -6,7 +6,7 @@ estimation.
 import pytest
 
 from loom_ai.backends.router import SimpleModelRouter
-from loom_ai.models_phase1 import ModelInfo
+from loom_ai.models_core import ModelInfo
 
 # ── Mock backends ────────────────────────────────────────────────────────
 
@@ -299,7 +299,7 @@ async def test_estimate_cost_unknown_model():
 
 async def test_satisfies_model_router_protocol():
     """SimpleModelRouter satisfies the ModelRouter protocol."""
-    from loom_ai.contracts_phase1 import ModelRouter
+    from loom_ai.contracts_core import ModelRouter
 
     router = SimpleModelRouter()
     assert isinstance(router, ModelRouter)

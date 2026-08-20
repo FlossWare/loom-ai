@@ -13,7 +13,7 @@ This document defines the core contracts (`InteractiveSession`, `SessionManager`
 
 ## Protocols/Contracts
 
-The following protocols define the core interfaces for managing and interacting with Loom-native coding sessions. These will reside in `loom_ai/contracts_phase7.py`.
+The following protocols define the core interfaces for managing and interacting with Loom-native coding sessions. These will reside in `loom_ai/contracts_provider.py`.
 
 ```python
 from __future__ import annotations
@@ -21,7 +21,7 @@ from __future__ import annotations
 from typing import TYPE_CHECKING, AsyncIterator, Literal, Protocol, runtime_checkable
 
 if TYPE_CHECKING:
-    from loom_ai.models_phase7 import (
+    from loom_ai.models_provider import (
         AgentOutput,
         SessionContext,
         SessionHistory,
@@ -106,7 +106,7 @@ class SessionManager(Protocol):
 
 ## Data Models
 
-The following data models define the structured information exchanged during an interactive session. These will reside in `loom_ai/models_phase7.py`.
+The following data models define the structured information exchanged during an interactive session. These will reside in `loom_ai/models_provider.py`.
 
 ```python
 from __future__ import annotations
@@ -189,7 +189,7 @@ The initial in-memory implementation will reside in `loom_ai/backends/in_memory_
 
 1.  **`InMemorySessionManager`**: This class will maintain a dictionary mapping `session_id` to `InMemoryInteractiveSession` instances. It will handle the creation, retrieval, and listing of sessions. Session metadata will be stored directly in memory.
 2.  **`InMemoryInteractiveSession`**:
-    *   **Agent Integration**: This class will instantiate and manage an `AgentLoop` (from `contracts_phase6.py`) internally. It will act as a bridge, translating `UserInput` into `AgentOperation`s and feeding them to the `AgentLoop`.
+    *   **Agent Integration**: This class will instantiate and manage an `AgentLoop` (from `contracts_agent.py`) internally. It will act as a bridge, translating `UserInput` into `AgentOperation`s and feeding them to the `AgentLoop`.
     *   **Output Streaming**: Agent outputs (e.g., from `AgentEnvironment` observations or `AgentLoop` state changes) will be captured and transformed into `AgentOutput` objects. An `asyncio.Queue` or similar mechanism will be used to buffer these outputs, allowing `receive_output` to yield them as an `AsyncIterator`.
     *   **History**: A simple `list[SessionHistoryEntry]` will store all `UserInput` and `AgentOutput` objects in chronological order.
     *   **Context**: The `SessionContext` will be updated dynamically based on agent actions (e.g., file modifications, task progression) and user-set autonomy levels.
@@ -200,7 +200,7 @@ The initial in-memory implementation will reside in `loom_ai/backends/in_memory_
 
 1.  **CLI Frontend Development**: Implement a command-line interface that consumes the `SessionManager` and `InteractiveSession` protocols, providing the specified UX.
 2.  **AgentLoop Integration**: Develop the internal logic within `InMemoryInteractiveSession` to effectively translate `UserInput` into `AgentOperation`s and process `AgentLoop` outputs into `AgentOutput` streams.
-3.  **Environment Interaction**: Integrate with `AgentEnvironment` (from `contracts_phase6.py`) for file system operations, code execution, and observation.
+3.  **Environment Interaction**: Integrate with `AgentEnvironment` (from `contracts_agent.py`) for file system operations, code execution, and observation.
 4.  **Autonomy Level Logic**: Implement the decision-making logic for different `AutonomyLevel` settings, particularly for tool call approvals and automatic execution.
 5.  **Error Handling and Recovery**: Define and implement robust error propagation and recovery mechanisms within the session.
 6.  **Persistence Layer**: Design and implement a persistence layer for `SessionHistory` and `SessionContext` to enable session resume/reconnect across process restarts.

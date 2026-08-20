@@ -20,7 +20,7 @@ from dataclasses import dataclass
 from datetime import datetime, timezone
 from enum import Enum
 
-from loom_ai.models_phase3 import WorkerInfo, WorkerStatus
+from loom_ai.models_session import WorkerInfo, WorkerStatus
 
 # ── data models ──────────────────────────────────────────────────────────
 

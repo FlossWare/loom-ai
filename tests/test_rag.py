@@ -8,7 +8,7 @@ from loom_ai.backends.rag import (
     _cosine_similarity,
     _simple_embedding,
 )
-from loom_ai.models_phase1 import RetrievalResult
+from loom_ai.models_core import RetrievalResult
 
 # ── _simple_embedding ────────────────────────────────────────────────────
 

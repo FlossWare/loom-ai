@@ -6,7 +6,7 @@ from loom_ai.backends.fleet import (
     RoutingStrategy,
     WorkerPool,
 )
-from loom_ai.models_phase3 import WorkerInfo
+from loom_ai.models_session import WorkerInfo
 
 
 def _worker(

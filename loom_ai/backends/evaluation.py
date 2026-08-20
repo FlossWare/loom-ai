@@ -14,7 +14,7 @@ import re
 from typing import TYPE_CHECKING, Any
 
 from loom_ai.models import ChatMessage
-from loom_ai.models_phase3 import EvaluationResult
+from loom_ai.models_session import EvaluationResult
 
 if TYPE_CHECKING:
     from loom_ai.protocols import LLMBackend
@@ -74,7 +74,7 @@ def _verdict_from_average(avg: float) -> str:
 class SimpleEvaluationHarness:
     """Multi-model evaluation harness using an ``LLMBackend``.
 
-    Satisfies :class:`~loom_ai.contracts_phase3.EvaluationHarness` via
+    Satisfies :class:`~loom_ai.contracts_session.EvaluationHarness` via
     structural subtyping.
 
     Parameters

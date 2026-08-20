@@ -10,7 +10,7 @@ from __future__ import annotations
 
 from typing import Any
 
-from loom_ai.contracts_phase6 import (
+from loom_ai.contracts_agent import (
     ACPAdapter,
     AgentCapabilityRegistry,
     AgentEnvironment,
@@ -19,7 +19,7 @@ from loom_ai.contracts_phase6 import (
     RecipeExecutor,
     TrajectoryStore,
 )
-from loom_ai.models_phase6 import (
+from loom_ai.models_agent import (
     ACPEvent,
     ACPMessage,
     ACPSession,

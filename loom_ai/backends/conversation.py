@@ -1,6 +1,6 @@
 """In-memory conversation session manager for loom-ai.
 
-Implements :class:`~loom_ai.contracts_phase1.ConversationManager` using
+Implements :class:`~loom_ai.contracts_core.ConversationManager` using
 plain dicts -- no external dependencies.  Suitable for testing, local
 development, and the *crush* deployment profile.  All data is lost on
 process exit.
@@ -25,7 +25,7 @@ def _estimate_tokens(message: ChatMessage) -> int:
 class InMemoryConversationManager:
     """Dict-backed conversation session manager.
 
-    Satisfies :class:`~loom_ai.contracts_phase1.ConversationManager` via
+    Satisfies :class:`~loom_ai.contracts_core.ConversationManager` via
     structural subtyping.
 
     Each session stores an ordered message list and optional metadata.

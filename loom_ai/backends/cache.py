@@ -1,7 +1,7 @@
 """Prompt-cache policy backend for loom-ai.
 
 Provides ``PromptCachePolicy``, a zero-dependency implementation of the
-:class:`~loom_ai.contracts_phase3.CachePolicy` protocol.  It adds
+:class:`~loom_ai.contracts_session.CachePolicy` protocol.  It adds
 provider-specific cache-control hints to message lists and tracks
 hit/miss statistics via content hashing.
 
@@ -14,7 +14,7 @@ import hashlib
 import json
 import threading
 
-from loom_ai.models_phase3 import CacheStats
+from loom_ai.models_session import CacheStats
 
 
 def _content_hash(messages: list[dict]) -> str:
@@ -31,7 +31,7 @@ def _content_hash(messages: list[dict]) -> str:
 class PromptCachePolicy:
     """Adds provider-specific cache hints and tracks cache statistics.
 
-    Satisfies :class:`~loom_ai.contracts_phase3.CachePolicy` via
+    Satisfies :class:`~loom_ai.contracts_session.CachePolicy` via
     structural subtyping.  Thread-safe via a single lock.
 
     Cache-hit detection works by hashing the full message list: if the

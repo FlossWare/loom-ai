@@ -36,7 +36,7 @@ EXPECTED_PROTOCOLS: dict[str, list[str]] = {
         "TaskRunner",
         "ToolProvider",
     ],
-    "loom_ai.contracts_phase1": [
+    "loom_ai.contracts_core": [
         "ChunkingStrategy",
         "ConversationManager",
         "ExecutionPattern",
@@ -45,7 +45,7 @@ EXPECTED_PROTOCOLS: dict[str, list[str]] = {
         "PersistentMemoryBackend",
         "StructuredOutputMixin",
     ],
-    "loom_ai.contracts_phase2": [
+    "loom_ai.contracts_workflow": [
         "BudgetTracker",
         "LearningExtractor",
         "ObservabilityBackend",
@@ -55,7 +55,7 @@ EXPECTED_PROTOCOLS: dict[str, list[str]] = {
         "WorkflowEngine",
         "WorkflowStorageBackend",
     ],
-    "loom_ai.contracts_phase3": [
+    "loom_ai.contracts_session": [
         "CachePolicy",
         "EvaluationHarness",
         "FeedbackLoopDetector",
@@ -63,14 +63,14 @@ EXPECTED_PROTOCOLS: dict[str, list[str]] = {
         "SessionInitializer",
         "WorkerRegistry",
     ],
-    "loom_ai.contracts_phase4": [
+    "loom_ai.contracts_graph": [
         "BeliefManager",
         "ExternalGraphAdapter",
         "GraphRetriever",
         "KnowledgeGraph",
         "TemporalKnowledgeStore",
     ],
-    "loom_ai.contracts_phase5": [
+    "loom_ai.contracts_inference": [
         "AgentLifecycleRuntime",
         "AgentMemory",
         "EvalSuite",
@@ -80,7 +80,7 @@ EXPECTED_PROTOCOLS: dict[str, list[str]] = {
         "ProgramOptimizer",
         "SecurityGate",
     ],
-    "loom_ai.contracts_phase6": [
+    "loom_ai.contracts_agent": [
         "ACPAdapter",
         "AgentCapabilityRegistry",
         "AgentEnvironment",
@@ -89,13 +89,13 @@ EXPECTED_PROTOCOLS: dict[str, list[str]] = {
         "RecipeExecutor",
         "TrajectoryStore",
     ],
-    "loom_ai.contracts_phase7": [
+    "loom_ai.contracts_provider": [
         "CatalogSynchronizer",
         "PolicyRegistry",
         "ProviderCapabilityRegistry",
         "ProviderRegistry",
     ],
-    "loom_ai.contracts_phase8": [
+    "loom_ai.contracts_capability": [
         "CapabilitySelector",
         "ConsensusStrategy",
         "EvalCapabilityRegistry",
@@ -106,7 +106,7 @@ EXPECTED_PROTOCOLS: dict[str, list[str]] = {
         "SkillEstimator",
         "TournamentRunner",
     ],
-    "loom_ai.contracts_phase9": [
+    "loom_ai.contracts_context": [
         "CanonicalSourceIndex",
         "CapabilityBackend",
         "ContextCompressor",

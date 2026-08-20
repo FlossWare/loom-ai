@@ -9,7 +9,7 @@ from __future__ import annotations
 import pytest
 
 from loom_ai.backends.workflow import InMemoryWorkflowStorage, SimpleWorkflowEngine
-from loom_ai.models_phase2 import (
+from loom_ai.models_workflow import (
     WorkerResult,
     WorkflowDefinition,
     WorkflowExecution,
@@ -384,12 +384,12 @@ class TestProtocolConformance:
     """Verify that implementations satisfy their Protocol contracts."""
 
     def test_storage_satisfies_protocol(self):
-        from loom_ai.contracts_phase2 import WorkflowStorageBackend
+        from loom_ai.contracts_workflow import WorkflowStorageBackend
 
         assert isinstance(InMemoryWorkflowStorage(), WorkflowStorageBackend)
 
     def test_engine_satisfies_protocol(self):
-        from loom_ai.contracts_phase2 import WorkflowEngine
+        from loom_ai.contracts_workflow import WorkflowEngine
 
         storage = InMemoryWorkflowStorage()
         assert isinstance(SimpleWorkflowEngine(storage), WorkflowEngine)

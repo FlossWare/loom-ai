@@ -13,7 +13,7 @@ short-circuit for known-fatal errors.
 Circuit-breaker integration
 ---------------------------
 When an optional :class:`~loom_ai.backends.resilience.CircuitBreakerPolicy`
-(or any :class:`~loom_ai.contracts_phase2.ResiliencePolicy` implementor) is
+(or any :class:`~loom_ai.contracts_workflow.ResiliencePolicy` implementor) is
 provided, the decorator will:
 
 1. Check ``should_allow`` before each attempt.
@@ -33,7 +33,7 @@ from dataclasses import dataclass, field
 from typing import TYPE_CHECKING, Any, Callable
 
 if TYPE_CHECKING:
-    from loom_ai.contracts_phase2 import ResiliencePolicy
+    from loom_ai.contracts_workflow import ResiliencePolicy
 
 logger = logging.getLogger(__name__)
 

@@ -15,7 +15,7 @@ from collections import Counter
 from datetime import datetime, timezone
 from typing import Any, Callable
 
-from loom_ai.models_phase3 import FeedbackLoopReport, FeedbackLoopRisk
+from loom_ai.models_session import FeedbackLoopReport, FeedbackLoopRisk
 
 # ── defaults ────────────────────────────────────────────────────────────
 
@@ -28,7 +28,7 @@ _SEVERITY_MEDIUM = 0.5
 class SimpleFeedbackLoopDetector:
     """In-memory feedback-loop detector.
 
-    Satisfies :class:`~loom_ai.contracts_phase3.FeedbackLoopDetector`
+    Satisfies :class:`~loom_ai.contracts_session.FeedbackLoopDetector`
     via structural subtyping.
 
     Parameters

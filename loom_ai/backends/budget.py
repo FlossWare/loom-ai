@@ -12,7 +12,7 @@ InMemoryBudgetTracker -- dict-backed token/cost tracker with per-model rates
 
 from __future__ import annotations
 
-from loom_ai.models_phase2 import BudgetStatus, CostReport, TokenUsage
+from loom_ai.models_workflow import BudgetStatus, CostReport, TokenUsage
 
 # Default cost per 1 000 tokens when no model-specific rate is configured.
 _DEFAULT_RATE_PER_1K = 0.01
@@ -33,7 +33,7 @@ def _extract_provider(model: str) -> str:
 class InMemoryBudgetTracker:
     """Fully async, dict-backed budget tracker.
 
-    Satisfies :class:`~loom_ai.contracts_phase2.BudgetTracker` via
+    Satisfies :class:`~loom_ai.contracts_workflow.BudgetTracker` via
     structural subtyping.
 
     Parameters

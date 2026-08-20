@@ -14,7 +14,7 @@ from __future__ import annotations
 
 from dataclasses import dataclass, field
 
-from loom_ai.models_phase1 import ModelInfo, ProviderStatus
+from loom_ai.models_core import ModelInfo, ProviderStatus
 
 
 @dataclass
@@ -34,7 +34,7 @@ class _ProviderEntry:
 class SimpleModelRouter:
     """Priority-aware model router with fallback and health tracking.
 
-    Satisfies :class:`~loom_ai.contracts_phase1.ModelRouter` via
+    Satisfies :class:`~loom_ai.contracts_core.ModelRouter` via
     structural subtyping.  No ABC or inheritance required.
 
     Providers are registered with a priority (higher wins).  When

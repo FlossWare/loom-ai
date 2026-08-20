@@ -16,7 +16,7 @@ from dataclasses import replace
 from datetime import datetime, timezone
 from typing import TYPE_CHECKING
 
-from loom_ai.models_phase4 import (
+from loom_ai.models_graph import (
     Claim,
     CommunitySummary,
     Consensus,
@@ -35,7 +35,7 @@ from loom_ai.models_phase4 import (
 )
 
 if TYPE_CHECKING:
-    from loom_ai.contracts_phase4 import KnowledgeGraph
+    from loom_ai.contracts_graph import KnowledgeGraph
 
 
 # ── InMemoryTemporalKnowledgeStore ──────────────────────────────────────

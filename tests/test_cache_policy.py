@@ -8,8 +8,8 @@ No external dependencies required.
 from __future__ import annotations
 
 from loom_ai.backends.cache import PromptCachePolicy, _content_hash
-from loom_ai.contracts_phase3 import CachePolicy
-from loom_ai.models_phase3 import CacheStats
+from loom_ai.contracts_session import CachePolicy
+from loom_ai.models_session import CacheStats
 
 # ── Protocol conformance ──────────────────────────────────────────────────
 

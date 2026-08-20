@@ -23,7 +23,7 @@ from __future__ import annotations
 import uuid
 from datetime import datetime, timezone
 
-from loom_ai.models_phase9 import (
+from loom_ai.models_context import (
     AgentInvocation,
     AgentResult,
     CacheCapability,

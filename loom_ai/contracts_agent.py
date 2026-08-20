@@ -25,7 +25,7 @@ from __future__ import annotations
 from typing import TYPE_CHECKING, Any, Protocol, runtime_checkable
 
 if TYPE_CHECKING:
-    from loom_ai.models_phase6 import (
+    from loom_ai.models_agent import (
         ACPEvent,
         ACPMessage,
         ACPSession,

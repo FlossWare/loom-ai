@@ -14,7 +14,7 @@ import json
 import pytest
 
 from loom_ai.backends.memory import InMemoryPersistentMemory
-from loom_ai.models_phase1 import RetrievalResult
+from loom_ai.models_core import RetrievalResult
 from loom_ai.session_persistence import (
     RecoveredContext,
     SessionEvent,

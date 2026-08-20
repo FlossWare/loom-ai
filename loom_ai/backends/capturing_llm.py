@@ -15,7 +15,7 @@ from typing import TYPE_CHECKING, Any
 logger = logging.getLogger(__name__)
 
 if TYPE_CHECKING:
-    from loom_ai.contracts_phase1 import KnowledgePipeline, PersistentMemoryBackend
+    from loom_ai.contracts_core import KnowledgePipeline, PersistentMemoryBackend
     from loom_ai.models import ChatMessage, ChatResponse
 
 

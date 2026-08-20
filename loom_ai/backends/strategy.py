@@ -14,7 +14,7 @@ from __future__ import annotations
 import random
 from dataclasses import dataclass
 
-from loom_ai.models_phase2 import StrategyStats
+from loom_ai.models_workflow import StrategyStats
 
 
 @dataclass
@@ -31,7 +31,7 @@ class _BanditArm:
 class ThompsonSamplingSelector:
     """In-memory Thompson Sampling strategy selector.
 
-    Satisfies :class:`~loom_ai.contracts_phase2.StrategySelector` via
+    Satisfies :class:`~loom_ai.contracts_workflow.StrategySelector` via
     structural subtyping.  Each (strategy, task_type) pair maintains
     independent Beta distribution parameters.  New arms start with a
     uniform prior (alpha=1, beta=1).

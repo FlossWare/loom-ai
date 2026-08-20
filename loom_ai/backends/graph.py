@@ -11,7 +11,7 @@ InMemoryKnowledgeGraph  -- KnowledgeGraph protocol implementation
                            with BFS/DFS traversal and path finding
 
 The ``InMemoryKnowledgeGraph`` satisfies the ``KnowledgeGraph`` protocol
-from ``contracts_phase4.py`` via structural subtyping.
+from ``contracts_graph.py`` via structural subtyping.
 """
 
 from __future__ import annotations
@@ -19,7 +19,7 @@ from __future__ import annotations
 import uuid
 from collections import deque
 
-from loom_ai.models_phase4 import (
+from loom_ai.models_graph import (
     Claim,
     KnowledgeEntity,
     KnowledgeRelationship,
@@ -55,7 +55,7 @@ class InMemoryKnowledgeGraph:
     - Shortest-path finding (BFS-based)
     - Entity search by label or properties
 
-    Satisfies :class:`~loom_ai.contracts_phase4.KnowledgeGraph` via
+    Satisfies :class:`~loom_ai.contracts_graph.KnowledgeGraph` via
     structural subtyping.
     """
 

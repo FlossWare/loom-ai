@@ -10,7 +10,7 @@ from loom_ai.backends.structured_output import (
     _validate_schema,
 )
 from loom_ai.models import ChatMessage, ChatResponse
-from loom_ai.models_phase1 import StructuredResponse
+from loom_ai.models_core import StructuredResponse
 
 # ── Mock LLMBackend ─────────────────────────────────────────────────────
 
@@ -370,7 +370,7 @@ async def test_tools_kwarg_accepted():
 
 async def test_satisfies_protocol():
     """StructuredOutputBackend satisfies StructuredOutputMixin protocol."""
-    from loom_ai.contracts_phase1 import StructuredOutputMixin
+    from loom_ai.contracts_core import StructuredOutputMixin
 
     backend = MockLLMBackend()
     structured = StructuredOutputBackend(backend)

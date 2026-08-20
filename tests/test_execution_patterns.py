@@ -8,7 +8,7 @@ from loom_ai.backends.patterns import (
     MapReducePattern,
 )
 from loom_ai.models import ChatMessage, ChatResponse
-from loom_ai.models_phase1 import PatternResult
+from loom_ai.models_core import PatternResult
 
 # ── Fake backends ────────────────────────────────────────────────────────
 
@@ -378,7 +378,7 @@ def test_patterns_importable():
 
 def test_patterns_satisfy_protocol():
     """Pattern classes satisfy the ExecutionPattern protocol."""
-    from loom_ai.contracts_phase1 import ExecutionPattern
+    from loom_ai.contracts_core import ExecutionPattern
 
     assert isinstance(ConsensusPattern(), ExecutionPattern)
     assert isinstance(CascadePattern(), ExecutionPattern)

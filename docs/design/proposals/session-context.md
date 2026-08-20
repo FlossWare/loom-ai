@@ -13,17 +13,17 @@ This system will enable long-running agents to maintain task continuity, resume 
 
 ## Protocols/Contracts
 
-A new protocol, `SessionKnowledgeStore`, will define the interface for managing session-specific memory. This protocol will be located in `loom_ai/contracts_phase7.py`.
+A new protocol, `SessionKnowledgeStore`, will define the interface for managing session-specific memory. This protocol will be located in `loom_ai/contracts_provider.py`.
 
 ```python
-# loom_ai/contracts_phase7.py
+# loom_ai/contracts_provider.py
 from __future__ import annotations
 
 from typing import TYPE_CHECKING, Any, Protocol, runtime_checkable
 from datetime import datetime
 
 if TYPE_CHECKING:
-    from loom_ai.models_phase7 import (
+    from loom_ai.models_provider import (
         SessionEvent,
         SessionContextSnippet,
         SessionFact,
@@ -98,10 +98,10 @@ class SessionKnowledgeStore(Protocol):
 
 ## Data Models
 
-The following data models will be defined in `loom_ai/models_phase7.py` to support the `SessionKnowledgeStore` protocol.
+The following data models will be defined in `loom_ai/models_provider.py` to support the `SessionKnowledgeStore` protocol.
 
 ```python
-# loom_ai/models_phase7.py
+# loom_ai/models_provider.py
 from __future__ import annotations
 
 from dataclasses import dataclass, field

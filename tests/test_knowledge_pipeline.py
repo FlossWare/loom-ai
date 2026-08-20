@@ -1,8 +1,8 @@
 """Tests for RAG chunking and knowledge pipeline backends."""
 
 from loom_ai.backends.knowledge import InMemoryKnowledgePipeline, TokenChunker
-from loom_ai.contracts_phase1 import ChunkingStrategy, KnowledgePipeline
-from loom_ai.models_phase1 import RetrievalResult
+from loom_ai.contracts_core import ChunkingStrategy, KnowledgePipeline
+from loom_ai.models_core import RetrievalResult
 
 # ── TokenChunker ─────────────────────────────────────────────────────────
 

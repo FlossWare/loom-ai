@@ -16,7 +16,7 @@ The initial set of capabilities covers fundamental development tasks including f
 The following protocols define the stable Loom contracts for coding tool capabilities. All methods are asynchronous and designed to return structured data or raise structured errors.
 
 ```python
-# loom_ai/contracts_phase7.py
+# loom_ai/contracts_provider.py
 from __future__ import annotations
 
 from typing import TYPE_CHECKING, Any, Protocol, runtime_checkable
@@ -24,7 +24,7 @@ from pathlib import Path
 from datetime import datetime
 
 if TYPE_CHECKING:
-    from loom_ai.models_phase7 import (
+    from loom_ai.models_provider import (
         ToolExecutionConfig, ToolResult, ToolError, FileContent, FileInfo, TextEdit,
         ShellOutput, GitStatus, GitDiff, GitLog, BuildOutput, TestOutput,
         EnvironmentInfo, WebContent, SearchResult,
@@ -137,7 +137,7 @@ class MCPTool(Protocol):
 These dataclasses define the structured inputs and outputs for the coding tool protocols.
 
 ```python
-# loom_ai/models_phase7.py
+# loom_ai/models_provider.py
 from dataclasses import dataclass, field
 from typing import Any, Optional
 from pathlib import Path

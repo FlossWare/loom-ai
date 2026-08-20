@@ -16,7 +16,7 @@ import time
 import uuid
 from datetime import datetime, timezone
 
-from loom_ai.models_phase2 import (
+from loom_ai.models_workflow import (
     WorkerResult,
     WorkflowDefinition,
     WorkflowExecution,
@@ -28,7 +28,7 @@ from loom_ai.models_phase2 import (
 class InMemoryWorkflowStorage:
     """Fully async, dict-backed workflow storage backend.
 
-    Satisfies :class:`~loom_ai.contracts_phase2.WorkflowStorageBackend` via
+    Satisfies :class:`~loom_ai.contracts_workflow.WorkflowStorageBackend` via
     structural subtyping.  Thread-safety is *not* provided -- callers that
     share an instance across threads must add their own synchronisation.
     """
@@ -77,13 +77,13 @@ class InMemoryWorkflowStorage:
 class SimpleWorkflowEngine:
     """Execute, resume, and inspect multi-phase workflows.
 
-    Satisfies :class:`~loom_ai.contracts_phase2.WorkflowEngine` via
+    Satisfies :class:`~loom_ai.contracts_workflow.WorkflowEngine` via
     structural subtyping.
 
     Parameters
     ----------
     storage:
-        A :class:`~loom_ai.contracts_phase2.WorkflowStorageBackend`
+        A :class:`~loom_ai.contracts_workflow.WorkflowStorageBackend`
         implementation used to persist execution records and look up
         prior runs (for ``resume`` / ``status``).
     phase_handler:

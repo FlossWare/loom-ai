@@ -7,7 +7,7 @@ that the stub methods return the expected model types.
 
 from __future__ import annotations
 
-from loom_ai.contracts_phase8 import (
+from loom_ai.contracts_capability import (
     CapabilitySelector,
     ConsensusStrategy,
     EvalCapabilityRegistry,
@@ -18,7 +18,7 @@ from loom_ai.contracts_phase8 import (
     SkillEstimator,
     TournamentRunner,
 )
-from loom_ai.models_phase8 import (
+from loom_ai.models_capability import (
     CapabilityHealthState,
     CapabilityProvider,
     ComparisonResult,

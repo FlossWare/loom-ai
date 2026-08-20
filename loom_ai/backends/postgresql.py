@@ -33,7 +33,7 @@ from loom_ai.models import (
     Embedding,
     SearchResult,
 )
-from loom_ai.models_phase1 import MemoryRecord, RetrievalResult
+from loom_ai.models_core import MemoryRecord, RetrievalResult
 
 try:
     import asyncpg  # type: ignore[import-untyped]
@@ -610,7 +610,7 @@ class PostgresqlSecretsBackend:
 class PostgresqlPersistentMemory:
     """PostgreSQL-backed persistent memory store.
 
-    Satisfies :class:`~loom_ai.contracts_phase1.PersistentMemoryBackend`
+    Satisfies :class:`~loom_ai.contracts_core.PersistentMemoryBackend`
     via structural subtyping.
 
     Stores named memory records with type, metadata, and timestamps in a
@@ -830,7 +830,7 @@ class PostgresqlPersistentMemory:
 class PostgresqlKnowledgeStore:
     """PostgreSQL-backed RAG knowledge store.
 
-    Satisfies :class:`~loom_ai.contracts_phase1.KnowledgePipeline` via
+    Satisfies :class:`~loom_ai.contracts_core.KnowledgePipeline` via
     structural subtyping.  Ingests content into chunks stored in a
     ``knowledge_chunks`` table and retrieves by keyword scoring.
 

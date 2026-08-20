@@ -34,7 +34,7 @@ from loom_ai.models import (
     QueueItem,
     SearchResult,
 )
-from loom_ai.models_phase1 import MemoryRecord
+from loom_ai.models_core import MemoryRecord
 
 # ── helpers ──────────────────────────────────────────────────────────────
 
@@ -718,7 +718,7 @@ class MemoryGraphBackend:
 class InMemoryPersistentMemory:
     """Dict-backed persistent memory store.
 
-    Satisfies :class:`~loom_ai.contracts_phase1.PersistentMemoryBackend`
+    Satisfies :class:`~loom_ai.contracts_core.PersistentMemoryBackend`
     via structural subtyping.  All data is lost on process exit.
     """
 

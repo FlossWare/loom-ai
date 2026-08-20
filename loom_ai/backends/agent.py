@@ -1,6 +1,6 @@
 """In-memory agent loop backend with tool-use support for loom-ai.
 
-Implements the :class:`~loom_ai.contracts_phase6.AgentLoop` protocol via
+Implements the :class:`~loom_ai.contracts_agent.AgentLoop` protocol via
 structural subtyping.  An optional :class:`~loom_ai.protocols.ToolProvider`
 enables dynamic tool registration, selection, and async execution with
 result synthesis.
@@ -21,7 +21,7 @@ from datetime import datetime, timezone
 from typing import TYPE_CHECKING, Any
 
 from loom_ai.models import ToolDefinition, ToolResult
-from loom_ai.models_phase6 import (
+from loom_ai.models_agent import (
     AgentCheckpoint,
     AgentOperation,
     AgentState,
@@ -35,7 +35,7 @@ if TYPE_CHECKING:
 class InMemoryAgentLoop:
     """Dict-backed agent loop with tool registration and execution.
 
-    Satisfies :class:`~loom_ai.contracts_phase6.AgentLoop` via structural
+    Satisfies :class:`~loom_ai.contracts_agent.AgentLoop` via structural
     subtyping.  When a :class:`~loom_ai.protocols.ToolProvider` is
     supplied, ``tool_call`` operations are dispatched to it during
     :meth:`step`.

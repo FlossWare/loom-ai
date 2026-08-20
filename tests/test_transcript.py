@@ -3,7 +3,7 @@
 import asyncio
 
 from loom_ai.backends.transcript import InMemoryTranscriptStore
-from loom_ai.contracts_phase2 import TranscriptStore
+from loom_ai.contracts_workflow import TranscriptStore
 from loom_ai.models import ChatMessage
 
 

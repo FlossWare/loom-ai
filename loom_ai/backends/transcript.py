@@ -1,7 +1,7 @@
 """In-memory transcript storage backend for loom-ai.
 
 Provides ``InMemoryTranscriptStore``, a dict-backed implementation of
-:class:`~loom_ai.contracts_phase2.TranscriptStore`.  All data is lost
+:class:`~loom_ai.contracts_workflow.TranscriptStore`.  All data is lost
 on process exit.  Suitable for testing and local development.
 """
 
@@ -11,7 +11,7 @@ from dataclasses import dataclass, field
 from datetime import datetime, timezone
 
 from loom_ai.models import ChatMessage
-from loom_ai.models_phase2 import TranscriptSummary
+from loom_ai.models_workflow import TranscriptSummary
 
 
 @dataclass
@@ -27,7 +27,7 @@ class _SessionRecord:
 class InMemoryTranscriptStore:
     """Dict-backed transcript store.
 
-    Satisfies :class:`~loom_ai.contracts_phase2.TranscriptStore` via
+    Satisfies :class:`~loom_ai.contracts_workflow.TranscriptStore` via
     structural subtyping -- no inheritance required.
     """
 

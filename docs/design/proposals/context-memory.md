@@ -31,7 +31,7 @@ if TYPE_CHECKING:
         TaskState,
         WorkspaceSnapshot,
     )
-    from loom_ai.models_phase6 import ContextSource # For integration
+    from loom_ai.models_agent import ContextSource # For integration
 
 
 # -- Workspace Management ---------------------------------------------------
@@ -202,7 +202,7 @@ For the initial implementation, simple in-memory backends will be provided for e
     *   `get_build_history`: Stores a list of mock build logs or simple strings.
 *   **`InMemoryCodingContextManager`**:
     *   Holds references to an `InMemoryWorkspaceManager` and `InMemoryTaskStateManager`.
-    *   `get_context_sources`: Orchestrates calls to the `WorkspaceManager` and `TaskStateManager` to gather information. It converts this raw information into `ContextSource` objects (from `loom_ai.models_phase6`) with appropriate provenance and freshness scores. For example, file contents become `ContextSource(content=file_content, metadata={'path': file_path, 'provenance': 'relevant_file_search'})`.
+    *   `get_context_sources`: Orchestrates calls to the `WorkspaceManager` and `TaskStateManager` to gather information. It converts this raw information into `ContextSource` objects (from `loom_ai.models_agent`) with appropriate provenance and freshness scores. For example, file contents become `ContextSource(content=file_content, metadata={'path': file_path, 'provenance': 'relevant_file_search'})`.
     *   `update_internal_state`: Updates internal caches or flags based on changes, potentially triggering re-evaluation of relevant files or task state.
 *   **`InMemoryKnowledgeBase` (Optional)**:
     *   A simple dictionary or list of pre-defined documents.
@@ -213,7 +213,7 @@ For the initial implementation, simple in-memory backends will be provided for e
 1.  **Implement `InMemoryWorkspaceManager`**: Provide basic file system interaction and project structure analysis.
 2.  **Implement `InMemoryTaskStateManager`**: Store task states in memory, mock git and build history.
 3.  **Implement `InMemoryCodingContextManager`**: Orchestrate context assembly, converting data from `WorkspaceManager` and `TaskStateManager` into `ContextSource` objects for the generic `ContextAssembler`.
-4.  **Integrate with `ContextAssembler`**: Ensure `CodingContextManager`'s `get_context_sources` output is compatible with `loom_ai.contracts_phase6.ContextAssembler.assemble_context`.
+4.  **Integrate with `ContextAssembler`**: Ensure `CodingContextManager`'s `get_context_sources` output is compatible with `loom_ai.contracts_agent.ContextAssembler.assemble_context`.
 5.  **Basic Compaction Strategy**: Within `CodingContextManager`, define initial heuristics for prioritizing context elements before passing to `ContextAssembler` for token-based compaction.
 6.  **Git Integration**: Enhance `InMemoryTaskStateManager` to interact with actual Git repositories for diffs and history.
 7.  **Incremental Context Updates**: Refine `CodingContextManager.update_internal_state` to efficiently track and incorporate changes from the workspace (e.g., file modifications, new test results).

@@ -19,7 +19,7 @@ import re
 import uuid
 from dataclasses import dataclass, field
 
-from loom_ai.models_phase1 import RetrievalResult
+from loom_ai.models_core import RetrievalResult
 
 # Characters-per-token estimate (shared with knowledge.py).
 _CHARS_PER_TOKEN = 4

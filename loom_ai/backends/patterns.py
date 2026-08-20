@@ -1,7 +1,7 @@
 """Pluggable multi-model execution patterns for loom-ai.
 
 Provides three ``ExecutionPattern`` implementations that satisfy the
-protocol defined in ``contracts_phase1.py``:
+protocol defined in ``contracts_core.py``:
 
 - **ConsensusPattern** -- fan-out to all models, collect responses,
   surface the most common answer.
@@ -22,10 +22,10 @@ from collections import Counter
 from typing import TYPE_CHECKING
 
 from loom_ai.models import ChatMessage, ChatResponse
-from loom_ai.models_phase1 import PatternResult
+from loom_ai.models_core import PatternResult
 
 if TYPE_CHECKING:
-    from loom_ai.contracts_phase1 import ModelRouter
+    from loom_ai.contracts_core import ModelRouter
     from loom_ai.protocols import LLMBackend
 
 _MISSING_BACKEND_MSG = "Either router or backend must be provided"

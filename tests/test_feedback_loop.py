@@ -1,8 +1,8 @@
 """Tests for the SimpleFeedbackLoopDetector backend."""
 
 from loom_ai.backends.feedback_loop import SimpleFeedbackLoopDetector
-from loom_ai.contracts_phase3 import FeedbackLoopDetector
-from loom_ai.models_phase3 import FeedbackLoopReport
+from loom_ai.contracts_session import FeedbackLoopDetector
+from loom_ai.models_session import FeedbackLoopReport
 
 
 def test_satisfies_protocol():

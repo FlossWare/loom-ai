@@ -29,7 +29,7 @@ from datetime import datetime, timezone
 from typing import TYPE_CHECKING, Any
 
 if TYPE_CHECKING:
-    from loom_ai.contracts_phase1 import (
+    from loom_ai.contracts_core import (
         KnowledgePipeline,
         PersistentMemoryBackend,
     )

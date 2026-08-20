@@ -1,7 +1,7 @@
 """Human-in-the-loop backend implementations for loom-ai.
 
 Provides two concrete implementations of the
-:class:`~loom_ai.contracts_phase3.HumanInTheLoop` protocol:
+:class:`~loom_ai.contracts_session.HumanInTheLoop` protocol:
 
 CallbackHumanInTheLoop   -- delegates to caller-supplied callbacks
 AutoApproveHumanInTheLoop -- always approves (for testing / CI pipelines)
@@ -19,7 +19,7 @@ from typing import Any, Callable
 class CallbackHumanInTheLoop:
     """Human-in-the-loop backend driven by caller-supplied callbacks.
 
-    Satisfies :class:`~loom_ai.contracts_phase3.HumanInTheLoop` via
+    Satisfies :class:`~loom_ai.contracts_session.HumanInTheLoop` via
     structural subtyping.
 
     Parameters
@@ -87,7 +87,7 @@ class AutoApproveHumanInTheLoop:
     Useful for testing, CI pipelines, and non-interactive deployments
     where human intervention is not available.
 
-    Satisfies :class:`~loom_ai.contracts_phase3.HumanInTheLoop` via
+    Satisfies :class:`~loom_ai.contracts_session.HumanInTheLoop` via
     structural subtyping.
 
     Behaviour

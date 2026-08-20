@@ -206,7 +206,7 @@ async def test_auto_approve_notify_is_noop():
 
 async def test_callback_satisfies_protocol():
     """CallbackHumanInTheLoop is recognized by the runtime_checkable protocol."""
-    from loom_ai.contracts_phase3 import HumanInTheLoop
+    from loom_ai.contracts_session import HumanInTheLoop
 
     hitl = CallbackHumanInTheLoop(input_handler=lambda p, o: "ok")
     assert isinstance(hitl, HumanInTheLoop)
@@ -214,7 +214,7 @@ async def test_callback_satisfies_protocol():
 
 async def test_auto_approve_satisfies_protocol():
     """AutoApproveHumanInTheLoop is recognized by the runtime_checkable protocol."""
-    from loom_ai.contracts_phase3 import HumanInTheLoop
+    from loom_ai.contracts_session import HumanInTheLoop
 
     hitl = AutoApproveHumanInTheLoop()
     assert isinstance(hitl, HumanInTheLoop)

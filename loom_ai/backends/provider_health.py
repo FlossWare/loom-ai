@@ -20,7 +20,7 @@ from collections import deque
 from dataclasses import dataclass, field
 
 from loom_ai.backends.resilience import CircuitBreakerPolicy
-from loom_ai.models_phase2 import CircuitState
+from loom_ai.models_workflow import CircuitState
 
 # ---------------------------------------------------------------------------
 # Data types
@@ -254,7 +254,7 @@ class ResilientProvider:
 
     Wraps a :class:`CircuitBreakerPolicy`, a :class:`ProviderHealthTracker`,
     and a :class:`RateLimiter` behind a unified async interface that
-    satisfies the :class:`~loom_ai.contracts_phase2.ResiliencePolicy`
+    satisfies the :class:`~loom_ai.contracts_workflow.ResiliencePolicy`
     protocol.
 
     Parameters

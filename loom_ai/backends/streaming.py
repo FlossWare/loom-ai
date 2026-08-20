@@ -2,7 +2,7 @@
 
 Provides utilities to convert raw ``str``-chunk streams (as produced by
 :meth:`~loom_ai.protocols.LLMBackend.chat_stream`) into structured
-:class:`~loom_ai.models_phase1.StreamEvent` sequences, accumulate
+:class:`~loom_ai.models_core.StreamEvent` sequences, accumulate
 incremental tool-call deltas, and collapse a stream back into a plain
 string.
 """
@@ -11,7 +11,7 @@ from __future__ import annotations
 
 from typing import AsyncIterator
 
-from loom_ai.models_phase1 import StreamEvent, ToolCallDelta
+from loom_ai.models_core import StreamEvent, ToolCallDelta
 
 
 class StreamAdapter:

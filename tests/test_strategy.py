@@ -5,8 +5,8 @@ import random
 import pytest
 
 from loom_ai.backends.strategy import ThompsonSamplingSelector
-from loom_ai.contracts_phase2 import StrategySelector
-from loom_ai.models_phase2 import StrategyStats
+from loom_ai.contracts_workflow import StrategySelector
+from loom_ai.models_workflow import StrategyStats
 
 # -- Protocol conformance ----------------------------------------------------
 

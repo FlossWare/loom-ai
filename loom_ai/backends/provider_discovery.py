@@ -13,7 +13,7 @@ from __future__ import annotations
 from copy import deepcopy
 from datetime import datetime, timezone
 
-from loom_ai.models_phase7 import (
+from loom_ai.models_provider import (
     CatalogEntry,
     CatalogSource,
     DiscoveryResult,

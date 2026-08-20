@@ -15,7 +15,7 @@ from typing import TYPE_CHECKING, Protocol, runtime_checkable
 
 if TYPE_CHECKING:
     from loom_ai.models import ChatMessage
-    from loom_ai.models_phase2 import (
+    from loom_ai.models_workflow import (
         BudgetStatus,
         CircuitState,
         CostReport,

@@ -316,7 +316,7 @@ async def test_reasoning_contains_scores() -> None:
 
 async def test_protocol_compliance() -> None:
     """SimpleEvaluationHarness satisfies the EvaluationHarness protocol."""
-    from loom_ai.contracts_phase3 import EvaluationHarness
+    from loom_ai.contracts_session import EvaluationHarness
 
     harness = SimpleEvaluationHarness()
     assert isinstance(harness, EvaluationHarness)

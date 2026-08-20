@@ -9,13 +9,13 @@ from __future__ import annotations
 
 import pytest
 
-from loom_ai.contracts_phase7 import (
+from loom_ai.contracts_provider import (
     CatalogSynchronizer,
     PolicyRegistry,
     ProviderCapabilityRegistry,
     ProviderRegistry,
 )
-from loom_ai.models_phase7 import (
+from loom_ai.models_provider import (
     CatalogEntry,
     CatalogSource,
     DataPolicy,

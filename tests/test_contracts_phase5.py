@@ -8,7 +8,7 @@ methods can be awaited without error.
 
 from __future__ import annotations
 
-from loom_ai.contracts_phase5 import (
+from loom_ai.contracts_inference import (
     AgentLifecycleRuntime,
     AgentMemory,
     EvalSuite,
@@ -18,7 +18,7 @@ from loom_ai.contracts_phase5 import (
     ProgramOptimizer,
     SecurityGate,
 )
-from loom_ai.models_phase5 import (
+from loom_ai.models_inference import (
     AgentEvent,
     AgentLifecycleState,
     AgentMemoryEntry,

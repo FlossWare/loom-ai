@@ -7,14 +7,14 @@ the data models can be constructed with expected defaults.
 
 from __future__ import annotations
 
-from loom_ai.contracts_phase4 import (
+from loom_ai.contracts_graph import (
     BeliefManager,
     ExternalGraphAdapter,
     GraphRetriever,
     KnowledgeGraph,
     TemporalKnowledgeStore,
 )
-from loom_ai.models_phase4 import (
+from loom_ai.models_graph import (
     Claim,
     CommunitySummary,
     Consensus,

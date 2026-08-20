@@ -22,7 +22,7 @@ import uuid
 from collections import Counter
 from dataclasses import replace
 
-from loom_ai.models_phase8 import (
+from loom_ai.models_capability import (
     CapabilityHealthState,
     CapabilityProvider,
     ComparisonResult,

@@ -41,7 +41,7 @@ coordination such as adaptive routing and fleet management.  These components
 depend on the contract layer but never on a specific backend.
 
 **Contract layer** -- 94 `@runtime_checkable` Protocol classes across
-`protocols.py` and `contracts_phase1.py` through `contracts_phase9.py` plus
+`protocols.py` and `contracts_core.py` through `contracts_context.py` plus
 `contracts_api.py` and `contracts_execution.py`.  Nearly all methods are `async` (exceptions include
 `IdempotentStore.is_idempotent`).  The only imports are from the
 standard library (`typing`, `dataclasses`).
@@ -60,11 +60,11 @@ direction only.
 
 ```text
 loom_ai/protocols.py          <-- 11 core Protocol classes
-loom_ai/contracts_phase1.py   <-- 7 orchestration contracts (phase 1)
-loom_ai/contracts_phase2.py   <-- 8 orchestration contracts (phase 2)
+loom_ai/contracts_core.py   <-- 7 orchestration contracts (phase 1)
+loom_ai/contracts_workflow.py   <-- 8 orchestration contracts (phase 2)
 ...                           <-- phases 3-9, contracts_api.py
 loom_ai/models.py             <-- plain dataclasses (Document, ChatMessage, ...)
-loom_ai/models_phase1.py      <-- phase-specific data models
+loom_ai/models_core.py      <-- phase-specific data models
 ...
 loom_ai/backends/memory.py    <-- in-memory implementations
 loom_ai/backends/postgresql.py
@@ -520,19 +520,19 @@ were designed:
 |-------|------|-------|-------|
 | Core | `protocols.py` | 13 | Storage, queue, secrets, LLM, tools, graph |
 | API | `contracts_api.py` | 4 | Request lifecycle, error handling, middleware |
-| 1 | `contracts_phase1.py` | 8 | Structured output, conversation, memory, router, RAG |
-| 2 | `contracts_phase2.py` | 9 | Workflow, learning, strategy, budget, resilience |
-| 3 | `contracts_phase3.py` | 7 | Session, worker registry, cache, evaluation |
-| 4 | `contracts_phase4.py` | 6 | Knowledge graphs, temporal stores, beliefs |
-| 5 | `contracts_phase5.py` | 9 | Eval suites, telemetry, agent lifecycle, security |
-| 6 | `contracts_phase6.py` | 8 | Agent loops, recipes, ACP, context, trajectories |
-| 7 | `contracts_phase7.py` | 5 | Provider/capability/policy registries, catalog sync |
-| 8 | `contracts_phase8.py` | 10 | Tournaments, consensus strategies, evaluation |
-| 9 | `contracts_phase9.py` | 11 | Context compression, prompt cache, runtimes, health |
+| 1 | `contracts_core.py` | 8 | Structured output, conversation, memory, router, RAG |
+| 2 | `contracts_workflow.py` | 9 | Workflow, learning, strategy, budget, resilience |
+| 3 | `contracts_session.py` | 7 | Session, worker registry, cache, evaluation |
+| 4 | `contracts_graph.py` | 6 | Knowledge graphs, temporal stores, beliefs |
+| 5 | `contracts_inference.py` | 9 | Eval suites, telemetry, agent lifecycle, security |
+| 6 | `contracts_agent.py` | 8 | Agent loops, recipes, ACP, context, trajectories |
+| 7 | `contracts_provider.py` | 5 | Provider/capability/policy registries, catalog sync |
+| 8 | `contracts_capability.py` | 10 | Tournaments, consensus strategies, evaluation |
+| 9 | `contracts_context.py` | 11 | Context compression, prompt cache, runtimes, health |
 | Execution | `contracts_execution.py` | 4 | Execution steps, pipelines, observers |
 
-Phases are additive -- later phases never modify earlier contracts.  Each phase
-has a corresponding `models_phaseN.py` with its data models.
+Domains are additive -- later domains never modify earlier contracts.  Each
+domain has a corresponding `models_<domain>.py` with its data models.
 
 ---
 

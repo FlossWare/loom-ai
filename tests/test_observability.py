@@ -3,7 +3,7 @@
 import pytest
 
 from loom_ai.backends.observability import InMemoryObservability
-from loom_ai.contracts_phase2 import ObservabilityBackend
+from loom_ai.contracts_workflow import ObservabilityBackend
 
 # -- protocol conformance ------------------------------------------------
 

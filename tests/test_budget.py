@@ -1,8 +1,8 @@
 """Tests for the InMemoryBudgetTracker backend."""
 
 from loom_ai.backends.budget import InMemoryBudgetTracker, _extract_provider
-from loom_ai.contracts_phase2 import BudgetTracker
-from loom_ai.models_phase2 import TokenUsage
+from loom_ai.contracts_workflow import BudgetTracker
+from loom_ai.models_workflow import TokenUsage
 
 # -- protocol conformance ---------------------------------------------------
 

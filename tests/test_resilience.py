@@ -183,7 +183,7 @@ async def test_default_recovery_timeout_is_sixty():
 
 
 async def test_satisfies_resilience_policy_protocol():
-    from loom_ai.contracts_phase2 import ResiliencePolicy
+    from loom_ai.contracts_workflow import ResiliencePolicy
 
     assert isinstance(CircuitBreakerPolicy(), ResiliencePolicy)
 

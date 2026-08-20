@@ -3,8 +3,8 @@
 import pytest
 
 from loom_ai.backends.memory import InMemoryPersistentMemory
-from loom_ai.contracts_phase1 import PersistentMemoryBackend
-from loom_ai.models_phase1 import MemoryRecord
+from loom_ai.contracts_core import PersistentMemoryBackend
+from loom_ai.models_core import MemoryRecord
 
 
 @pytest.fixture

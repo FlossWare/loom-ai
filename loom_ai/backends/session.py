@@ -1,6 +1,6 @@
 """Simple session initializer backend for loom-ai.
 
-Builds a :class:`~loom_ai.models_phase3.SessionBriefing` by gathering
+Builds a :class:`~loom_ai.models_session.SessionBriefing` by gathering
 context from optionally configured backends (memory, fleet, secrets) and
 merging caller-supplied overrides.
 
@@ -16,13 +16,13 @@ from __future__ import annotations
 from datetime import datetime, timezone
 from typing import Any
 
-from loom_ai.models_phase3 import SessionBriefing
+from loom_ai.models_session import SessionBriefing
 
 
 class SimpleSessionInitializer:
     """Configurable session bootstrap.
 
-    Satisfies :class:`~loom_ai.contracts_phase3.SessionInitializer` via
+    Satisfies :class:`~loom_ai.contracts_session.SessionInitializer` via
     structural subtyping.
 
     Parameters

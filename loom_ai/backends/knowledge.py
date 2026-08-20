@@ -15,7 +15,7 @@ from __future__ import annotations
 import re
 import uuid
 
-from loom_ai.models_phase1 import RetrievalResult
+from loom_ai.models_core import RetrievalResult
 
 # Characters-per-token estimate used to convert between character
 # lengths and approximate token counts.
@@ -25,7 +25,7 @@ _CHARS_PER_TOKEN = 4
 class TokenChunker:
     """Sentence-aware text chunker with token-bounded overlap.
 
-    Satisfies :class:`~loom_ai.contracts_phase1.ChunkingStrategy` via
+    Satisfies :class:`~loom_ai.contracts_core.ChunkingStrategy` via
     structural subtyping.
 
     Sentences are split on ``". "`` and ``"\\n"``.  Each chunk accumulates
@@ -121,13 +121,13 @@ class TokenChunker:
 class InMemoryKnowledgePipeline:
     """In-memory RAG pipeline with keyword-frequency scoring.
 
-    Satisfies :class:`~loom_ai.contracts_phase1.KnowledgePipeline` via
+    Satisfies :class:`~loom_ai.contracts_core.KnowledgePipeline` via
     structural subtyping.
 
     Parameters
     ----------
     chunker:
-        A :class:`~loom_ai.contracts_phase1.ChunkingStrategy` used to
+        A :class:`~loom_ai.contracts_core.ChunkingStrategy` used to
         split ingested content into chunks.
     max_tokens:
         Default token budget passed to the chunker.

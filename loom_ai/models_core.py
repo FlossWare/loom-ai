@@ -2,7 +2,7 @@
 
 All models are plain dataclasses with no imports outside the standard
 library.  These models support the Phase 1 protocol contracts defined
-in ``contracts_phase1.py``.
+in ``contracts_core.py``.
 """
 
 from __future__ import annotations

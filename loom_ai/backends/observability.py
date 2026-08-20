@@ -18,7 +18,7 @@ import uuid
 class InMemoryObservability:
     """In-memory observability backend.
 
-    Satisfies :class:`~loom_ai.contracts_phase2.ObservabilityBackend` via
+    Satisfies :class:`~loom_ai.contracts_workflow.ObservabilityBackend` via
     structural subtyping -- no inheritance required.
 
     All data is lost on process exit.

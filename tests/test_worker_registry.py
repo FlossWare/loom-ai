@@ -5,7 +5,7 @@ and model diversity with balanced and skewed distributions.
 import pytest
 
 from loom_ai.backends.registry import InMemoryWorkerRegistry
-from loom_ai.models_phase3 import WorkerInfo
+from loom_ai.models_session import WorkerInfo
 
 
 def _worker(

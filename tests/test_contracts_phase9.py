@@ -12,7 +12,7 @@ from __future__ import annotations
 
 from typing import Any
 
-from loom_ai.contracts_phase9 import (
+from loom_ai.contracts_context import (
     CanonicalSourceIndex,
     CapabilityBackend,
     ContextCompressor,
@@ -24,7 +24,7 @@ from loom_ai.contracts_phase9 import (
     PromptCacheOptimizer,
     RequestValidator,
 )
-from loom_ai.models_phase9 import (
+from loom_ai.models_context import (
     AgentInvocation,
     AgentResult,
     CacheCapability,

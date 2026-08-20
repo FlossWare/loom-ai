@@ -12,7 +12,7 @@ from loom_ai.backends.streaming import (
     stream_to_events,
     stream_to_string,
 )
-from loom_ai.models_phase1 import StreamEvent, ToolCallDelta
+from loom_ai.models_core import StreamEvent, ToolCallDelta
 
 # ---------------------------------------------------------------------------
 # Helpers

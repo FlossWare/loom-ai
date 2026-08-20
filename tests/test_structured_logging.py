@@ -6,7 +6,7 @@ import logging
 import pytest
 
 from loom_ai.backends.structured_logging import StructuredLoggingObservability
-from loom_ai.contracts_phase2 import ObservabilityBackend
+from loom_ai.contracts_workflow import ObservabilityBackend
 
 # -- protocol conformance ------------------------------------------------
 

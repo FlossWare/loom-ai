@@ -15,7 +15,7 @@ This design establishes clear boundaries between the agent's core logic, its int
 
 The Loom-native agent runtime will reuse several existing `loom-ai` contracts and introduce new ones to address the specific requirements of an interactive coding agent.
 
-**Reused Contracts (from `contracts_phase5.py` and `contracts_phase6.py`):**
+**Reused Contracts (from `contracts_inference.py` and `contracts_agent.py`):**
 
 *   **`AgentLoop`**: Orchestrates the agent's turn-based state machine, including pause/resume/cancel semantics.
 *   **`InferenceRouter`**: Handles model provider selection, inference requests, and adaptive routing.
@@ -25,7 +25,7 @@ The Loom-native agent runtime will reuse several existing `loom-ai` contracts an
 *   **`AgentEnvironment`**: Provides an interface for interacting with the execution environment (e.g., filesystem, shell, git).
 *   **`AgentCapabilityRegistry`**: Catalogs and matches agent/model capabilities with requirements.
 
-**New Contracts (to be defined in `contracts_phase7.py`):**
+**New Contracts (to be defined in `contracts_provider.py`):**
 
 *   **`AgentSession`**: Manages the lifecycle, state, and history of an interactive agent session.
 *   **`ToolExecutor`**: Selects, executes, and manages the results of various tools, including delegation to external agents/adapters.
@@ -36,20 +36,20 @@ The Loom-native agent runtime will reuse several existing `loom-ai` contracts an
 ## Concrete Protocol Definitions
 
 ```python
-# loom_ai/contracts_phase7.py
+# loom_ai/contracts_provider.py
 from __future__ import annotations
 
 from typing import TYPE_CHECKING, Any, Literal, Protocol, runtime_checkable
 
 if TYPE_CHECKING:
-    from loom_ai.models_phase6 import (
+    from loom_ai.models_agent import (
         AgentOperation,
         AgentState,
         AgentTurn,
         EnvironmentSpec,
         AgentEnvironmentObservation,
     )
-    from loom_ai.models_phase7 import (
+    from loom_ai.models_provider import (
         AgentSessionState,
         ToolInvocation,
         ToolResult,
@@ -148,14 +148,14 @@ class HumanInteraction(Protocol):
 ## Data Models
 
 ```python
-# loom_ai/models_phase7.py
+# loom_ai/models_provider.py
 from __future__ import annotations
 
 from dataclasses import dataclass, field
 from typing import Any, Literal
 
 if TYPE_CHECKING:
-    from loom_ai.models_phase6 import AgentState, AgentTurn
+    from loom_ai.models_agent import AgentState, AgentTurn
 
 
 @dataclass(frozen=True)

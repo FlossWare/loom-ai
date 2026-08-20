@@ -25,7 +25,7 @@ from typing import TYPE_CHECKING, Any, Protocol, runtime_checkable
 
 if TYPE_CHECKING:
     from loom_ai.models import ChatMessage
-    from loom_ai.models_phase1 import (
+    from loom_ai.models_core import (
         MemoryRecord,
         ModelInfo,
         PatternResult,
@@ -264,7 +264,7 @@ class KnowledgePipeline(Protocol):
 # ── Streaming Events (#95) ────────────────────────────────────────────
 #
 # The StreamEvent and ToolCallDelta models are defined in
-# ``models_phase1.py``.  They enable a richer streaming contract where
+# ``models_core.py``.  They enable a richer streaming contract where
 # ``LLMBackend.chat_stream`` would return ``AsyncIterator[StreamEvent]``
 # instead of ``AsyncIterator[str]``.
 #

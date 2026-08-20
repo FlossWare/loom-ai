@@ -14,7 +14,7 @@ from loom_ai.backends.adaptive_router import (
     AdaptiveModelRouter,
     ModelCapabilityProfile,
 )
-from loom_ai.models_phase1 import ModelInfo
+from loom_ai.models_core import ModelInfo
 
 # ── Mock backend ─────────────────────────────────────────────────────────
 
@@ -332,7 +332,7 @@ class TestOutcomeTracking:
 
 class TestProtocolConformance:
     async def test_satisfies_model_router_protocol(self):
-        from loom_ai.contracts_phase1 import ModelRouter
+        from loom_ai.contracts_core import ModelRouter
 
         router = AdaptiveModelRouter()
         assert isinstance(router, ModelRouter)

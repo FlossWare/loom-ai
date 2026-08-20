@@ -3,7 +3,7 @@
 import pytest
 
 from loom_ai.backends.conversation import InMemoryConversationManager
-from loom_ai.contracts_phase1 import ConversationManager
+from loom_ai.contracts_core import ConversationManager
 from loom_ai.models import ChatMessage
 
 

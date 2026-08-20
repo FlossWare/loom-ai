@@ -1,7 +1,7 @@
 """OrientDB graph backend (requires ``pyorient`` extra).
 
 Wraps the OrientDB Python driver behind the
-:class:`~loom_ai.contracts_phase4.KnowledgeGraph` protocol, providing
+:class:`~loom_ai.contracts_graph.KnowledgeGraph` protocol, providing
 persistent graph storage with the OrientDB multi-model database.
 """
 
@@ -21,7 +21,7 @@ except ImportError as _exc:
     ) from _exc
 
 if TYPE_CHECKING:
-    from loom_ai.models_phase4 import (
+    from loom_ai.models_graph import (
         Claim,
         KnowledgeEntity,
         KnowledgeRelationship,
@@ -45,7 +45,7 @@ def _validate_rid(rid: str) -> str:
 class OrientDBGraphBackend:
     """OrientDB-backed knowledge graph.
 
-    Satisfies :class:`~loom_ai.contracts_phase4.KnowledgeGraph` via
+    Satisfies :class:`~loom_ai.contracts_graph.KnowledgeGraph` via
     structural subtyping.
     """
 
@@ -96,7 +96,7 @@ class OrientDBGraphBackend:
         )
         if not results:
             return None
-        from loom_ai.models_phase4 import KnowledgeEntity as KE
+        from loom_ai.models_graph import KnowledgeEntity as KE
 
         rec = results[0]
         return KE(
@@ -138,7 +138,7 @@ class OrientDBGraphBackend:
         entity_type: str | None = None,
         limit: int = 10,
     ) -> list[KnowledgeEntity]:
-        from loom_ai.models_phase4 import KnowledgeEntity as KE
+        from loom_ai.models_graph import KnowledgeEntity as KE
 
         escaped_q = _escape(query)
         where = f"WHERE label LIKE '%{escaped_q}%'"

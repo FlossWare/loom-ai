@@ -2,7 +2,7 @@
 
 Adds schema-validated JSON output with automatic retries to any
 existing ``LLMBackend`` implementation.  Satisfies the
-:class:`~loom_ai.contracts_phase1.StructuredOutputMixin` protocol via
+:class:`~loom_ai.contracts_core.StructuredOutputMixin` protocol via
 structural subtyping.
 
 Optional dependency: ``jsonschema`` is used for full JSON Schema
@@ -17,7 +17,7 @@ import json
 from typing import TYPE_CHECKING, Any
 
 from loom_ai.models import ChatMessage, ChatResponse
-from loom_ai.models_phase1 import StructuredResponse
+from loom_ai.models_core import StructuredResponse
 
 if TYPE_CHECKING:
     from loom_ai.protocols import LLMBackend
@@ -148,7 +148,7 @@ def _build_response(
 class StructuredOutputBackend:
     """Wraps any ``LLMBackend`` to add structured-output support.
 
-    Satisfies :class:`~loom_ai.contracts_phase1.StructuredOutputMixin`
+    Satisfies :class:`~loom_ai.contracts_core.StructuredOutputMixin`
     via structural subtyping -- no inheritance required.
 
     Parameters

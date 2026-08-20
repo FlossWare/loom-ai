@@ -1,7 +1,7 @@
 """Scoped memory adapter over PersistentMemoryBackend.
 
 Provides agent-scoped, session-scoped, or project-scoped views of the
-canonical :class:`~loom_ai.contracts_phase1.PersistentMemoryBackend`.
+canonical :class:`~loom_ai.contracts_core.PersistentMemoryBackend`.
 Replaces the need for a separate ``AgentMemory`` store.
 
 This is the canonical way to get scoped memory access in loom-ai.
@@ -13,8 +13,8 @@ from __future__ import annotations
 from typing import TYPE_CHECKING
 
 if TYPE_CHECKING:
-    from loom_ai.contracts_phase1 import PersistentMemoryBackend
-    from loom_ai.models_phase1 import MemoryRecord
+    from loom_ai.contracts_core import PersistentMemoryBackend
+    from loom_ai.models_core import MemoryRecord
 
 
 class ScopedMemoryView:

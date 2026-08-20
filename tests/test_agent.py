@@ -8,9 +8,9 @@ ToolProvider, result synthesis, operation binding, and edge cases.
 from __future__ import annotations
 
 from loom_ai.backends.agent import InMemoryAgentLoop
-from loom_ai.contracts_phase6 import AgentLoop
+from loom_ai.contracts_agent import AgentLoop
 from loom_ai.models import ToolDefinition, ToolResult
-from loom_ai.models_phase6 import (
+from loom_ai.models_agent import (
     AgentCheckpoint,
     AgentOperation,
     AgentState,
