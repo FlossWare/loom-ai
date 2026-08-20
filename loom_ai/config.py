@@ -61,8 +61,6 @@ class LoomConfig:
     resources: ResourceProvider | None = None
     router: AdaptiveModelRouter | None = None
 
-    # ── Factory ──────────────────────────────────────────────────────
-
     @classmethod
     async def from_env(cls) -> LoomConfig:
         """Build a LoomConfig by reading ``LOOM_*`` environment variables.
@@ -119,8 +117,6 @@ class LoomConfig:
                 os.environ.get("LOOM_ROUTER", "disabled"),
             ),
         )
-
-    # ── Private builders (lazy imports keep core dependency-free) ─────
 
     @staticmethod
     async def _build_storage(kind: str) -> StorageBackend:
@@ -319,6 +315,5 @@ class LoomConfig:
         if kind == "adaptive":
             return AdaptiveModelRouter()
         raise ValueError(
-            f"Unknown router backend: {kind!r}.  "
-            f"Valid options: disabled, adaptive"
+            f"Unknown router backend: {kind!r}.  Valid options: disabled, adaptive"
         )
