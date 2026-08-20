@@ -26,6 +26,7 @@ class ClientConfig:
     base_url: str = "http://127.0.0.1:5000"
     api_key: str = ""
     timeout: int = 60
+    allow_insecure_http: bool = False
 
     @classmethod
     def from_env(cls) -> ClientConfig:
@@ -33,7 +34,12 @@ class ClientConfig:
             timeout = int(os.environ.get("LOOM_TIMEOUT", "60"))
         except ValueError:
             timeout = 60
-        return cls(
+        insecure = os.environ.get("LOOM_ALLOW_INSECURE_HTTP", "").lower() in (
+            "1",
+            "true",
+            "yes",
+        )
+        cfg = cls(
             base_url=os.environ.get(
                 "LOOM_URL",
                 "http://{}:{}".format(
@@ -43,6 +49,38 @@ class ClientConfig:
             ),
             api_key=os.environ.get("LOOM_API_KEY", ""),
             timeout=timeout,
+            allow_insecure_http=insecure,
+        )
+        cfg.validate_transport()
+        return cfg
+
+    def validate_transport(self) -> None:
+        """Reject API keys over plaintext HTTP to non-loopback hosts."""
+        if not self.api_key:
+            return
+        url = self.base_url.strip()
+        if url.lower().startswith("https://"):
+            return
+        if not url.lower().startswith("http://"):
+            return
+        if self.allow_insecure_http:
+            logger.warning(
+                "LOOM_ALLOW_INSECURE_HTTP enabled: sending API key over HTTP to %s",
+                self.base_url,
+            )
+            return
+        host = urllib.parse.urlparse(url).hostname or ""
+        loopback = host in {
+            "127.0.0.1",
+            "localhost",
+            "::1",
+            "0:0:0:0:0:0:0:1",
+        }
+        if loopback:
+            return
+        raise ValueError(
+            f"refusing to send API key over plaintext HTTP to {self.base_url!r}; "
+            "use https:// or set LOOM_ALLOW_INSECURE_HTTP=1 for explicit override"
         )
 
 
@@ -61,6 +99,7 @@ class LoomClient:
 
     def __init__(self, config: ClientConfig | None = None) -> None:
         self._config = config or ClientConfig.from_env()
+        self._config.validate_transport()
         self._base = self._config.base_url.rstrip("/")
 
     @classmethod
@@ -140,15 +179,11 @@ class LoomClient:
     ) -> dict[str, Any]:
         return await self._request("POST", path, body=body, **kwargs)
 
-    # ── Health ───────────────────────────────────────────────────────────
-
     async def health(self) -> dict[str, Any]:
         return await self._get("/health")
 
     async def ready(self) -> dict[str, Any]:
         return await self._get("/ready")
-
-    # ── LLM ──────────────────────────────────────────────────────────────
 
     async def list_models(self) -> list[str]:
         resp = await self._get("/llm/models")
@@ -233,8 +268,6 @@ class LoomClient:
         if error_holder:
             raise error_holder[0]
 
-    # ── Consensus ────────────────────────────────────────────────────────
-
     async def consensus_gather(
         self,
         messages: list[dict[str, str]],
@@ -272,8 +305,6 @@ class LoomClient:
             body["arbiter_model"] = arbiter_model
         return await self._post("/consensus/synthesize", body)
 
-    # ── Knowledge / Storage ──────────────────────────────────────────────
-
     async def knowledge_stats(self) -> dict[str, Any]:
         return await self._get("/knowledge/stats")
 
@@ -306,8 +337,6 @@ class LoomClient:
             },
         )
 
-    # ── Search ───────────────────────────────────────────────────────────
-
     async def search_text(self, query: str, *, limit: int = 10) -> dict[str, Any]:
         return await self._get("/search/text", q=query, limit=str(limit))
 
@@ -316,10 +345,7 @@ class LoomClient:
     ) -> dict[str, Any]:
         return await self._post(
             "/search/semantic",
-            {
-                "vector": vector,
-                "limit": limit,
-            },
+            {"vector": vector, "limit": limit},
         )
 
     async def search_hybrid(
@@ -340,8 +366,6 @@ class LoomClient:
             },
         )
 
-    # ── Secrets ──────────────────────────────────────────────────────────
-
     async def list_secrets(self) -> list[str]:
         resp = await self._get("/secrets/")
         return resp.get("secrets", resp.get("names", []))
@@ -354,8 +378,6 @@ class LoomClient:
         )
         return resp.get("value", "")
 
-    # ── Queue / Pipeline ─────────────────────────────────────────────────
-
     async def queue_status(self, queue_name: str) -> dict[str, Any]:
         path = f"/pipeline/queues/{urllib.parse.quote(queue_name)}"
         return await self._get(f"{path}/status")
@@ -365,8 +387,6 @@ class LoomClient:
             f"/pipeline/queues/{urllib.parse.quote(queue_name)}/enqueue",
             {"items": [{"payload": payload}]},
         )
-
-    # ── Graph ────────────────────────────────────────────────────────────
 
     async def add_node(
         self, label: str, *, node_id: str | None = None, properties: dict | None = None
@@ -405,8 +425,6 @@ class LoomClient:
             body["properties"] = properties
         return await self._post("/graph/edges", body)
 
-    # ── Tools ────────────────────────────────────────────────────────────
-
     async def list_tools(self) -> list[dict[str, Any]]:
         resp = await self._get("/tools/")
         return resp.get("tools", [])
@@ -418,8 +436,6 @@ class LoomClient:
             "/tools/call",
             {"name": name, "arguments": arguments or {}},
         )
-
-    # ── Resources ────────────────────────────────────────────────────────
 
     async def list_resources(self) -> list[dict[str, Any]]:
         resp = await self._get("/resources/")
