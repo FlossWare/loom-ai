@@ -854,7 +854,9 @@ def _mount_router_routes(app: FastAPI, config: LoomConfig, auth_deps: list) -> N
     from fastapi import APIRouter, HTTPException
 
     router_api = APIRouter(
-        prefix="/router", tags=["router"], dependencies=auth_deps,
+        prefix="/router",
+        tags=["router"],
+        dependencies=auth_deps,
     )
 
     @router_api.post(
@@ -865,7 +867,8 @@ def _mount_router_routes(app: FastAPI, config: LoomConfig, auth_deps: list) -> N
     async def router_select(body: RouterSelectRequest):
         try:
             model = await config.router.select(
-                body.task_type, candidates=body.candidates,
+                body.task_type,
+                candidates=body.candidates,
             )
         except ValueError as exc:
             raise HTTPException(status_code=400, detail=str(exc))
@@ -874,12 +877,15 @@ def _mount_router_routes(app: FastAPI, config: LoomConfig, auth_deps: list) -> N
     @router_api.post("/outcome", response_model=RouterOutcomeResponse)
     async def router_outcome(body: RouterOutcomeRequest):
         await config.router.record_outcome(
-            body.model, body.task_type, reward=body.reward,
+            body.model,
+            body.task_type,
+            reward=body.reward,
         )
         return {"recorded": True}
 
     @router_api.get(
-        "/performance", response_model=RouterPerformanceResponse,
+        "/performance",
+        response_model=RouterPerformanceResponse,
     )
     async def router_performance(task_type: str | None = None):
         arms = await config.router.performance(task_type=task_type)
@@ -990,7 +996,7 @@ def _sanitize_validation_errors(errors: list[dict]) -> list[dict]:
     input contains secret material the echo could leak it in the response.
     The ``ctx`` key may contain raw exception objects that are not JSON
     serialisable and can leak internal implementation details.  This helper
-    keeps only ``type``, ``loc``, ``msg``, and ``url`` -- enough for the
+    keeps only ``type``, "loc", "msg", and "url" -- enough for the
     caller to understand what went wrong without revealing submitted values
     or internal state.
     """
