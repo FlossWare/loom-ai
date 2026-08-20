@@ -80,10 +80,10 @@ class TestGetClient:
         assert isinstance(client, LoomClient)
 
     @pytest.mark.asyncio
-    async def test_returns_loom_client_when_host_set(self):
+    async def test_host_alone_does_not_trigger_remote(self):
         with patch.dict(os.environ, {"LOOM_HOST": "myhost"}, clear=False):
             client = await get_client()
-        assert isinstance(client, LoomClient)
+        assert isinstance(client, LocalClient)
 
     @pytest.mark.asyncio
     async def test_returns_local_client_when_no_remote(self):
