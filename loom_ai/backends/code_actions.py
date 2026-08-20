@@ -45,9 +45,10 @@ async def _run(
         stderr=asyncio.subprocess.PIPE,
     )
     try:
-        async with asyncio.timeout(timeout_seconds):
-            stdout, stderr = await proc.communicate()
-    except TimeoutError:
+        stdout, stderr = await asyncio.wait_for(
+            proc.communicate(), timeout=timeout_seconds
+        )
+    except asyncio.TimeoutError:
         proc.kill()
         await proc.wait()
         return {"exit_code": -1, "stdout": "", "stderr": "timeout"}
