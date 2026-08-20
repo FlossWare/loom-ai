@@ -17,7 +17,6 @@ import os
 
 logger = logging.getLogger("loom_ai.server_demo")
 
-# Routes kept when LOOM_DEMO_PUBLIC=1 (plus anything under /v1 and /llm).
 _PUBLIC_PATH_PREFIXES = (
     "/health",
     "/ready",
@@ -29,15 +28,20 @@ _PUBLIC_PATH_PREFIXES = (
 )
 
 
+def _path_is_public(path: str) -> bool:
+    if path in _PUBLIC_PATH_PREFIXES:
+        return True
+    return path.startswith(tuple(f"{p}/" for p in _PUBLIC_PATH_PREFIXES)) or path.startswith(
+        tuple(f"{p}{{" for p in _PUBLIC_PATH_PREFIXES)
+    )
+
+
 def _strip_non_public_routes(app) -> None:
     """Remove mounts that must not be on the public free surface."""
     kept = []
     for route in app.routes:
         path = getattr(route, "path", "") or ""
-        if any(
-            path == p or path.startswith(p + "/") or path.startswith(p + "{")
-            for p in _PUBLIC_PATH_PREFIXES
-        ):
+        if _path_is_public(path):
             kept.append(route)
             continue
         if path in ("", "/") and getattr(route, "name", None) in (
@@ -46,7 +50,7 @@ def _strip_non_public_routes(app) -> None:
         ):
             kept.append(route)
             continue
-        if path.startswith("/docs") or path.startswith("/redoc"):
+        if path.startswith(("/docs", "/redoc")):
             kept.append(route)
             continue
         logger.info("demo public: dropping route %s", path)
@@ -61,7 +65,6 @@ def main() -> None:
             "Install server extra: pip install flossware-loom-ai[server]"
         ) from exc
 
-    # Ensure public mode is on for this entrypoint
     os.environ.setdefault("LOOM_DEMO_PUBLIC", "1")
 
     from loom_ai.config import LoomConfig
@@ -72,13 +75,11 @@ def main() -> None:
     config = asyncio.run(LoomConfig.from_env())
     app = create_app(config)
 
-    # Brand-neutral OpenAPI metadata
     app.title = "Free LLM Gateway"
     app.description = "OpenAI-compatible free model gateway"
     app.version = "0.1.0"
 
     if config.llm is not None:
-        # Avoid double-mount if create_app already wired /v1 in a future release
         if not any(
             (getattr(r, "path", "") or "").startswith("/v1") for r in app.routes
         ):
