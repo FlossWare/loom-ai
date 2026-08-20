@@ -1,0 +1,91 @@
+# Docker Compose for loom-ai deployment modes.
+#
+# Profiles:
+#   server   -- Loom server + PostgreSQL + OrientDB
+#   client   -- Loom CLI connecting to a remote server
+#   combined -- All-in-one: server + client + databases
+#
+# Usage:
+#   docker compose --profile server up
+#   docker compose --profile combined up
+#   docker compose --profile client run loom-client --help
+
+services:
+  # ── Databases ───────────────────────────────────────────────────
+  postgres:
+    image: pgvector/pgvector:pg16
+    profiles: [server, combined]
+    environment:
+      POSTGRES_USER: loom
+      POSTGRES_PASSWORD: ${LOOM_PG_PASSWORD:-loom}
+      POSTGRES_DB: loom
+    ports:
+      - "${LOOM_PG_PORT:-5432}:5432"
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U loom"]
+      interval: 5s
+      timeout: 3s
+      retries: 5
+
+  orientdb:
+    image: orientdb:3.2
+    profiles: [server, combined]
+    environment:
+      ORIENTDB_ROOT_PASSWORD: ${ORIENTDB_ROOT_PASSWORD:-loom}
+    ports:
+      - "${ORIENTDB_HTTP_PORT:-2480}:2480"
+      - "${ORIENTDB_BINARY_PORT:-2424}:2424"
+    volumes:
+      - orientdata:/orientdb/databases
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:2480/listDatabases"]
+      interval: 10s
+      timeout: 5s
+      retries: 3
+
+  # ── Loom Server ─────────────────────────────────────────────────
+  loom-server:
+    build:
+      context: .
+      target: server
+    profiles: [server, combined]
+    depends_on:
+      postgres:
+        condition: service_healthy
+    ports:
+      - "${LOOM_PORT:-5000}:5000"
+    environment:
+      LOOM_HOST: "0.0.0.0"
+      LOOM_PORT: "5000"
+      LOOM_API_KEY: ${LOOM_API_KEY:-}
+      LOOM_STORAGE: postgresql
+      LOOM_SECRETS: postgresql
+      LOOM_SEARCH: postgresql
+      LOOM_PG_HOST: postgres
+      LOOM_PG_PORT: "5432"
+      LOOM_PG_USER: loom
+      LOOM_PG_PASSWORD: ${LOOM_PG_PASSWORD:-loom}
+      LOOM_PG_DATABASE: loom
+      LOOM_SECRETS_KEY: ${LOOM_SECRETS_KEY:-}
+      LOOM_LLM_BASE_URL: ${LOOM_LLM_BASE_URL:-}
+      LOOM_LLM_API_KEY: ${LOOM_LLM_API_KEY:-}
+      LOOM_LLM_MODEL: ${LOOM_LLM_MODEL:-}
+      LOOM_GRAPH: ${LOOM_GRAPH:-disabled}
+
+  # ── Loom Client ─────────────────────────────────────────────────
+  loom-client:
+    build:
+      context: .
+      target: client
+    profiles: [client, combined]
+    environment:
+      LOOM_SERVER_URL: ${LOOM_SERVER_URL:-http://loom-server:5000}
+      LOOM_API_KEY: ${LOOM_API_KEY:-}
+    stdin_open: true
+    tty: true
+
+volumes:
+  pgdata:
+  orientdata:
