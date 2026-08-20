@@ -12,10 +12,11 @@ FROM python:3.12-slim AS builder
 
 WORKDIR /build
 
-COPY pyproject.toml README.md ./
+COPY pyproject.toml uv.lock README.md ./
 COPY loom_ai/ loom_ai/
 
-RUN pip install --no-cache-dir --only-binary :all: --prefix=/install \
+RUN pip install --no-cache-dir uv \
+    && uv pip install --locked --only-binary :all: --prefix=/install \
     ".[server,postgresql]"
 
 # ── server (default) ────────────────────────────────────────────────
@@ -46,10 +47,12 @@ FROM python:3.12-slim AS client
 RUN groupadd -r loom && useradd -r -g loom -s /sbin/nologin loom
 
 WORKDIR /build
-COPY pyproject.toml README.md ./
+COPY pyproject.toml uv.lock README.md ./
 COPY loom_ai/ loom_ai/
 
-RUN pip install --no-cache-dir --only-binary :all: "." && rm -rf /build
+RUN pip install --no-cache-dir uv \
+    && uv pip install --locked --only-binary :all: "." \
+    && rm -rf /build
 
 USER loom
 WORKDIR /home/loom
