@@ -81,7 +81,7 @@ services:
       target: client
     profiles: [client, combined]
     environment:
-      LOOM_SERVER_URL: ${LOOM_SERVER_URL:-http://loom-server:5000}
+      LOOM_URL: ${LOOM_URL:-http://loom-server:5000}
       LOOM_API_KEY: ${LOOM_API_KEY:-}
     stdin_open: true
     tty: true
