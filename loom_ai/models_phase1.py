@@ -23,7 +23,12 @@ class StructuredResponse:
 
 @dataclass
 class MemoryRecord:
-    """A single record in a persistent memory store."""
+    """A single record in a persistent memory store.
+
+    Canonical memory model for loom-ai.  Covers session-scoped,
+    agent-scoped, and project-scoped memories through the ``scope``
+    field.  Optional ``ttl_seconds`` enables time-bounded retention.
+    """
 
     id: str
     name: str
@@ -32,6 +37,12 @@ class MemoryRecord:
     metadata: dict = field(default_factory=dict)
     created_at: str = ""
     updated_at: str = ""
+    scope: str = "global"
+    agent_id: str = ""
+    session_id: str = ""
+    ttl_seconds: int | None = None
+    superseded_by: str | None = None
+    confidence: float = 1.0
 
 
 @dataclass
