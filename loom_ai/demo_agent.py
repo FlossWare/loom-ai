@@ -29,6 +29,7 @@ from loom_ai.backends.code_actions import (
     run_tests,
 )
 from loom_ai.models import ChatMessage, ChatResponse
+from loom_ai.session_persistence import SessionManager
 
 logger = logging.getLogger(__name__)
 
@@ -78,9 +79,12 @@ class DemoAgent:
         self,
         llm: Any,
         workspace: str,
+        *,
+        session_manager: SessionManager | None = None,
     ) -> None:
         self._llm = llm
         self._workspace = workspace
+        self._session = session_manager or SessionManager()
 
     @classmethod
     async def create(
@@ -213,6 +217,11 @@ class DemoAgent:
         """Execute the full agent loop for an issue."""
         result = AgentResult(issue=issue_number or 0)
 
+        sid = await self._session.create_session(
+            project="loom-ai",
+            metadata={"issue": issue_number or 0},
+        )
+
         if not issue_text and issue_number:
             try:
                 proc = await asyncio.create_subprocess_exec(
@@ -236,9 +245,29 @@ class DemoAgent:
             context = await self._gather_context(issue_text)
             logger.info("Gathered repo context (%d chars)", len(context))
 
+            prior = await self._session.recover_context(
+                project="loom-ai",
+                query=issue_text[:200],
+            )
+            if prior.knowledge:
+                context += (
+                    "\n\n## Prior knowledge\n"
+                    + "\n".join(
+                        k["content"][:500] for k in prior.knowledge[:3]
+                    )
+                )
+                await self._session.record_event(
+                    sid,
+                    f"recovered {len(prior.knowledge)} prior findings",
+                    kind="observation",
+                )
+
             plan = await self._plan(context)
             result.plan = plan
             logger.info("Generated plan (%d chars)", len(plan))
+            await self._session.record_event(
+                sid, f"planned {len(plan)} chars", kind="decision",
+            )
 
             changes = await self._implement(plan, context)
             result.changes = changes
@@ -246,6 +275,13 @@ class DemoAgent:
             logger.info(
                 "Applied %d/%d changes", len(applied), len(changes),
             )
+
+            for c in applied:
+                await self._session.record_event(
+                    sid,
+                    f"applied diff to {c.get('file', '?')}",
+                    kind="fix",
+                )
 
             if applied:
                 lint = await run_linter(workspace=self._workspace)
@@ -261,6 +297,7 @@ class DemoAgent:
             result.error = str(exc)
             logger.exception("Agent run failed")
 
+        await self._session.persist(sid)
         return result
 
 
