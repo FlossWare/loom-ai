@@ -380,6 +380,45 @@ class FreeModelRouter:
         return accounts
 
     async def _query_secrets(self) -> list[tuple[str, str]]:
+        rows = await self._query_secrets_rest()
+        if rows:
+            return rows
+        return await self._query_secrets_psql()
+
+    async def _query_secrets_rest(self) -> list[tuple[str, str]]:
+        api_url = os.environ.get(
+            "LOOM_SECRETS_API", "http://localhost:5000/secrets",
+        )
+        try:
+            status, body = await _async_request(
+                "GET", api_url,
+                {"X-Secret-Access-Reason": "FreeModelRouter discovery"},
+                timeout=5,
+            )
+            if status != 200:
+                return []
+            key_names = [
+                k for k in body.get("keys", [])
+                if "API_KEY" in k and k.startswith("PERSONAL_")
+            ]
+            rows: list[tuple[str, str]] = []
+            for key_name in key_names:
+                try:
+                    s, val_body = await _async_request(
+                        "GET", f"{api_url}/{key_name}",
+                        {"X-Secret-Access-Reason": "FreeModelRouter"},
+                        timeout=3,
+                    )
+                    if s == 200 and val_body.get("value"):
+                        rows.append((key_name, val_body["value"]))
+                except Exception:
+                    pass
+            return rows
+        except Exception as exc:
+            logger.debug("REST secrets API unavailable: %s", exc)
+            return []
+
+    async def _query_secrets_psql(self) -> list[tuple[str, str]]:
         try:
             import subprocess
             result = await asyncio.to_thread(

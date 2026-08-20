@@ -93,6 +93,7 @@ class LoomConfig:
             LOOM_SECRETS_FILE   Path to .env file (when LOOM_SECRETS=dotenv)
             LOOM_SECRETS_PREFIX Key prefix for env secret lookup
             LOOM_SECRETS_KEY    Fernet key for encrypting PG-backed secrets
+            LOOM_CAPTURE_LLM    0 | 1                      (default: 0)
             LOOM_TOOLS          disabled | memory          (default: disabled)
             LOOM_RESOURCES      disabled | memory          (default: disabled)
         """
@@ -107,6 +108,10 @@ class LoomConfig:
             pg_pool = await get_shared_pool()
 
         llm = cls._build_llm()
+        if llm is not None and os.environ.get("LOOM_CAPTURE_LLM") == "1":
+            from loom_ai.backends.capturing_llm import CapturingLLMBackend
+
+            llm = CapturingLLMBackend(llm)
         return cls(
             storage=await cls._build_storage(storage_kind, pool=pg_pool),
             queue=await cls._build_queue(
