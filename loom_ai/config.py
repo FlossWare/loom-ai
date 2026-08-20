@@ -29,6 +29,8 @@ from loom_ai.protocols import (
     ToolProvider,
 )
 
+GraphLike = GraphBackend
+
 
 @dataclass
 class LoomConfig:
@@ -55,7 +57,7 @@ class LoomConfig:
     secrets: SecretsBackend
     embedding: EmbeddingBackend
     search: SearchBackend
-    graph: GraphBackend | None = None
+    graph: GraphLike | None = None
     llm: LLMBackend | None = None
     consensus: ConsensusEngine | None = None
     tools: ToolProvider | None = None

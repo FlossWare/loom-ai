@@ -109,3 +109,15 @@ class InMemoryConversationManager:
         """Export the full session transcript as a list of plain dicts."""
         session = self._require_session(session_id)
         return [asdict(msg) for msg in session["messages"]]
+
+    async def archive(self, session_id: str) -> str:
+        """Archive a session and return the session id.
+
+        In-memory implementation stores a frozen copy of the transcript
+        under an ``archived_`` prefix.  Persistent implementations
+        should write to a ``TranscriptStore``.
+        """
+        session = self._require_session(session_id)
+        archive_id = f"archived_{session_id}"
+        self._sessions[archive_id] = copy.deepcopy(session)
+        return archive_id

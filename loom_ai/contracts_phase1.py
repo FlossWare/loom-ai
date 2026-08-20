@@ -98,6 +98,15 @@ class ConversationManager(Protocol):
         """Export the full session transcript as a list of plain dicts."""
         ...
 
+    async def archive(self, session_id: str) -> str:
+        """Archive a session to durable storage and return an archive id.
+
+        Implementations should persist the session transcript through
+        a ``TranscriptStore`` or equivalent, making the session
+        recoverable after process termination.
+        """
+        ...
+
 
 # ── Persistent Memory (#91) ───────────────────────────────────────────
 
