@@ -3,9 +3,10 @@
 from __future__ import annotations
 
 import subprocess
-from unittest.mock import MagicMock
+from unittest.mock import AsyncMock, MagicMock, patch
 
 from loom_ai.demo_agent import AgentResult, DemoAgent
+from loom_ai.mcp_server import _DISPATCH_TABLE, _TOOLS
 from loom_ai.models import ChatResponse
 
 
@@ -223,3 +224,63 @@ class TestAgentResult:
         assert r.issue == 42
         assert r.success is False
         assert r.changes == []
+
+    def test_pr_url_default_empty(self):
+        assert AgentResult(issue=1).pr_url == ""
+
+    def test_pr_url_can_be_set(self):
+        r = AgentResult(issue=1, pr_url="https://github.com/pr/1")
+        assert r.pr_url == "https://github.com/pr/1"
+
+
+class TestCommitAndPr:
+    async def test_creates_branch_and_returns_pr_url(self, tmp_path):
+        agent = DemoAgent(llm=_make_llm(), workspace=str(tmp_path))
+
+        with patch(
+            "loom_ai.demo_agent._git", new_callable=AsyncMock
+        ) as mock_git:
+            mock_git.return_value = ""
+
+            mock_proc = AsyncMock()
+            mock_proc.communicate.return_value = (
+                b"https://github.com/FlossWare/loom-ai/pull/99\n",
+                b"",
+            )
+            mock_proc.returncode = 0
+
+            with patch(
+                "asyncio.create_subprocess_exec",
+                return_value=mock_proc,
+            ):
+                result = await agent._commit_and_pr(42, ["test.py"])
+
+        assert result["branch"] == "fix/issue-42"
+        assert result["pr_url"] == (
+            "https://github.com/FlossWare/loom-ai/pull/99"
+        )
+        assert mock_git.call_count >= 4
+
+
+class TestRunAutoPr:
+    async def test_accepts_auto_pr_kwarg(self, tmp_path):
+        _git_init(tmp_path)
+        llm = _make_llm(["plan", "[]"])
+        agent = DemoAgent(llm=llm, workspace=str(tmp_path))
+        result = await agent.run(issue_text="test", auto_pr=True)
+        assert isinstance(result, AgentResult)
+
+
+class TestMcpResolveIssue:
+    def test_tool_definition_exists(self):
+        names = [t["name"] for t in _TOOLS]
+        assert "loom_resolve_issue" in names
+
+    def test_tool_requires_issue_number(self):
+        tool = next(
+            t for t in _TOOLS if t["name"] == "loom_resolve_issue"
+        )
+        assert "issue_number" in tool["inputSchema"]["required"]
+
+    def test_dispatch_table_has_entry(self):
+        assert "loom_resolve_issue" in _DISPATCH_TABLE

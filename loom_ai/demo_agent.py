@@ -45,6 +45,7 @@ class AgentResult:
     lint_result: dict = field(default_factory=dict)
     success: bool = False
     error: str = ""
+    pr_url: str = ""
 
 
 async def _git(
@@ -220,6 +221,57 @@ class DemoAgent:
     _MAX_REVIEW_ATTEMPTS = 3
     _REVIEW_VOTES_NEEDED = 2
     _REVIEW_ROUNDS = 3
+
+    async def _commit_and_pr(
+        self,
+        issue_number: int,
+        changed_files: list[str],
+    ) -> dict:
+        """Create a branch, commit changes, push, and open a PR."""
+        branch = f"fix/issue-{issue_number}"
+        await _git("checkout", "-b", branch, cwd=self._workspace)
+        for f in changed_files:
+            await _git("add", f, cwd=self._workspace)
+        await _git(
+            "-c",
+            "user.name=Scot P. Floess",
+            "-c",
+            "user.email=scot.floess@gmail.com",
+            "commit",
+            "-m",
+            f"fix: resolve issue #{issue_number}",
+            cwd=self._workspace,
+        )
+        await _git(
+            "push",
+            "--set-upstream",
+            "origin",
+            branch,
+            cwd=self._workspace,
+        )
+        proc = await asyncio.create_subprocess_exec(
+            "gh",
+            "pr",
+            "create",
+            "--head",
+            branch,
+            "--base",
+            "main",
+            "--title",
+            f"fix: resolve issue #{issue_number}",
+            "--body",
+            f"Fixes #{issue_number}",
+            stdout=asyncio.subprocess.PIPE,
+            stderr=asyncio.subprocess.PIPE,
+            cwd=self._workspace,
+        )
+        stdout, stderr = await proc.communicate()
+        if proc.returncode != 0:
+            raise RuntimeError(
+                f"gh pr create failed: {stderr.decode(errors='replace')}"
+            )
+        pr_url = stdout.decode(errors="replace").strip()
+        return {"branch": branch, "pr_url": pr_url}
 
     async def _get_diff(self) -> str:
         """Return git diff of uncommitted changes in the workspace."""
@@ -400,6 +452,8 @@ class DemoAgent:
         self,
         issue_number: int | None = None,
         issue_text: str = "",
+        *,
+        auto_pr: bool = False,
     ) -> AgentResult:
         """Execute the full agent loop for an issue."""
         result = AgentResult(issue=issue_number or 0)
@@ -454,6 +508,16 @@ class DemoAgent:
                 tests = await run_tests(workspace=self._workspace)
                 result.test_result = tests
                 result.success = tests.get("exit_code") == 0
+
+                if auto_pr and result.success:
+                    changed = [
+                        c["file"]
+                        for c in result.changes
+                        if c.get("result", {}).get("applied")
+                    ]
+                    if changed:
+                        pr_info = await self._commit_and_pr(issue_number or 0, changed)
+                        result.pr_url = pr_info["pr_url"]
             elif not result.error:
                 result.error = (
                     f"Review not approved after {self._MAX_REVIEW_ATTEMPTS} attempts"
