@@ -11,6 +11,7 @@ core carries zero third-party dependencies.
 
 from __future__ import annotations
 
+import logging
 import os
 from dataclasses import dataclass
 from typing import Any
@@ -30,6 +31,7 @@ from loom_ai.protocols import (
 )
 
 GraphLike = GraphBackend
+logger = logging.getLogger(__name__)
 
 
 @dataclass
@@ -65,13 +67,21 @@ class LoomConfig:
     router: AdaptiveModelRouter | None = None
 
     async def close(self) -> None:
-        """Shut down shared resources (e.g. the PostgreSQL connection pool)."""
+        """Shut down all resource-owning backends."""
         try:
             from loom_ai.backends.postgresql import close_shared_pool
 
             await close_shared_pool()
         except ImportError:
             pass
+
+        for name in ("graph", "queue", "llm"):
+            backend = getattr(self, name, None)
+            if backend is not None and hasattr(backend, "close"):
+                try:
+                    await backend.close()
+                except Exception:
+                    logger.warning("Failed to close %s backend", name)
 
     @classmethod
     async def from_env(cls) -> LoomConfig:

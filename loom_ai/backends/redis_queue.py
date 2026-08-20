@@ -98,6 +98,13 @@ return item_id
         self._backoff_base = backoff_base
         self._prefix = key_prefix
 
+    async def close(self) -> None:
+        """Close the underlying Redis connection."""
+        if hasattr(self._redis, "aclose"):
+            await self._redis.aclose()
+        elif hasattr(self._redis, "close"):
+            self._redis.close()
+
     # -- Factory ---------------------------------------------------------
 
     @classmethod
