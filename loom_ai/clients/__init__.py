@@ -15,19 +15,56 @@ from __future__ import annotations
 
 import os
 
-from loom_ai.clients.client import LoomClient
+from loom_ai.clients.client import ClientConfig, LoomClient
 from loom_ai.clients.local_client import LocalClient
+from loom_ai.clients.transport_security import (
+    allow_insecure_from_env,
+    validate_api_key_transport,
+)
 
-__all__ = ["LocalClient", "LoomClient", "get_client"]
+# --- transport security (#669) ----------------------------------------
+# Patch ClientConfig / LoomClient so API keys cannot be sent over
+# plaintext HTTP to non-loopback hosts.  LOOM_ALLOW_INSECURE_HTTP=1 opts out.
+
+_orig_from_env = ClientConfig.from_env
+_orig_init = LoomClient.__init__
+
+
+@classmethod  # type: ignore[misc]
+def _from_env_secure(cls) -> ClientConfig:
+    cfg = _orig_from_env()
+    insecure = allow_insecure_from_env()
+    object.__setattr__(cfg, "allow_insecure_http", insecure)
+    validate_api_key_transport(
+        cfg.base_url, cfg.api_key, allow_insecure_http=insecure
+    )
+    return cfg
+
+
+def _init_secure(self, config: ClientConfig | None = None) -> None:
+    cfg = config or ClientConfig.from_env()
+    insecure = bool(getattr(cfg, "allow_insecure_http", False))
+    validate_api_key_transport(
+        cfg.base_url, cfg.api_key, allow_insecure_http=insecure
+    )
+    _orig_init(self, cfg)
+
+
+ClientConfig.from_env = _from_env_secure  # type: ignore[method-assign]
+LoomClient.__init__ = _init_secure  # type: ignore[method-assign]
+
+__all__ = ["LocalClient", "LoomClient", "ClientConfig", "get_client"]
 
 
 async def get_client() -> LocalClient | LoomClient:
     """Auto-detect and return the appropriate client.
 
-    Returns :class:`LoomClient` when ``LOOM_URL`` or ``LOOM_HOST`` is set
-    (remote server mode), otherwise returns :class:`LocalClient` with
-    embedded backends (local mode).
+    Returns :class:`LoomClient` when ``LOOM_URL`` is set (remote server
+    mode), otherwise returns :class:`LocalClient` with embedded backends.
+
+    Note: ``LOOM_HOST`` alone no longer triggers remote mode (see #676);
+    use ``LOOM_URL`` for an explicit remote endpoint.
     """
-    if os.environ.get("LOOM_URL") or os.environ.get("LOOM_HOST"):
+    if os.environ.get("LOOM_URL"):
         return LoomClient.from_env()
     return await LocalClient.create()
