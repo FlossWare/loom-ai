@@ -23,9 +23,8 @@ from loom_ai.clients.transport_security import (
 )
 
 # --- transport security (#669) ----------------------------------------
-# Patch ClientConfig so API keys cannot be sent over plaintext HTTP to
-# non-loopback hosts.  allow_insecure_http / LOOM_ALLOW_INSECURE_HTTP=1
-# opts out explicitly.
+# Patch ClientConfig / LoomClient so API keys cannot be sent over
+# plaintext HTTP to non-loopback hosts.  LOOM_ALLOW_INSECURE_HTTP=1 opts out.
 
 _orig_from_env = ClientConfig.from_env
 _orig_init = LoomClient.__init__
@@ -35,11 +34,7 @@ _orig_init = LoomClient.__init__
 def _from_env_secure(cls) -> ClientConfig:
     cfg = _orig_from_env()
     insecure = allow_insecure_from_env()
-    # attach flag if dataclass doesn't have the field yet
-    if not hasattr(cfg, "allow_insecure_http"):
-        object.__setattr__(cfg, "allow_insecure_http", insecure)
-    else:
-        object.__setattr__(cfg, "allow_insecure_http", insecure)
+    object.__setattr__(cfg, "allow_insecure_http", insecure)
     validate_api_key_transport(
         cfg.base_url, cfg.api_key, allow_insecure_http=insecure
     )
@@ -64,10 +59,12 @@ __all__ = ["LocalClient", "LoomClient", "ClientConfig", "get_client"]
 async def get_client() -> LocalClient | LoomClient:
     """Auto-detect and return the appropriate client.
 
-    Returns :class:`LoomClient` when ``LOOM_URL`` or ``LOOM_HOST`` is set
-    (remote server mode), otherwise returns :class:`LocalClient` with
-    embedded backends (local mode).
+    Returns :class:`LoomClient` when ``LOOM_URL`` is set (remote server
+    mode), otherwise returns :class:`LocalClient` with embedded backends.
+
+    Note: ``LOOM_HOST`` alone no longer triggers remote mode (see #676);
+    use ``LOOM_URL`` for an explicit remote endpoint.
     """
-    if os.environ.get("LOOM_URL") or os.environ.get("LOOM_HOST"):
+    if os.environ.get("LOOM_URL"):
         return LoomClient.from_env()
     return await LocalClient.create()
