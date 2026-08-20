@@ -53,9 +53,7 @@ def test_transport_http_remote_with_key_fails():
 
 
 def test_transport_http_remote_insecure_override():
-    validate_api_key_transport(
-        "http://api.example.com", "k", allow_insecure_http=True
-    )
+    validate_api_key_transport("http://api.example.com", "k", allow_insecure_http=True)
 
 
 def test_transport_http_remote_without_key_ok():

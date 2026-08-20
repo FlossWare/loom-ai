@@ -46,9 +46,7 @@ class InMemoryRequestLifecycle:
 
     async def authorize(self, request: APIRequest) -> AuthContext:
         headers = request.headers or {}
-        token = headers.get("Authorization", "") or headers.get(
-            "authorization", ""
-        )
+        token = headers.get("Authorization", "") or headers.get("authorization", "")
         if token:
             return AuthContext(
                 authenticated=True,
@@ -68,9 +66,7 @@ class InMemoryRequestLifecycle:
         return APIResponse(
             status_code=200,
             body=(
-                {"data": result}
-                if isinstance(result, dict)
-                else {"data": str(result)}
+                {"data": result} if isinstance(result, dict) else {"data": str(result)}
             ),
             request_id=request_id,
         )
@@ -92,9 +88,7 @@ _DEFAULT_ERROR_MAP: dict[type, tuple[int, str]] = {
 class InMemoryErrorHandler:
     """Maps exception types to status codes and formats as APIError."""
 
-    def __init__(
-        self, error_map: dict[type, tuple[int, str]] | None = None
-    ) -> None:
+    def __init__(self, error_map: dict[type, tuple[int, str]] | None = None) -> None:
         self._error_map = error_map or dict(_DEFAULT_ERROR_MAP)
 
     async def handle(self, error: Exception, *, request_id: str = "") -> APIError:
@@ -172,29 +166,37 @@ class LoggingExecutionObserver:
         self.events: list[dict[str, Any]] = []
 
     async def on_step_start(self, step_id: str, context: ExecutionContext) -> None:
-        self.events.append({
-            "type": "step_start",
-            "step_id": step_id,
-            "execution_id": context.execution_id,
-        })
+        self.events.append(
+            {
+                "type": "step_start",
+                "step_id": step_id,
+                "execution_id": context.execution_id,
+            }
+        )
 
     async def on_step_complete(self, step_id: str, result: StepResult) -> None:
-        self.events.append({
-            "type": "step_complete",
-            "step_id": step_id,
-            "status": result.status.value,
-        })
+        self.events.append(
+            {
+                "type": "step_complete",
+                "step_id": step_id,
+                "status": result.status.value,
+            }
+        )
 
     async def on_step_error(self, step_id: str, error: Exception) -> None:
-        self.events.append({
-            "type": "step_error",
-            "step_id": step_id,
-            "error": str(error),
-        })
+        self.events.append(
+            {
+                "type": "step_error",
+                "step_id": step_id,
+                "error": str(error),
+            }
+        )
 
     async def on_execution_complete(self, result: ExecutionResult) -> None:
-        self.events.append({
-            "type": "execution_complete",
-            "execution_id": result.execution_id,
-            "status": result.status.value,
-        })
+        self.events.append(
+            {
+                "type": "execution_complete",
+                "execution_id": result.execution_id,
+                "status": result.status.value,
+            }
+        )
