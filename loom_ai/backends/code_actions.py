@@ -25,13 +25,16 @@ from loom_ai.models import ToolDefinition
 
 def _resolve_safe(workspace: Path, relpath: str) -> Path:
     """Resolve *relpath* under *workspace*, rejecting escapes."""
-    target = (workspace / relpath).resolve()
-    if not str(target).startswith(str(workspace.resolve())):
+    resolved_ws = workspace.resolve()
+    target = (resolved_ws / relpath).resolve()
+    if not target.is_relative_to(resolved_ws):
         raise ValueError(f"Path escapes workspace: {relpath}")
     return target
 
 
-async def _run(cmd: list[str], cwd: Path, timeout: int = 120) -> dict[str, Any]:
+async def _run(
+    cmd: list[str], cwd: Path, timeout_seconds: int = 120,
+) -> dict[str, Any]:
     """Run a subprocess and return stdout, stderr, and exit code."""
     proc = await asyncio.create_subprocess_exec(
         *cmd,
@@ -40,10 +43,9 @@ async def _run(cmd: list[str], cwd: Path, timeout: int = 120) -> dict[str, Any]:
         stderr=asyncio.subprocess.PIPE,
     )
     try:
-        stdout, stderr = await asyncio.wait_for(
-            proc.communicate(), timeout=timeout,
-        )
-    except asyncio.TimeoutError:
+        async with asyncio.timeout(timeout_seconds):
+            stdout, stderr = await proc.communicate()
+    except TimeoutError:
         proc.kill()
         await proc.wait()
         return {"exit_code": -1, "stdout": "", "stderr": "timeout"}
@@ -64,10 +66,10 @@ async def apply_diff(
     """Apply a search-and-replace block to a file."""
     ws = Path(workspace or os.getcwd())
     target = _resolve_safe(ws, file)
-    if not target.is_file():
+    if not await asyncio.to_thread(target.is_file):
         return {"applied": False, "error": f"File not found: {file}"}
 
-    content = target.read_text()
+    content = await asyncio.to_thread(target.read_text)
     if search not in content:
         return {"applied": False, "error": "Search text not found in file"}
 
@@ -79,7 +81,7 @@ async def apply_diff(
         }
 
     new_content = content.replace(search, replace, 1)
-    target.write_text(new_content)
+    await asyncio.to_thread(target.write_text, new_content)
     return {
         "applied": True,
         "file": file,
@@ -163,7 +165,7 @@ async def run_tests(
     *,
     pattern: str = "",
     workspace: str = "",
-    timeout: int = 300,
+    timeout_seconds: int = 300,
 ) -> dict[str, Any]:
     """Execute pytest on specified tests."""
     ws = Path(workspace or os.getcwd())
@@ -176,7 +178,7 @@ async def run_tests(
     if not shutil.which("python"):
         return {"error": "python not found in PATH"}
 
-    result = await _run(cmd, ws, timeout=timeout)
+    result = await _run(cmd, ws, timeout_seconds=timeout_seconds)
     passed = failed = 0
     for line in result["stdout"].splitlines():
         match = re.match(r"(\d+) passed", line)
@@ -306,7 +308,10 @@ _TOOL_DEFS = [
                 "path": {"type": "string", "description": "Test path"},
                 "pattern": {"type": "string", "description": "pytest -k pattern"},
                 "workspace": {"type": "string"},
-                "timeout": {"type": "integer", "description": "Timeout in seconds"},
+                "timeout_seconds": {
+                    "type": "integer",
+                    "description": "Timeout in seconds",
+                },
             },
         },
     ),
@@ -352,9 +357,7 @@ _HANDLERS = {
 }
 
 
-def create_code_action_provider(
-    workspace: str | None = None,
-) -> MemoryToolProvider:
+def create_code_action_provider() -> MemoryToolProvider:
     """Create a MemoryToolProvider pre-loaded with code-action tools."""
     provider = MemoryToolProvider()
     for defn in _TOOL_DEFS:

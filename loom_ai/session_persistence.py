@@ -205,7 +205,8 @@ class SessionManager:
         """Recover context from prior sessions.
 
         Searches both memory (session records) and knowledge
-        (extracted engineering knowledge) backends.
+        (extracted engineering knowledge) backends.  When *project*
+        is given, results are filtered to that project.
         """
         ctx = RecoveredContext()
 
@@ -214,6 +215,8 @@ class SessionManager:
                 query, limit=limit, memory_type="session",
             )
             for r in records:
+                if project and r.metadata.get("project") != project:
+                    continue
                 ctx.memories.append({
                     "name": r.name,
                     "content": r.content,
@@ -229,6 +232,8 @@ class SessionManager:
                 query, limit=limit,
             )
             for r in results:
+                if project and r.metadata.get("project") != project:
+                    continue
                 ctx.knowledge.append({
                     "content": r.content,
                     "score": r.score,

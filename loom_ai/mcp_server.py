@@ -275,104 +275,89 @@ def _handle(name: str, args: dict) -> dict:
         }
 
 
+def _dispatch_secret_get(args: dict) -> dict:
+    sn = urllib.parse.quote(args["name"])
+    hdrs = {
+        "Content-Type": "application/json",
+        "User-Agent": "loom-ai-mcp-server/1.0",
+        "X-Secret-Access-Reason": args["reason"],
+    }
+    if _LOOM_KEY:
+        hdrs["Authorization"] = f"Bearer {_LOOM_KEY}"
+    req = urllib.request.Request(
+        f"{_LOOM_URL}/secrets/{sn}/reveal",
+        data=None, headers=hdrs, method="POST",
+    )
+    try:
+        with urllib.request.urlopen(req, timeout=30) as resp:
+            return json.loads(resp.read())
+    except urllib.error.HTTPError as exc:
+        text = exc.read(4096).decode(errors="replace")
+        raise _ToolError(f"HTTP {exc.code}: {text}") from exc
+
+
+def _dispatch_search(args: dict) -> dict:
+    q = urllib.parse.quote(args["query"])
+    limit = int(args.get("limit", 10))
+    return _api("GET", f"/search/text?q={q}&limit={limit}")
+
+
+def _dispatch_graph_neighbors(args: dict) -> dict:
+    nid = urllib.parse.quote(args["node_id"])
+    edge = args.get("edge_label", "")
+    qs = f"?edge_label={edge}" if edge else ""
+    return _api("GET", f"/graph/nodes/{nid}/neighbors{qs}")
+
+
+_DISPATCH_TABLE = {
+    "loom_chat": lambda a: _api("POST", "/llm/chat", {
+        "messages": a["messages"], "model": a.get("model"),
+        "temperature": a.get("temperature", 0.7),
+        "max_tokens": a.get("max_tokens"),
+    }),
+    "loom_list_models": lambda a: _api("GET", "/llm/models"),
+    "loom_search": _dispatch_search,
+    "loom_store": lambda a: _api("POST", "/knowledge/documents", {
+        "title": a["title"], "content": a["content"],
+        "category": a.get("category", ""),
+    }),
+    "loom_consensus": lambda a: _api("POST", "/consensus/gather", {
+        "messages": [{"role": "user", "content": a["prompt"]}],
+        "models": a["models"],
+    }),
+    "loom_synthesize": lambda a: _api("POST", "/consensus/synthesize", {
+        "prompt": a["prompt"], "models": a["models"],
+        "arbiter_model": a.get("arbiter_model"),
+    }),
+    "loom_queue_enqueue": lambda a: _api(
+        "POST",
+        f"/pipeline/queues/{a['queue_name']}/enqueue",
+        {"items": [{"payload": a["payload"]}]},
+    ),
+    "loom_queue_status": lambda a: _api(
+        "GET",
+        f"/pipeline/queues/{urllib.parse.quote(a['queue_name'])}/status",
+    ),
+    "loom_secret_list": lambda a: _api("GET", "/secrets/"),
+    "loom_secret_get": _dispatch_secret_get,
+    "loom_graph_add_node": lambda a: _api("POST", "/graph/nodes", {
+        "label": a["label"],
+        "properties": a.get("properties", {}),
+    }),
+    "loom_graph_neighbors": _dispatch_graph_neighbors,
+    "loom_router_select": lambda a: _api("POST", "/router/select", {
+        "task_type": a["task_type"],
+    }),
+    "loom_router_stats": lambda a: _api("GET", "/router/performance"),
+    "loom_health": lambda a: _api("GET", "/health"),
+}
+
+
 def _dispatch(name: str, args: dict) -> dict:
-    if name == "loom_chat":
-        return _api("POST", "/llm/chat", {
-            "messages": args["messages"],
-            "model": args.get("model"),
-            "temperature": args.get("temperature", 0.7),
-            "max_tokens": args.get("max_tokens"),
-        })
-
-    if name == "loom_list_models":
-        return _api("GET", "/llm/models")
-
-    if name == "loom_search":
-        q = urllib.parse.quote(args["query"])
-        limit = int(args.get("limit", 10))
-        return _api("GET", f"/search/text?q={q}&limit={limit}")
-
-    if name == "loom_store":
-        return _api("POST", "/knowledge/documents", {
-            "title": args["title"],
-            "content": args["content"],
-            "category": args.get("category", ""),
-        })
-
-    if name == "loom_consensus":
-        msgs = [{"role": "user", "content": args["prompt"]}]
-        return _api("POST", "/consensus/gather", {
-            "messages": msgs,
-            "models": args["models"],
-        })
-
-    if name == "loom_synthesize":
-        return _api("POST", "/consensus/synthesize", {
-            "prompt": args["prompt"],
-            "models": args["models"],
-            "arbiter_model": args.get("arbiter_model"),
-        })
-
-    if name == "loom_queue_enqueue":
-        return _api(
-            "POST",
-            f"/pipeline/queues/{args['queue_name']}/enqueue",
-            {"items": [{"payload": args["payload"]}]},
-        )
-
-    if name == "loom_queue_status":
-        qn = urllib.parse.quote(args["queue_name"])
-        return _api("GET", f"/pipeline/queues/{qn}/status")
-
-    if name == "loom_secret_list":
-        return _api("GET", "/secrets/")
-
-    if name == "loom_secret_get":
-        sn = urllib.parse.quote(args["name"])
-        headers = {"X-Secret-Access-Reason": args["reason"]}
-        url = f"{_LOOM_URL}/secrets/{sn}/reveal"
-        data = None
-        hdrs = {
-            "Content-Type": "application/json",
-            "User-Agent": "loom-ai-mcp-server/1.0",
-            **headers,
-        }
-        if _LOOM_KEY:
-            hdrs["Authorization"] = f"Bearer {_LOOM_KEY}"
-        req = urllib.request.Request(
-            url, data=data, headers=hdrs, method="POST",
-        )
-        try:
-            with urllib.request.urlopen(req, timeout=30) as resp:
-                return json.loads(resp.read())
-        except urllib.error.HTTPError as exc:
-            text = exc.read(4096).decode(errors="replace")
-            raise _ToolError(f"HTTP {exc.code}: {text}") from exc
-
-    if name == "loom_graph_add_node":
-        return _api("POST", "/graph/nodes", {
-            "label": args["label"],
-            "properties": args.get("properties", {}),
-        })
-
-    if name == "loom_graph_neighbors":
-        nid = urllib.parse.quote(args["node_id"])
-        edge = args.get("edge_label", "")
-        qs = f"?edge_label={edge}" if edge else ""
-        return _api("GET", f"/graph/nodes/{nid}/neighbors{qs}")
-
-    if name == "loom_router_select":
-        return _api("POST", "/router/select", {
-            "task_type": args["task_type"],
-        })
-
-    if name == "loom_router_stats":
-        return _api("GET", "/router/performance")
-
-    if name == "loom_health":
-        return _api("GET", "/health")
-
-    raise _ToolError(f"Unknown tool: {name}")
+    handler = _DISPATCH_TABLE.get(name)
+    if handler is None:
+        raise _ToolError(f"Unknown tool: {name}")
+    return handler(args)
 
 
 def _read_message() -> dict | None:
@@ -438,7 +423,7 @@ def main() -> None:
                 },
             })
         elif method == "notifications/initialized":
-            pass
+            logger.debug("Client initialized")
         elif method == "tools/list":
             _respond(req_id, {"tools": _TOOLS})
         elif method == "tools/call":

@@ -193,7 +193,7 @@ class DemoAgent:
             parsed = json.loads(
                 raw[raw.find("["):raw.rfind("]") + 1] or "[]"
             )
-        except (json.JSONDecodeError, ValueError):
+        except ValueError:
             logger.warning("Failed to parse LLM diff output")
             return changes
 
