@@ -476,7 +476,10 @@ def test_from_env_reads_loom_redis_url(monkeypatch):
 
     monkeypatch.setenv("LOOM_REDIS_URL", "redis://myhost:6380/2")
 
-    with patch("loom_ai.backends.redis_queue._redis_lib", mock_redis_mod):
+    with (
+        patch("loom_ai.backends.redis_queue._HAS_REDIS", True),
+        patch("loom_ai.backends.redis_queue._redis_lib", mock_redis_mod),
+    ):
         backend = RedisQueueBackend.from_env()
 
     mock_redis_mod.Redis.from_url.assert_called_once_with("redis://myhost:6380/2")
@@ -491,7 +494,10 @@ def test_from_env_uses_default_url(monkeypatch):
     mock_redis_mod = MagicMock()
     mock_redis_mod.Redis.from_url.return_value = mock_client
 
-    with patch("loom_ai.backends.redis_queue._redis_lib", mock_redis_mod):
+    with (
+        patch("loom_ai.backends.redis_queue._HAS_REDIS", True),
+        patch("loom_ai.backends.redis_queue._redis_lib", mock_redis_mod),
+    ):
         backend = RedisQueueBackend.from_env()
 
     mock_redis_mod.Redis.from_url.assert_called_once_with("redis://localhost:6379/0")
