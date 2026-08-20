@@ -92,6 +92,7 @@ class LoomConfig:
             LOOM_LLM_MODEL      Default model id for the LLM backend
             LOOM_SECRETS_FILE   Path to .env file (when LOOM_SECRETS=dotenv)
             LOOM_SECRETS_PREFIX Key prefix for env secret lookup
+            LOOM_SECRETS_KEY    Fernet key for encrypting PG-backed secrets
             LOOM_TOOLS          disabled | memory          (default: disabled)
             LOOM_RESOURCES      disabled | memory          (default: disabled)
         """
