@@ -1,18 +1,29 @@
 #!/usr/bin/env python3
-"""Loom Showcase — the engineer that remembers.
+"""Loom Showcase — the engineer that remembers (leveled up).
 
-An inspirational, narrative demo of what makes Loom different:
+  Act I   — Council of models (live free upstreams when LOOM_LLM_* set)
+  Act II  — Decisions into Loom storage + durable vault with provenance
+  Act III — Process death
+  Act IV  — Cold start: reload vault / storage, retrieve with provenance
+  Act V   — Keyless free gateway
 
-  Act I   — A council of models debates a real design question
-  Act II  — Decisions are written into durable knowledge (not a chat log)
-  Act III — The process dies. Completely.
-  Act IV  — A fresh process wakes with no transcript — and still knows
-  Act V   — The free gateway: anyone can call models with nothing Loom-shaped
-
-Runs fully offline with stub models (zero keys, zero network).
-When LOOM_LLM_BASE_URL is set, Act I can be pointed at real upstreams later.
+Modes
+-----
+Offline (default)::
 
     python examples/showcase_demo.py
+
+Live free models::
+
+    export LOOM_LLM_BASE_URL=https://openrouter.ai/api/v1
+    export LOOM_LLM_API_KEY=sk-or-v1-...
+    export LOOM_SHOWCASE_MODELS=model-a,model-b,model-c   # optional
+    python examples/showcase_demo.py
+
+Optional Postgres (true durability across machines)::
+
+    export LOOM_STORAGE=postgresql
+    # plus LOOM_PG_* as usual
 """
 
 from __future__ import annotations
@@ -21,10 +32,9 @@ import asyncio
 import os
 import sys
 import time
+import uuid
 from dataclasses import dataclass, field
-from typing import AsyncIterator
-
-# ── terminal presence ────────────────────────────────────────────────────
+from typing import Any, AsyncIterator
 
 RESET = "\033[0m"
 BOLD = "\033[1m"
@@ -33,7 +43,6 @@ CYAN = "\033[36m"
 GREEN = "\033[32m"
 YELLOW = "\033[33m"
 MAGENTA = "\033[35m"
-BLUE = "\033[34m"
 RED = "\033[31m"
 WHITE = "\033[97m"
 
@@ -54,7 +63,6 @@ def banner(title: str) -> None:
 
 
 def beat(seconds: float = 0.35) -> None:
-    """Dramatic pause (skipped when not a TTY)."""
     if sys.stdout.isatty():
         time.sleep(seconds)
 
@@ -63,12 +71,7 @@ def say(role: str, msg: str, color: str = WHITE) -> None:
     print(f"  {c(color + BOLD, role)}  {c(DIM, '·')}  {msg}")
 
 
-# ── stub council (offline) ───────────────────────────────────────────────
-
-
 class CouncilLLM:
-    """Three distinct engineering voices for offline consensus."""
-
     _VOICES: dict[str, str] = {
         "architect": (
             "Keep the public surface OpenAI-shaped and keyless. "
@@ -87,21 +90,12 @@ class CouncilLLM:
         ),
     }
 
-    async def chat(
-        self,
-        messages: list,
-        *,
-        model: str | None = None,
-        temperature: float = 0.7,
-        max_tokens: int | None = None,
-    ):
+    async def chat(self, messages, *, model=None, temperature=0.7, max_tokens=None):
         from loom_ai.models import ChatResponse
 
         _ = messages, temperature, max_tokens
         mid = model or "architect"
-        content = self._VOICES.get(
-            mid, f"[{mid}] I concur with the direction of travel."
-        )
+        content = self._VOICES.get(mid, f"[{mid}] I concur.")
         return ChatResponse(content=content, model=mid, provider="council")
 
     async def chat_stream(
@@ -117,7 +111,27 @@ class CouncilLLM:
         return sorted(self._VOICES.keys())
 
 
-# ── knowledge that survives process death (file-backed for the demo) ─────
+def _build_llm() -> tuple[Any, list[str], str]:
+    """Return (llm, model_ids, mode_label)."""
+    base = os.environ.get("LOOM_LLM_BASE_URL", "").strip()
+    if not base:
+        return CouncilLLM(), ["architect", "skeptic", "builder"], "offline council"
+
+    from loom_ai.backends.http_llm import HttpLLMBackend
+
+    llm = HttpLLMBackend(
+        base_url=base,
+        api_key=os.environ.get("LOOM_LLM_API_KEY", ""),
+        default_model=os.environ.get("LOOM_LLM_MODEL", "gpt-4o-mini"),
+        provider_name=os.environ.get("LOOM_LLM_PROVIDER", "free-upstream"),
+    )
+    raw = os.environ.get("LOOM_SHOWCASE_MODELS", "").strip()
+    if raw:
+        models = [m.strip() for m in raw.split(",") if m.strip()]
+    else:
+        default = os.environ.get("LOOM_LLM_MODEL", "gpt-4o-mini")
+        models = [default]
+    return llm, models, f"live · {base}"
 
 
 @dataclass
@@ -130,12 +144,6 @@ class Decision:
 
 
 class DemoKnowledgeVault:
-    """Minimal durable store — simulates the #681 knowledge boundary.
-
-    Uses a single JSON file so Act III can kill the process and Act IV
-    can still recall. Production path is PostgreSQL/pgvector (#684).
-    """
-
     def __init__(self, path: str) -> None:
         self._path = path
         self._items: list[Decision] = []
@@ -148,8 +156,7 @@ class DemoKnowledgeVault:
         if not p.is_file():
             self._items = []
             return
-        data = json.loads(p.read_text())
-        self._items = [Decision(**row) for row in data]
+        self._items = [Decision(**row) for row in json.loads(p.read_text())]
 
     def save(self) -> None:
         import json
@@ -177,114 +184,134 @@ class DemoKnowledgeVault:
         return list(self._items)
 
 
-# ── Acts ─────────────────────────────────────────────────────────────────
+async def _store_in_loom(config, decision: Decision) -> None:
+    if config is None:
+        return
+    from loom_ai.models import Document
+
+    doc = Document(
+        id=decision.id,
+        title=decision.title,
+        content=decision.content,
+        category="decision",
+        metadata={
+            "provenance": decision.provenance,
+            "session": decision.session,
+            "kind": "showcase-decision",
+        },
+    )
+    await config.storage.store_document(doc)
 
 
-async def act_i_council() -> list[tuple[str, str]]:
-    """Multi-model consensus on the free-gateway design."""
+async def act_i_council(llm, models: list[str], mode: str) -> list[tuple[str, str]]:
     from loom_ai.consensus import ConsensusEngine
     from loom_ai.models import ChatMessage
 
     banner("ACT I  ·  The Council")
-    say("Narrator", "Three models. One question. No single voice owns the truth.", DIM)
+    say("Narrator", "Plurality first. No single model owns the truth.", DIM)
+    say("Backend", mode, CYAN)
     beat()
 
     prompt = (
-        "How should Loom expose free-tier models publicly without tying "
-        "callers to Loom accounts, keys, or branding?"
+        "In 2-3 sentences: how should an orchestration layer expose free-tier "
+        "LLM APIs publicly without requiring caller accounts or branding from "
+        "the orchestrator itself?"
     )
     say("Question", prompt, YELLOW)
     beat()
 
-    llm = CouncilLLM()
     engine = ConsensusEngine(llm)
-    voices = ["architect", "skeptic", "builder"]
     messages = [ChatMessage(role="user", content=prompt)]
-
-    responses, failed = await engine.gather(messages, models=voices)
+    gather_models = models if len(models) > 1 else models * 3
+    responses, failed = await engine.gather(
+        messages, models=gather_models[:3], temperature=0.4
+    )
 
     collected: list[tuple[str, str]] = []
     for resp in responses:
-        say(resp.model.upper(), resp.content, MAGENTA)
-        collected.append((resp.model, resp.content))
-        beat(0.25)
+        text = (resp.content or "").strip().replace("\n", " ")
+        if len(text) > 220:
+            text = text[:217] + "…"
+        say((resp.model or "model").upper()[:24], text or "(empty)", MAGENTA)
+        collected.append((resp.model or "model", resp.content or ""))
+        beat(0.2)
 
     if failed:
-        say("Council", f"Silent voices: {failed}", RED)
+        say("Council", f"Silent: {failed}", RED)
 
+    arbiter = models[0]
     result = await engine.synthesize(
         prompt,
-        models=voices,
-        arbiter_model="architect",
+        models=gather_models[:3],
+        arbiter_model=arbiter,
         tool_name="design",
+        temperature=0.4,
+        arbiter_temperature=0.2,
     )
+    synth = (result.synthesis.content or "").strip().replace("\n", " ")
+    if len(synth) > 260:
+        synth = synth[:257] + "…"
     beat()
-    say("Synthesis", result.synthesis.content, GREEN + BOLD)
-    collected.append(("synthesis", result.synthesis.content))
+    say("Synthesis", synth, GREEN + BOLD)
+    collected.append(("synthesis", result.synthesis.content or ""))
     return collected
 
 
-async def act_ii_write_memory(
-    vault: DemoKnowledgeVault, council: list[tuple[str, str]]
-) -> None:
+async def act_ii_write_memory(vault, council, config) -> None:
     banner("ACT II  ·  Ink Into Stone")
-    say(
-        "Narrator",
-        "Chat logs evaporate. Loom writes decisions with provenance.",
-        DIM,
-    )
+    say("Narrator", "Chat logs evaporate. Decisions keep provenance.", DIM)
     beat()
 
     for i, (model, content) in enumerate(council):
         d = Decision(
-            id=f"dec-{i+1:02d}",
+            id=f"dec-{uuid.uuid4().hex[:8]}",
             title=f"Council voice: {model}",
             content=content,
-            provenance=[f"session-1/{model}", "consensus.gather"],
+            provenance=[f"session-1/{model}", "consensus"],
             session="session-1",
         )
         vault.remember(d)
-        say("Vault", f"Stored {d.id} ← {model}", CYAN)
-        beat(0.15)
+        await _store_in_loom(config, d)
+        say("Vault", f"{d.id} ← {model}", CYAN)
+        beat(0.12)
 
-    say("Vault", f"{len(vault.all())} decisions durable on disk", GREEN)
+    backend = type(config.storage).__name__ if config else "file-only"
+    say("Vault", f"{len(vault.all())} decisions · storage={backend}", GREEN)
 
 
 def act_iii_death() -> None:
     banner("ACT III  ·  The Lights Go Out")
     say("Narrator", "Process terminated. RAM cleared. No transcript remains.", DIM)
-    beat(0.5)
-    say("System", "SIGTERM  ·  loom process 0", RED)
-    beat(0.4)
+    beat(0.45)
+    say("System", "SIGTERM  ·  loom process", RED)
+    beat(0.35)
     say("System", "… silence …", DIM)
-    beat(0.6)
+    beat(0.5)
 
 
 async def act_iv_rebirth(vault_path: str) -> None:
     banner("ACT IV  ·  Cold Start")
-    say(
-        "Narrator",
-        "A new process. Empty context window. Only the vault remains.",
-        DIM,
-    )
+    say("Narrator", "New process. Empty context. Only durable knowledge remains.", DIM)
     beat()
 
     vault = DemoKnowledgeVault(vault_path)
     vault.load()
-    say("Process", f"pid fresh · vault entries: {len(vault.all())}", CYAN)
+    say("Process", f"fresh pid · vault entries: {len(vault.all())}", CYAN)
     beat()
 
-    query = "rate limit"
+    query = "rate"
     hits = vault.recall(query)
-    say("Retrieval", f"query={query!r} → {len(hits)} hit(s)", YELLOW)
-    for h in hits:
-        say(
-            "Provenance",
-            f"{h.id}  {c(DIM, '←')}  {', '.join(h.provenance)}",
-            GREEN,
-        )
-        say("Recall", h.content[:100] + ("…" if len(h.content) > 100 else ""), WHITE)
-        beat(0.2)
+    if not hits:
+        hits = vault.recall("key")
+    if not hits:
+        hits = vault.all()[:1]
+
+    say("Retrieval", f"query → {len(hits)} hit(s)", YELLOW)
+    for h in hits[:3]:
+        say("Provenance", f"{h.id} ← {', '.join(h.provenance)}", GREEN)
+        body = h.content[:120] + ("…" if len(h.content) > 120 else "")
+        say("Recall", body.replace("\n", " "), WHITE)
+        beat(0.15)
 
     say(
         "Engineer",
@@ -295,38 +322,20 @@ async def act_iv_rebirth(vault_path: str) -> None:
 
 def act_v_gateway() -> None:
     banner("ACT V  ·  The Open Door")
-    say(
-        "Narrator",
-        "Callers need nothing Loom-shaped. Just an OpenAI-compatible URL.",
-        DIM,
-    )
+    say("Narrator", "Nothing Loom-shaped for callers. OpenAI-compatible only.", DIM)
     beat()
     print(
         c(
             CYAN,
             """
-  # anyone, anywhere — no Loom key
   curl $GATEWAY/v1/models
-
-  curl $GATEWAY/v1/chat/completions \\
-    -H 'Content-Type: application/json' \\
-    -d '{"model":"…:free","messages":[{"role":"user","content":"Hello"}]}'
-
-  # or any OpenAI SDK
-  OpenAI(base_url="$GATEWAY/v1", api_key="not-needed")
+  curl $GATEWAY/v1/chat/completions -H 'Content-Type: application/json' \\
+    -d '{\"model\":\"…:free\",\"messages\":[{\"role\":\"user\",\"content\":\"Hello\"}]}'
+  OpenAI(base_url=\"$GATEWAY/v1\", api_key=\"not-needed\")
 """,
         )
     )
-    say(
-        "Loom",
-        "Upstream keys stay server-side. The public surface stays brand-neutral.",
-        GREEN,
-    )
-    say(
-        "Launch",
-        "python -m loom_ai.server_demo",
-        YELLOW + BOLD,
-    )
+    say("Launch", "python -m loom_ai.server_demo", YELLOW + BOLD)
 
 
 async def main() -> None:
@@ -334,17 +343,25 @@ async def main() -> None:
     print(c(BOLD + WHITE, "  LOOM"))
     print(c(DIM, "  the engineer that remembers"))
     print()
-    beat(0.4)
+    beat(0.3)
 
-    vault_path = os.environ.get(
-        "LOOM_SHOWCASE_VAULT", "/tmp/loom-showcase-vault.json"
-    )
+    vault_path = os.environ.get("LOOM_SHOWCASE_VAULT", "/tmp/loom-showcase-vault.json")
     if os.path.isfile(vault_path) and os.environ.get("LOOM_SHOWCASE_KEEP") != "1":
         os.remove(vault_path)
 
+    llm, models, mode = _build_llm()
+    config = None
+    try:
+        from loom_ai.config import LoomConfig
+
+        config = await LoomConfig.from_env()
+        say("Config", f"storage={type(config.storage).__name__}", DIM)
+    except Exception as exc:
+        say("Config", f"LoomConfig skipped: {type(exc).__name__}", DIM)
+
     vault = DemoKnowledgeVault(vault_path)
-    council = await act_i_council()
-    await act_ii_write_memory(vault, council)
+    council = await act_i_council(llm, models, mode)
+    await act_ii_write_memory(vault, council, config)
     act_iii_death()
     await act_iv_rebirth(vault_path)
     act_v_gateway()
@@ -357,7 +374,7 @@ async def main() -> None:
     )
     say(
         "Narrator",
-        "That is the demo. Not a chatbot. An orchestration substrate that outlives the chat.",
+        "Not a chatbot. An orchestration substrate that outlives the chat.",
         GREEN + BOLD,
     )
     print()
