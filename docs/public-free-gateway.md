@@ -14,8 +14,7 @@ export LOOM_LLM_MODEL=meta-llama/llama-3.3-70b-instruct:free
 # Optional allowlist (recommended for public)
 export LOOM_FREE_MODELS=meta-llama/llama-3.3-70b-instruct:free,google/gemma-2-9b-it:free
 
-# Public demo mode
-export LOOM_DEMO_PUBLIC=1
+# Rate limits for the public surface
 export LOOM_PUBLIC_RPM=20
 export LOOM_PUBLIC_MAX_TOKENS=2048
 
@@ -23,8 +22,11 @@ export LOOM_PUBLIC_MAX_TOKENS=2048
 export LOOM_HOST=127.0.0.1
 export LOOM_PORT=8080
 
-python -m loom_ai.server
+python -m loom_ai.server_demo
 ```
+
+`server_demo` forces `LOOM_DEMO_PUBLIC=1`, mounts `/v1`, strips secrets/knowledge/graph,
+and allows non-loopback bind without `LOOM_API_KEY` (put a reverse proxy in front).
 
 ## Caller usage (no Loom key)
 
@@ -58,9 +60,9 @@ print(client.chat.completions.create(
 |------|------|--------|
 | `GET /v1/models` | none | Free allowlist when set |
 | `POST /v1/chat/completions` | none | Stream supported |
-| `GET/POST /llm/*` | none in demo public | Loom-native shape |
+| `GET/POST /llm/*` | none | Loom-native shape (also kept) |
 | `/health`, `/ready` | none | Probes only |
-| secrets / knowledge / graph / … | **not mounted** in demo public | |
+| secrets / knowledge / graph / … | **stripped** | |
 
 ## Upstream mix
 
