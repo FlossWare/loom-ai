@@ -15,7 +15,8 @@ WORKDIR /build
 COPY pyproject.toml uv.lock README.md ./
 COPY loom_ai/ loom_ai/
 
-RUN pip install --no-cache-dir uv \
+# uv.lock pins versions; --only-binary :all: prevents source builds
+RUN pip install --no-cache-dir --only-binary :all: uv \
     && uv pip install --locked --only-binary :all: --prefix=/install \
     ".[server,postgresql]"
 
@@ -50,7 +51,8 @@ WORKDIR /build
 COPY pyproject.toml uv.lock README.md ./
 COPY loom_ai/ loom_ai/
 
-RUN pip install --no-cache-dir uv \
+# uv.lock pins versions; --only-binary :all: prevents source builds
+RUN pip install --no-cache-dir --only-binary :all: uv \
     && uv pip install --locked --only-binary :all: "." \
     && rm -rf /build
 
