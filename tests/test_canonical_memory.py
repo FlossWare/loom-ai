@@ -12,9 +12,15 @@ from loom_ai.models_phase1 import MemoryRecord
 class TestMemoryRecordCanonical:
     def test_has_scope_fields(self):
         r = MemoryRecord(
-            id="1", name="test", content="c", memory_type="fact",
-            scope="session", agent_id="a1", session_id="s1",
-            ttl_seconds=3600, confidence=0.9,
+            id="1",
+            name="test",
+            content="c",
+            memory_type="fact",
+            scope="session",
+            agent_id="a1",
+            session_id="s1",
+            ttl_seconds=3600,
+            confidence=0.9,
         )
         assert r.scope == "session"
         assert r.agent_id == "a1"
@@ -25,7 +31,10 @@ class TestMemoryRecordCanonical:
 
     def test_defaults(self):
         r = MemoryRecord(
-            id="2", name="x", content="y", memory_type="t",
+            id="2",
+            name="x",
+            content="y",
+            memory_type="t",
         )
         assert r.scope == "global"
         assert r.agent_id == ""
@@ -39,10 +48,13 @@ class TestScopedMemoryView:
 
         backend = InMemoryPersistentMemory()
         view = ScopedMemoryView(
-            backend, scope="agent-1", agent_id="a1",
+            backend,
+            scope="agent-1",
+            agent_id="a1",
         )
         rid = await view.store(
-            "finding", "bug in parser",
+            "finding",
+            "bug in parser",
             memory_type="observation",
         )
         assert rid
@@ -85,7 +97,8 @@ class TestConversationArchive:
         mgr = InMemoryConversationManager()
         sid = await mgr.create_session()
         await mgr.add_message(
-            sid, ChatMessage(role="user", content="hello"),
+            sid,
+            ChatMessage(role="user", content="hello"),
         )
 
         archive_id = await mgr.archive(sid)
@@ -96,7 +109,8 @@ class TestConversationArchive:
         assert transcript[0]["content"] == "hello"
 
         await mgr.add_message(
-            sid, ChatMessage(role="assistant", content="hi"),
+            sid,
+            ChatMessage(role="assistant", content="hi"),
         )
         archived = await mgr.export_transcript(archive_id)
         assert len(archived) == 1

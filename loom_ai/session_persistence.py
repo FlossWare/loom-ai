@@ -113,12 +113,14 @@ class SessionManager:
         if state is None:
             raise KeyError(f"Session not found: {session_id}")
         now = datetime.now(timezone.utc).isoformat()
-        state.events.append(SessionEvent(
-            kind=kind,
-            content=content,
-            timestamp=now,
-            metadata=metadata or {},
-        ))
+        state.events.append(
+            SessionEvent(
+                kind=kind,
+                content=content,
+                timestamp=now,
+                metadata=metadata or {},
+            )
+        )
 
     async def persist(self, session_id: str) -> dict[str, Any]:
         """Persist session state to memory and knowledge backends.
@@ -136,19 +138,21 @@ class SessionManager:
         }
 
         if self._memory is not None:
-            session_content = json.dumps({
-                "session_id": state.session_id,
-                "project": state.project,
-                "created_at": state.created_at,
-                "events": [
-                    {
-                        "kind": e.kind,
-                        "content": e.content,
-                        "timestamp": e.timestamp,
-                    }
-                    for e in state.events
-                ],
-            })
+            session_content = json.dumps(
+                {
+                    "session_id": state.session_id,
+                    "project": state.project,
+                    "created_at": state.created_at,
+                    "events": [
+                        {
+                            "kind": e.kind,
+                            "content": e.content,
+                            "timestamp": e.timestamp,
+                        }
+                        for e in state.events
+                    ],
+                }
+            )
             await self._memory.store(
                 f"session/{session_id}",
                 session_content,
@@ -184,11 +188,12 @@ class SessionManager:
         parts = []
         for event in state.events:
             if event.kind in (
-                "observation", "decision", "discovery", "fix",
+                "observation",
+                "decision",
+                "discovery",
+                "fix",
             ):
-                parts.append(
-                    f"[{event.kind}] {event.content}"
-                )
+                parts.append(f"[{event.kind}] {event.content}")
         if not parts:
             return ""
         header = f"Project: {state.project}\n"
@@ -206,17 +211,21 @@ class SessionManager:
         if self._memory is None:
             return
         records = await self._memory.search(
-            query, limit=limit, memory_type="session",
+            query,
+            limit=limit,
+            memory_type="session",
         )
         for r in records:
             if project and r.metadata.get("project") != project:
                 continue
-            ctx.memories.append({
-                "name": r.name,
-                "content": r.content,
-                "type": r.memory_type,
-                "metadata": r.metadata,
-            })
+            ctx.memories.append(
+                {
+                    "name": r.name,
+                    "content": r.content,
+                    "type": r.memory_type,
+                    "metadata": r.metadata,
+                }
+            )
             ctx.provenance.append(f"memory:{r.name}")
 
     async def _recover_knowledge(
@@ -230,17 +239,20 @@ class SessionManager:
         if self._knowledge is None:
             return
         results = await self._knowledge.query(
-            query, limit=limit,
+            query,
+            limit=limit,
         )
         for r in results:
             if project and r.metadata.get("project") != project:
                 continue
-            ctx.knowledge.append({
-                "content": r.content,
-                "score": r.score,
-                "source": r.source,
-                "metadata": r.metadata,
-            })
+            ctx.knowledge.append(
+                {
+                    "content": r.content,
+                    "score": r.score,
+                    "source": r.source,
+                    "metadata": r.metadata,
+                }
+            )
             ctx.provenance.append(f"knowledge:{r.source}")
 
     async def recover_context(
@@ -263,7 +275,8 @@ class SessionManager:
         return ctx
 
     async def get_session(
-        self, session_id: str,
+        self,
+        session_id: str,
     ) -> SessionState | None:
         """Return the in-memory session state, or None."""
         return self._sessions.get(session_id)

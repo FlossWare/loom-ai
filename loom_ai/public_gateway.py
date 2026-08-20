@@ -270,9 +270,7 @@ def mount_public_v1_routes(app: FastAPI, config: LoomConfig) -> None:
     try:
         from pydantic import BaseModel
     except ImportError as exc:
-        raise ImportError(
-            "Public gateway requires pydantic (server extra)."
-        ) from exc
+        raise ImportError("Public gateway requires pydantic (server extra).") from exc
 
     class V1Message(BaseModel):
         role: str

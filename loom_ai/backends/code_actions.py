@@ -33,7 +33,9 @@ def _resolve_safe(workspace: Path, relpath: str) -> Path:
 
 
 async def _run(
-    cmd: list[str], cwd: Path, timeout_seconds: int = 120,
+    cmd: list[str],
+    cwd: Path,
+    timeout_seconds: int = 120,
 ) -> dict[str, Any]:
     """Run a subprocess and return stdout, stderr, and exit code."""
     proc = await asyncio.create_subprocess_exec(
@@ -116,13 +118,15 @@ async def run_linter(
     for line in result["stdout"].splitlines():
         match = re.match(r"^(.+):(\d+):(\d+):\s+(\S+)\s+(.*)", line)
         if match:
-            findings.append({
-                "file": match.group(1),
-                "line": int(match.group(2)),
-                "col": int(match.group(3)),
-                "code": match.group(4),
-                "message": match.group(5),
-            })
+            findings.append(
+                {
+                    "file": match.group(1),
+                    "line": int(match.group(2)),
+                    "col": int(match.group(3)),
+                    "code": match.group(4),
+                    "message": match.group(5),
+                }
+            )
     return {
         "tool": tool,
         "exit_code": result["exit_code"],

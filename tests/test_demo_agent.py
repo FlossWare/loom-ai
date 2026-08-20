@@ -28,18 +28,31 @@ def _make_llm(responses: list[str] | None = None) -> MagicMock:
 def _git_init(path, *, add_all: bool = False):
     """Initialise a git repo, optionally staging and committing all files."""
     subprocess.run(
-        ["git", "init", "-q"], cwd=path, check=True,
+        ["git", "init", "-q"],
+        cwd=path,
+        check=True,
     )
     if add_all:
         subprocess.run(
-            ["git", "-c", "user.name=t", "-c", "user.email=t@t",
-             "add", ".", "-A"],
-            cwd=path, check=True,
+            ["git", "-c", "user.name=t", "-c", "user.email=t@t", "add", ".", "-A"],
+            cwd=path,
+            check=True,
         )
     subprocess.run(
-        ["git", "-c", "user.name=t", "-c", "user.email=t@t",
-         "commit", "--allow-empty", "-m", "init", "-q"],
-        cwd=path, check=True,
+        [
+            "git",
+            "-c",
+            "user.name=t",
+            "-c",
+            "user.email=t@t",
+            "commit",
+            "--allow-empty",
+            "-m",
+            "init",
+            "-q",
+        ],
+        cwd=path,
+        check=True,
     )
 
 
@@ -69,14 +82,17 @@ class TestAgentRun:
 
         plan_json = '{"files": [{"path": "sample.py"}]}'
         changes_json = (
-            '[{"file": "sample.py", "search": '
-            '"\\"old\\"", "replace": "\\"new\\""}]'
+            '[{"file": "sample.py", "search": "\\"old\\"", "replace": "\\"new\\""}]'
         )
-        llm = _make_llm([
-            plan_json,
-            changes_json,
-            "APPROVE", "APPROVE", "APPROVE",
-        ])
+        llm = _make_llm(
+            [
+                plan_json,
+                changes_json,
+                "APPROVE",
+                "APPROVE",
+                "APPROVE",
+            ]
+        )
         agent = DemoAgent(llm=llm, workspace=str(tmp_path))
 
         result = await agent.run(
@@ -115,11 +131,13 @@ class TestReviewLoop:
         assert review["votes"] == 2
 
     async def test_review_rejects_without_majority(self, tmp_path):
-        llm = _make_llm([
-            "REJECT: bug on line 5",
-            "APPROVE",
-            "REJECT: missing test",
-        ])
+        llm = _make_llm(
+            [
+                "REJECT: bug on line 5",
+                "APPROVE",
+                "REJECT: missing test",
+            ]
+        )
         agent = DemoAgent(llm=llm, workspace=str(tmp_path))
         review = await agent._review_changes("diff content", "context")
         assert review["approved"] is False
@@ -144,7 +162,8 @@ class TestReviewLoop:
         (tmp_path / "f.txt").write_text("world\n")
 
         agent = DemoAgent(
-            llm=_make_llm(), workspace=str(tmp_path),
+            llm=_make_llm(),
+            workspace=str(tmp_path),
         )
         diff = await agent._get_diff()
         assert "hello" in diff
@@ -156,16 +175,21 @@ class TestReviewLoop:
 
         plan_json = '{"files": [{"path": "sample.py"}]}'
         changes_json = (
-            '[{"file": "sample.py", "search": '
-            '"\\"old\\"", "replace": "\\"new\\""}]'
+            '[{"file": "sample.py", "search": "\\"old\\"", "replace": "\\"new\\""}]'
         )
-        llm = _make_llm([
-            plan_json,
-            changes_json,
-            "REJECT: needs test", "REJECT", "REJECT",
-            changes_json,
-            "APPROVE", "APPROVE", "APPROVE",
-        ])
+        llm = _make_llm(
+            [
+                plan_json,
+                changes_json,
+                "REJECT: needs test",
+                "REJECT",
+                "REJECT",
+                changes_json,
+                "APPROVE",
+                "APPROVE",
+                "APPROVE",
+            ]
+        )
         agent = DemoAgent(llm=llm, workspace=str(tmp_path))
         result = await agent.run(
             issue_text="Change old to new",

@@ -42,6 +42,7 @@ _CHAT_TIMEOUT = 120
 # Concrete selection strategies
 # ---------------------------------------------------------------------------
 
+
 class ThompsonSamplingStrategy:
     """Bayesian exploration/exploitation via Beta-distributed sampling."""
 
@@ -122,6 +123,7 @@ STRATEGIES: dict[str, type] = {
 # ---------------------------------------------------------------------------
 # Internal data classes
 # ---------------------------------------------------------------------------
+
 
 @dataclass
 class _ProviderAccount:
@@ -344,7 +346,9 @@ class FreeModelRouter:
             if isinstance(result, BaseException):
                 logger.warning(
                     "Probe failed for %s/%s: %s",
-                    acct.provider, acct.account_name, result,
+                    acct.provider,
+                    acct.account_name,
+                    result,
                 )
             elif isinstance(result, list):
                 self._endpoints.extend(result)
@@ -363,19 +367,25 @@ class FreeModelRouter:
         for key_name, value in rows:
             provider = _detect_provider(key_name)
             if provider and value:
-                accounts.append(_ProviderAccount(
-                    provider=provider,
-                    api_key=value,
-                    account_name=_detect_account(key_name),
-                ))
+                accounts.append(
+                    _ProviderAccount(
+                        provider=provider,
+                        api_key=value,
+                        account_name=_detect_account(key_name),
+                    )
+                )
 
         if self._env_fallback and not accounts:
             for env_key, provider in _KEY_PREFIX_MAP.items():
                 val = os.environ.get(f"{env_key}_API_KEY", "")
                 if val:
-                    accounts.append(_ProviderAccount(
-                        provider=provider, api_key=val, account_name="env",
-                    ))
+                    accounts.append(
+                        _ProviderAccount(
+                            provider=provider,
+                            api_key=val,
+                            account_name="env",
+                        )
+                    )
 
         return accounts
 
@@ -387,25 +397,29 @@ class FreeModelRouter:
 
     async def _query_secrets_rest(self) -> list[tuple[str, str]]:
         api_url = os.environ.get(
-            "LOOM_SECRETS_API", "http://localhost:5000/secrets",
+            "LOOM_SECRETS_API",
+            "http://localhost:5000/secrets",
         )
         try:
             status, body = await _async_request(
-                "GET", api_url,
+                "GET",
+                api_url,
                 {"X-Secret-Access-Reason": "FreeModelRouter discovery"},
                 timeout=5,
             )
             if status != 200:
                 return []
             key_names = [
-                k for k in body.get("keys", [])
+                k
+                for k in body.get("keys", [])
                 if "API_KEY" in k and k.startswith("PERSONAL_")
             ]
             rows: list[tuple[str, str]] = []
             for key_name in key_names:
                 try:
                     s, val_body = await _async_request(
-                        "GET", f"{api_url}/{key_name}",
+                        "GET",
+                        f"{api_url}/{key_name}",
                         {"X-Secret-Access-Reason": "FreeModelRouter"},
                         timeout=3,
                     )
@@ -421,17 +435,25 @@ class FreeModelRouter:
     async def _query_secrets_psql(self) -> list[tuple[str, str]]:
         try:
             import subprocess
+
             result = await asyncio.to_thread(
                 subprocess.run,
                 [
-                    "psql", self._pg_dsn, "-t", "-A", "-F", "\t",
+                    "psql",
+                    self._pg_dsn,
+                    "-t",
+                    "-A",
+                    "-F",
+                    "\t",
                     "-c",
                     "SELECT key, value FROM auth.secrets "
                     "WHERE encrypted = false "
                     "AND key LIKE 'PERSONAL_%API_KEY%' "
                     "ORDER BY key",
                 ],
-                capture_output=True, text=True, timeout=10,
+                capture_output=True,
+                text=True,
+                timeout=10,
             )
             rows: list[tuple[str, str]] = []
             for line in result.stdout.strip().splitlines():
@@ -444,7 +466,8 @@ class FreeModelRouter:
             return []
 
     async def _probe_account(
-        self, account: _ProviderAccount,
+        self,
+        account: _ProviderAccount,
     ) -> list[_ModelEndpoint]:
         provider = account.provider
         endpoints: list[_ModelEndpoint] = []
@@ -452,22 +475,28 @@ class FreeModelRouter:
         try:
             models = await self._discover_models(provider, account.api_key)
             for model_id in models:
-                endpoints.append(_ModelEndpoint(
-                    provider=provider,
-                    model_id=model_id,
-                    api_key=account.api_key,
-                    account_name=account.account_name,
-                ))
+                endpoints.append(
+                    _ModelEndpoint(
+                        provider=provider,
+                        model_id=model_id,
+                        api_key=account.api_key,
+                        account_name=account.account_name,
+                    )
+                )
         except Exception as exc:
             logger.debug(
                 "Probe failed for %s/%s: %s",
-                provider, account.account_name, exc,
+                provider,
+                account.account_name,
+                exc,
             )
 
         return endpoints
 
     async def _discover_models(
-        self, provider: str, api_key: str,
+        self,
+        provider: str,
+        api_key: str,
     ) -> list[str]:
         base = _PROVIDER_URLS.get(provider, "")
         if not base:
@@ -477,7 +506,10 @@ class FreeModelRouter:
             url = f"{base}/models"
             headers = {"Authorization": f"Bearer {api_key}"}
             status, body = await _async_request(
-                "GET", url, headers, timeout=_PROBE_TIMEOUT,
+                "GET",
+                url,
+                headers,
+                timeout=_PROBE_TIMEOUT,
             )
             if status == 200:
                 return [m["id"] for m in body.get("data", [])]
@@ -486,7 +518,10 @@ class FreeModelRouter:
             url = f"{base}/models"
             headers = {"Authorization": f"Bearer {api_key}"}
             status, body = await _async_request(
-                "GET", url, headers, timeout=_PROBE_TIMEOUT,
+                "GET",
+                url,
+                headers,
+                timeout=_PROBE_TIMEOUT,
             )
             if status == 200:
                 return [
@@ -500,15 +535,16 @@ class FreeModelRouter:
             url = f"{base}/models"
             headers = {"x-goog-api-key": api_key}
             status, body = await _async_request(
-                "GET", url, headers, timeout=_PROBE_TIMEOUT,
+                "GET",
+                url,
+                headers,
+                timeout=_PROBE_TIMEOUT,
             )
             if status == 200:
                 return [
                     m["name"].removeprefix("models/")
                     for m in body.get("models", [])
-                    if "generateContent" in str(
-                        m.get("supportedGenerationMethods", [])
-                    )
+                    if "generateContent" in str(m.get("supportedGenerationMethods", []))
                 ]
 
         elif provider == "cohere":
@@ -517,7 +553,8 @@ class FreeModelRouter:
         return []
 
     def _select_endpoint(
-        self, model: str | None = None,
+        self,
+        model: str | None = None,
     ) -> list[_ModelEndpoint]:
         candidates = self._endpoints
         if model:
@@ -542,7 +579,10 @@ class FreeModelRouter:
         return sorted(candidates, key=_score, reverse=True)
 
     def _record(
-        self, ep: _ModelEndpoint, success: bool, latency_s: float = 0.0,
+        self,
+        ep: _ModelEndpoint,
+        success: bool,
+        latency_s: float = 0.0,
     ) -> None:
         if success:
             ep.successes += 1
@@ -550,7 +590,9 @@ class FreeModelRouter:
             ep.failures += 1
         key = f"{ep.provider}/{ep.model_id}/{ep.account_name}"
         self._strategy.record(
-            success=success, endpoint_key=key, latency_s=latency_s,
+            success=success,
+            endpoint_key=key,
+            latency_s=latency_s,
         )
 
     async def chat(
@@ -582,9 +624,7 @@ class FreeModelRouter:
                 last_err = exc
                 logger.debug("Failed %s/%s: %s", ep.provider, ep.model_id, exc)
 
-        raise RuntimeError(
-            f"All {len(candidates)} endpoints failed. Last: {last_err}"
-        )
+        raise RuntimeError(f"All {len(candidates)} endpoints failed. Last: {last_err}")
 
     async def chat_stream(
         self,
@@ -595,7 +635,9 @@ class FreeModelRouter:
         max_tokens: int | None = None,
     ) -> AsyncIterator[str]:
         resp = await self.chat(
-            messages, model=model, temperature=temperature,
+            messages,
+            model=model,
+            temperature=temperature,
             max_tokens=max_tokens,
         )
         yield resp.content
@@ -612,33 +654,34 @@ class FreeModelRouter:
         temperature: float,
         max_tokens: int | None,
     ) -> ChatResponse:
-        if ep.provider in ("groq", "openrouter", "cerebras", "deepinfra",
-                           "nvidia"):
-            return await self._call_openai(ep, messages, temperature,
-                                           max_tokens)
+        if ep.provider in ("groq", "openrouter", "cerebras", "deepinfra", "nvidia"):
+            return await self._call_openai(ep, messages, temperature, max_tokens)
         if ep.provider == "gemini":
             return await self._call_gemini(ep, messages, max_tokens)
         if ep.provider == "cohere":
-            return await self._call_cohere(ep, messages, temperature,
-                                          max_tokens)
+            return await self._call_cohere(ep, messages, temperature, max_tokens)
         raise RuntimeError(f"Unsupported provider: {ep.provider}")
 
     async def _call_openai(
-        self, ep: _ModelEndpoint, messages: list[ChatMessage],
-        temperature: float, max_tokens: int | None,
+        self,
+        ep: _ModelEndpoint,
+        messages: list[ChatMessage],
+        temperature: float,
+        max_tokens: int | None,
     ) -> ChatResponse:
         base = _PROVIDER_URLS[ep.provider]
         url = f"{base}/chat/completions"
         headers = {"Authorization": f"Bearer {ep.api_key}"}
-        body = _openai_chat_body(messages, ep.model_id, temperature,
-                                 max_tokens)
+        body = _openai_chat_body(messages, ep.model_id, temperature, max_tokens)
         status, resp = await _async_request("POST", url, headers, body)
         if status != 200:
             raise RuntimeError(f"HTTP {status}: {resp}")
         return _parse_openai_response(resp, ep.provider)
 
     async def _call_gemini(
-        self, ep: _ModelEndpoint, messages: list[ChatMessage],
+        self,
+        ep: _ModelEndpoint,
+        messages: list[ChatMessage],
         max_tokens: int | None,
     ) -> ChatResponse:
         base = _PROVIDER_URLS["gemini"]
@@ -651,14 +694,20 @@ class FreeModelRouter:
         return _parse_gemini_response(resp, ep.model_id)
 
     async def _call_cohere(
-        self, ep: _ModelEndpoint, messages: list[ChatMessage],
-        temperature: float, max_tokens: int | None,
+        self,
+        ep: _ModelEndpoint,
+        messages: list[ChatMessage],
+        temperature: float,
+        max_tokens: int | None,
     ) -> ChatResponse:
         url = f"{_PROVIDER_URLS['cohere']}/chat"
         headers = {"Authorization": f"Bearer {ep.api_key}"}
         msgs = [{"role": m.role, "content": m.content} for m in messages]
-        body: dict = {"model": ep.model_id, "messages": msgs,
-                      "temperature": temperature}
+        body: dict = {
+            "model": ep.model_id,
+            "messages": msgs,
+            "temperature": temperature,
+        }
         if max_tokens is not None:
             body["max_tokens"] = max_tokens
         status, resp = await _async_request("POST", url, headers, body)

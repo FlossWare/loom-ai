@@ -248,7 +248,10 @@ def _api(method: str, path: str, body: dict | None = None) -> dict:
     if _LOOM_KEY:
         headers["Authorization"] = f"Bearer {_LOOM_KEY}"
     req = urllib.request.Request(
-        url, data=data, headers=headers, method=method,
+        url,
+        data=data,
+        headers=headers,
+        method=method,
     )
     try:
         with urllib.request.urlopen(req, timeout=60) as resp:
@@ -286,7 +289,9 @@ def _dispatch_secret_get(args: dict) -> dict:
         hdrs["Authorization"] = f"Bearer {_LOOM_KEY}"
     req = urllib.request.Request(
         f"{_LOOM_URL}/secrets/{sn}/reveal",
-        data=None, headers=hdrs, method="POST",
+        data=None,
+        headers=hdrs,
+        method="POST",
     )
     try:
         with urllib.request.urlopen(req, timeout=30) as resp:
@@ -310,25 +315,44 @@ def _dispatch_graph_neighbors(args: dict) -> dict:
 
 
 _DISPATCH_TABLE = {
-    "loom_chat": lambda a: _api("POST", "/llm/chat", {
-        "messages": a["messages"], "model": a.get("model"),
-        "temperature": a.get("temperature", 0.7),
-        "max_tokens": a.get("max_tokens"),
-    }),
+    "loom_chat": lambda a: _api(
+        "POST",
+        "/llm/chat",
+        {
+            "messages": a["messages"],
+            "model": a.get("model"),
+            "temperature": a.get("temperature", 0.7),
+            "max_tokens": a.get("max_tokens"),
+        },
+    ),
     "loom_list_models": lambda a: _api("GET", "/llm/models"),
     "loom_search": _dispatch_search,
-    "loom_store": lambda a: _api("POST", "/knowledge/documents", {
-        "title": a["title"], "content": a["content"],
-        "category": a.get("category", ""),
-    }),
-    "loom_consensus": lambda a: _api("POST", "/consensus/gather", {
-        "messages": [{"role": "user", "content": a["prompt"]}],
-        "models": a["models"],
-    }),
-    "loom_synthesize": lambda a: _api("POST", "/consensus/synthesize", {
-        "prompt": a["prompt"], "models": a["models"],
-        "arbiter_model": a.get("arbiter_model"),
-    }),
+    "loom_store": lambda a: _api(
+        "POST",
+        "/knowledge/documents",
+        {
+            "title": a["title"],
+            "content": a["content"],
+            "category": a.get("category", ""),
+        },
+    ),
+    "loom_consensus": lambda a: _api(
+        "POST",
+        "/consensus/gather",
+        {
+            "messages": [{"role": "user", "content": a["prompt"]}],
+            "models": a["models"],
+        },
+    ),
+    "loom_synthesize": lambda a: _api(
+        "POST",
+        "/consensus/synthesize",
+        {
+            "prompt": a["prompt"],
+            "models": a["models"],
+            "arbiter_model": a.get("arbiter_model"),
+        },
+    ),
     "loom_queue_enqueue": lambda a: _api(
         "POST",
         f"/pipeline/queues/{a['queue_name']}/enqueue",
@@ -340,14 +364,22 @@ _DISPATCH_TABLE = {
     ),
     "loom_secret_list": lambda a: _api("GET", "/secrets/"),
     "loom_secret_get": _dispatch_secret_get,
-    "loom_graph_add_node": lambda a: _api("POST", "/graph/nodes", {
-        "label": a["label"],
-        "properties": a.get("properties", {}),
-    }),
+    "loom_graph_add_node": lambda a: _api(
+        "POST",
+        "/graph/nodes",
+        {
+            "label": a["label"],
+            "properties": a.get("properties", {}),
+        },
+    ),
     "loom_graph_neighbors": _dispatch_graph_neighbors,
-    "loom_router_select": lambda a: _api("POST", "/router/select", {
-        "task_type": a["task_type"],
-    }),
+    "loom_router_select": lambda a: _api(
+        "POST",
+        "/router/select",
+        {
+            "task_type": a["task_type"],
+        },
+    ),
     "loom_router_stats": lambda a: _api("GET", "/router/performance"),
     "loom_health": lambda a: _api("GET", "/health"),
 }
@@ -399,7 +431,8 @@ def _negotiate_version(
 def main() -> None:
     """Run the MCP server loop over stdin/stdout."""
     logging.basicConfig(
-        level=logging.WARNING, stream=sys.stderr,
+        level=logging.WARNING,
+        stream=sys.stderr,
     )
     while True:
         msg = _read_message()
@@ -414,14 +447,17 @@ def main() -> None:
             version = _negotiate_version(
                 params.get("protocolVersion"),
             )
-            _respond(req_id, {
-                "protocolVersion": version,
-                "capabilities": {"tools": {"listChanged": False}},
-                "serverInfo": {
-                    "name": "loom-ai",
-                    "version": "1.0.0",
+            _respond(
+                req_id,
+                {
+                    "protocolVersion": version,
+                    "capabilities": {"tools": {"listChanged": False}},
+                    "serverInfo": {
+                        "name": "loom-ai",
+                        "version": "1.0.0",
+                    },
                 },
-            })
+            )
         elif method == "notifications/initialized":
             logger.debug("Client initialized")
         elif method == "tools/list":
@@ -433,14 +469,16 @@ def main() -> None:
         elif method == "ping":
             _respond(req_id, {})
         else:
-            _write_message({
-                "jsonrpc": "2.0",
-                "id": req_id,
-                "error": {
-                    "code": -32601,
-                    "message": f"Method not found: {method}",
-                },
-            })
+            _write_message(
+                {
+                    "jsonrpc": "2.0",
+                    "id": req_id,
+                    "error": {
+                        "code": -32601,
+                        "message": f"Method not found: {method}",
+                    },
+                }
+            )
 
 
 if __name__ == "__main__":

@@ -76,12 +76,11 @@ class ScopedMemoryView:
     ) -> list[MemoryRecord]:
         """Search memories, returning only those in this scope."""
         results = await self._backend.search(
-            query, limit=limit * 3, memory_type=memory_type,
+            query,
+            limit=limit * 3,
+            memory_type=memory_type,
         )
-        filtered = [
-            r for r in results
-            if r.metadata.get("scope") == self._scope
-        ]
+        filtered = [r for r in results if r.metadata.get("scope") == self._scope]
         return filtered[:limit]
 
     async def forget(self, name: str) -> bool:
@@ -97,7 +96,4 @@ class ScopedMemoryView:
         all_memories = await self._backend.list_memories(
             memory_type=memory_type,
         )
-        return [
-            m for m in all_memories
-            if m.metadata.get("scope") == self._scope
-        ]
+        return [m for m in all_memories if m.metadata.get("scope") == self._scope]
