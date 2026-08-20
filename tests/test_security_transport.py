@@ -4,7 +4,8 @@ from __future__ import annotations
 
 import pytest
 
-from loom_ai.clients.client import ClientConfig, LoomClient
+from loom_ai.clients.client import ClientConfig
+from loom_ai.clients.transport_security import validate_api_key_transport
 from loom_ai.security_bind import is_loopback_host, require_api_key_for_non_loopback
 
 
@@ -38,33 +39,29 @@ def test_require_api_key_non_loopback_with_key_ok():
     require_api_key_for_non_loopback("0.0.0.0", "secret")
 
 
-def test_client_https_with_key_ok():
-    ClientConfig(base_url="https://api.example.com", api_key="k").validate_transport()
+def test_transport_https_with_key_ok():
+    validate_api_key_transport("https://api.example.com", "k")
 
 
-def test_client_http_loopback_with_key_ok():
-    ClientConfig(base_url="http://127.0.0.1:5000", api_key="k").validate_transport()
+def test_transport_http_loopback_with_key_ok():
+    validate_api_key_transport("http://127.0.0.1:5000", "k")
 
 
-def test_client_http_remote_with_key_fails():
+def test_transport_http_remote_with_key_fails():
     with pytest.raises(ValueError, match="plaintext HTTP"):
-        ClientConfig(
-            base_url="http://api.example.com", api_key="k"
-        ).validate_transport()
+        validate_api_key_transport("http://api.example.com", "k")
 
 
-def test_client_http_remote_insecure_override():
-    ClientConfig(
-        base_url="http://api.example.com",
-        api_key="k",
-        allow_insecure_http=True,
-    ).validate_transport()
+def test_transport_http_remote_insecure_override():
+    validate_api_key_transport(
+        "http://api.example.com", "k", allow_insecure_http=True
+    )
 
 
-def test_client_http_remote_without_key_ok():
-    ClientConfig(base_url="http://api.example.com", api_key="").validate_transport()
+def test_transport_http_remote_without_key_ok():
+    validate_api_key_transport("http://api.example.com", "")
 
 
-def test_loom_client_init_rejects_insecure():
-    with pytest.raises(ValueError, match="plaintext HTTP"):
-        LoomClient(ClientConfig(base_url="http://remote.example", api_key="secret"))
+def test_client_config_defaults_loopback():
+    cfg = ClientConfig()
+    assert "127.0.0.1" in cfg.base_url or "localhost" in cfg.base_url
