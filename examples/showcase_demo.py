@@ -31,6 +31,7 @@ from __future__ import annotations
 import asyncio
 import os
 import sys
+import tempfile
 import time
 import uuid
 from dataclasses import dataclass, field
@@ -345,7 +346,10 @@ async def main() -> None:
     print()
     beat(0.3)
 
-    vault_path = os.environ.get("LOOM_SHOWCASE_VAULT", "/tmp/loom-showcase-vault.json")
+    vault_path = os.environ.get(
+        "LOOM_SHOWCASE_VAULT",
+        os.path.join(tempfile.gettempdir(), "loom-showcase-vault.json"),
+    )
     if os.path.isfile(vault_path) and os.environ.get("LOOM_SHOWCASE_KEEP") != "1":
         os.remove(vault_path)
 
