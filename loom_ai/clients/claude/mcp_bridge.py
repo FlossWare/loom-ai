@@ -142,9 +142,7 @@ def _validate_arguments(name: str, arguments: dict) -> None:
         expected_type = properties[arg_name].get("type")
         if expected_type in _TYPE_CHECKS:
             if not isinstance(arg_value, _TYPE_CHECKS[expected_type]):
-                raise _ToolError(
-                    f"Argument '{arg_name}' must be {expected_type}"
-                )
+                raise _ToolError(f"Argument '{arg_name}' must be {expected_type}")
 
 
 def _handle_tool_call(name: str, arguments: dict) -> dict:
@@ -180,9 +178,7 @@ def _handle_tool_call(name: str, arguments: dict) -> dict:
             raise _ToolError(f"Unknown tool: {name}")
 
         return {
-            "content": [
-                {"type": "text", "text": json.dumps(result, indent=2)}
-            ],
+            "content": [{"type": "text", "text": json.dumps(result, indent=2)}],
         }
     except _ToolError as exc:
         return {
@@ -266,9 +262,7 @@ def _respond(msg_id: int | str | None, result: dict) -> None:
     _write_message({"jsonrpc": "2.0", "id": msg_id, "result": result})
 
 
-def _respond_error(
-    msg_id: int | str | None, code: int, message: str
-) -> None:
+def _respond_error(msg_id: int | str | None, code: int, message: str) -> None:
     _write_message(
         {
             "jsonrpc": "2.0",
@@ -318,9 +312,7 @@ def _dispatch(msg: dict) -> bool:
     msg_id = msg.get("id")
 
     if "method" not in msg:
-        _respond_error(
-            msg_id, -32600, "Invalid Request: missing 'method'"
-        )
+        _respond_error(msg_id, -32600, "Invalid Request: missing 'method'")
         return True
 
     method = msg["method"]
