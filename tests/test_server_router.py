@@ -35,9 +35,7 @@ def _seeded_client(monkeypatch) -> TestClient:
     asyncio.run(
         router.register_provider("openai", None, models=["gpt-4o", "gpt-4o-mini"])
     )
-    asyncio.run(
-        router.register_provider("google", None, models=["gemini-flash"])
-    )
+    asyncio.run(router.register_provider("google", None, models=["gemini-flash"]))
     router.set_profile(
         "gpt-4o",
         ModelCapabilityProfile(
@@ -77,12 +75,20 @@ def _seeded_client(monkeypatch) -> TestClient:
 class TestRouterSelect:
     def test_select_from_candidates(self, monkeypatch):
         client = _make_client(monkeypatch)
-        client.post("/router/register", json={
-            "provider_name": "test", "models": ["model-a", "model-b"],
-        })
-        resp = client.post("/router/select", json={
-            "task_type": "code", "candidates": ["model-a", "model-b"],
-        })
+        client.post(
+            "/router/register",
+            json={
+                "provider_name": "test",
+                "models": ["model-a", "model-b"],
+            },
+        )
+        resp = client.post(
+            "/router/select",
+            json={
+                "task_type": "code",
+                "candidates": ["model-a", "model-b"],
+            },
+        )
         assert resp.status_code == 200
         body = resp.json()
         assert body["model"] in ("model-a", "model-b")
@@ -96,9 +102,13 @@ class TestRouterSelect:
 
     def test_select_no_candidates_400(self, monkeypatch):
         client = _make_client(monkeypatch)
-        resp = client.post("/router/select", json={
-            "task_type": "code", "candidates": [],
-        })
+        resp = client.post(
+            "/router/select",
+            json={
+                "task_type": "code",
+                "candidates": [],
+            },
+        )
         assert resp.status_code == 400
 
     def test_select_unknown_task_falls_back(self, monkeypatch):
@@ -111,27 +121,47 @@ class TestRouterSelect:
 class TestRouterOutcome:
     def test_record_outcome(self, monkeypatch):
         client = _seeded_client(monkeypatch)
-        resp = client.post("/router/outcome", json={
-            "model": "gpt-4o", "task_type": "code", "reward": 0.9,
-        })
+        resp = client.post(
+            "/router/outcome",
+            json={
+                "model": "gpt-4o",
+                "task_type": "code",
+                "reward": 0.9,
+            },
+        )
         assert resp.status_code == 200
         assert resp.json()["recorded"] is True
 
     def test_reward_out_of_range_422(self, monkeypatch):
         client = _seeded_client(monkeypatch)
-        resp = client.post("/router/outcome", json={
-            "model": "gpt-4o", "task_type": "code", "reward": 1.5,
-        })
+        resp = client.post(
+            "/router/outcome",
+            json={
+                "model": "gpt-4o",
+                "task_type": "code",
+                "reward": 1.5,
+            },
+        )
         assert resp.status_code == 422
 
     def test_outcome_updates_performance(self, monkeypatch):
         client = _seeded_client(monkeypatch)
-        client.post("/router/outcome", json={
-            "model": "gpt-4o", "task_type": "code", "reward": 0.95,
-        })
-        client.post("/router/outcome", json={
-            "model": "gpt-4o", "task_type": "code", "reward": 0.2,
-        })
+        client.post(
+            "/router/outcome",
+            json={
+                "model": "gpt-4o",
+                "task_type": "code",
+                "reward": 0.95,
+            },
+        )
+        client.post(
+            "/router/outcome",
+            json={
+                "model": "gpt-4o",
+                "task_type": "code",
+                "reward": 0.2,
+            },
+        )
         resp = client.get("/router/performance", params={"task_type": "code"})
         assert resp.status_code == 200
         arms = resp.json()["arms"]
@@ -143,21 +173,27 @@ class TestRouterOutcome:
 class TestRouterManagement:
     def test_register_provider(self, monkeypatch):
         client = _make_client(monkeypatch)
-        resp = client.post("/router/register", json={
-            "provider_name": "groq",
-            "models": ["llama-70b", "mixtral-8x7b"],
-            "priority": 5,
-        })
+        resp = client.post(
+            "/router/register",
+            json={
+                "provider_name": "groq",
+                "models": ["llama-70b", "mixtral-8x7b"],
+                "priority": 5,
+            },
+        )
         assert resp.status_code == 200
         assert resp.json()["models_registered"] == 2
 
     def test_set_profile(self, monkeypatch):
         client = _make_client(monkeypatch)
-        resp = client.post("/router/profile", json={
-            "model": "llama-70b",
-            "capabilities": ["code", "reasoning"],
-            "strengths": {"code": 0.7},
-        })
+        resp = client.post(
+            "/router/profile",
+            json={
+                "model": "llama-70b",
+                "capabilities": ["code", "reasoning"],
+                "strengths": {"code": 0.7},
+            },
+        )
         assert resp.status_code == 200
         assert resp.json()["capabilities"] == ["code", "reasoning"]
 

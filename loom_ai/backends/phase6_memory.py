@@ -172,7 +172,8 @@ class InMemoryACPAdapter:
         )
         self._messages[session_id].append(response)
         self._emit_event(
-            session_id, "message_received",
+            session_id,
+            "message_received",
             {"message_id": response.message_id},
         )
         return response
@@ -195,17 +196,21 @@ class InMemoryACPAdapter:
         return [e for e in events if e.sequence >= since_sequence]
 
     def _emit_event(
-        self, session_id: str, event_type: str,
+        self,
+        session_id: str,
+        event_type: str,
         data: dict | None = None,
     ) -> None:
         events = self._events.setdefault(session_id, [])
         seq = len(events)
-        events.append(ACPEvent(
-            event_type=event_type,
-            session_id=session_id,
-            data=data or {},
-            sequence=seq,
-        ))
+        events.append(
+            ACPEvent(
+                event_type=event_type,
+                session_id=session_id,
+                data=data or {},
+                sequence=seq,
+            )
+        )
 
 
 # ══════════════════════════════════════════════════════════════════════════
@@ -234,14 +239,16 @@ class InMemoryContextAssembler:
                 remaining = max_tokens - total_tokens
                 if remaining > 0:
                     truncated_chars = remaining * _CHARS_PER_TOKEN
-                    kept.append(ContextSource(
-                        source_type=source.source_type,
-                        content=source.content[:truncated_chars],
-                        priority=source.priority,
-                        token_count=remaining,
-                        provenance=source.provenance,
-                        metadata=source.metadata,
-                    ))
+                    kept.append(
+                        ContextSource(
+                            source_type=source.source_type,
+                            content=source.content[:truncated_chars],
+                            priority=source.priority,
+                            token_count=remaining,
+                            provenance=source.provenance,
+                            metadata=source.metadata,
+                        )
+                    )
                     total_tokens = max_tokens
                 break
             kept.append(source)
@@ -282,14 +289,17 @@ class InMemoryContextAssembler:
     async def replay(self, snapshot: ContextSnapshot) -> list[dict]:
         entries: list[dict] = []
         for i, source in enumerate(snapshot.sources):
-            entries.append({
-                "step": i,
-                "action": "include",
-                "source_type": source.source_type,
-                "priority": source.priority,
-                "token_count": source.token_count or _estimate_tokens(source.content),
-                "provenance": source.provenance,
-            })
+            entries.append(
+                {
+                    "step": i,
+                    "action": "include",
+                    "source_type": source.source_type,
+                    "priority": source.priority,
+                    "token_count": source.token_count
+                    or _estimate_tokens(source.content),
+                    "provenance": source.provenance,
+                }
+            )
         if snapshot.compacted:
             entries.append({"step": len(entries), "action": "compact"})
         return entries
@@ -371,22 +381,24 @@ class InMemoryTrajectoryStore:
             t = self._trajectories.get(tid)
             if t is None:
                 continue
-            records.append({
-                "trajectory_id": t.trajectory_id,
-                "task": t.task,
-                "outcome": t.outcome,
-                "total_reward": t.total_reward,
-                "model": t.model,
-                "steps": [
-                    {
-                        "step_id": s.step_id,
-                        "action": s.action,
-                        "observation": s.observation,
-                        "reward": s.reward,
-                    }
-                    for s in t.steps
-                ],
-            })
+            records.append(
+                {
+                    "trajectory_id": t.trajectory_id,
+                    "task": t.task,
+                    "outcome": t.outcome,
+                    "total_reward": t.total_reward,
+                    "model": t.model,
+                    "steps": [
+                        {
+                            "step_id": s.step_id,
+                            "action": s.action,
+                            "observation": s.observation,
+                            "reward": s.reward,
+                        }
+                        for s in t.steps
+                    ],
+                }
+            )
 
         if format == "jsonl":
             return "\n".join(json.dumps(r) for r in records)
@@ -502,7 +514,8 @@ class InMemoryAgentCapabilityRegistry:
     ) -> list[AgentCapabilityProfile]:
         required_ids = {r.capability_id for r in requirements}
         return [
-            p for p in self._profiles.values()
+            p
+            for p in self._profiles.values()
             if required_ids.issubset(set(p.capabilities))
         ]
 

@@ -193,15 +193,9 @@ class InMemoryTemporalKnowledgeStore:
         results = [
             c
             for c in self._claims.values()
-            if c.subject_id == entity_id
-            and self._in_window(c, start, end)
+            if c.subject_id == entity_id and self._in_window(c, start, end)
         ]
-        results.sort(
-            key=lambda c: (
-                c.temporal.valid_from if c.temporal else ""
-            )
-            or ""
-        )
+        results.sort(key=lambda c: (c.temporal.valid_from if c.temporal else "") or "")
         return results
 
     @staticmethod
@@ -268,12 +262,17 @@ class InMemoryGraphRetriever:
             current, current_depth = queue.popleft()
             if current_depth >= depth:
                 continue
-            rels = await self._graph.get_relationships(
-                current, direction="both"
-            )
+            rels = await self._graph.get_relationships(current, direction="both")
             await self._collect_neighbors(
-                rels, current, current_depth,
-                entities, relationships, seen_rels, visited, queue, limit,
+                rels,
+                current,
+                current_depth,
+                entities,
+                relationships,
+                seen_rels,
+                visited,
+                queue,
+                limit,
             )
 
         return SubgraphResult(entities=entities, relationships=relationships)
@@ -294,9 +293,7 @@ class InMemoryGraphRetriever:
             if rel.id not in seen_rels:
                 seen_rels.add(rel.id)
                 relationships.append(rel)
-            neighbor_id = (
-                rel.target_id if rel.source_id == current else rel.source_id
-            )
+            neighbor_id = rel.target_id if rel.source_id == current else rel.source_id
             if neighbor_id not in visited:
                 visited.add(neighbor_id)
                 entity = await self._graph.get_entity(neighbor_id)
@@ -334,8 +331,7 @@ class InMemoryGraphRetriever:
             rels = await self._graph.get_relationships(current, direction="both")
             for rel in rels:
                 neighbor_id = (
-                    rel.target_id if rel.source_id == current
-                    else rel.source_id
+                    rel.target_id if rel.source_id == current else rel.source_id
                 )
                 if neighbor_id not in visited:
                     visited.add(neighbor_id)
@@ -393,9 +389,7 @@ class InMemoryGraphRetriever:
 
         return SubgraphResult(entities=entities, relationships=relationships)
 
-    async def community_summaries(
-        self, *, limit: int = 10
-    ) -> list[CommunitySummary]:
+    async def community_summaries(self, *, limit: int = 10) -> list[CommunitySummary]:
         """Return summaries for detected graph communities."""
         all_summaries: list[CommunitySummary] = []
         return all_summaries[:limit]
@@ -576,7 +570,7 @@ class InMemoryExternalGraphAdapter:
         self._sources.add(source_system)
         entities_imported = 0
         if since:
-            for (src, _eid), _iid in self._id_map.items():
+            for (src, _eid), _iid in self._entity_map.items():
                 if src == source_system:
                     entities_imported += 1
         return ImportResult(
