@@ -19,6 +19,7 @@ PostgresqlKnowledgeStore       -- RAG pipeline backed by PostgreSQL
 
 from __future__ import annotations
 
+import asyncio
 import json
 import os
 import urllib.parse
@@ -44,6 +45,8 @@ except ImportError:
 
 
 _DELETE_ONE = "DELETE 1"
+_shared_pool: Any = None
+_shared_pool_lock = asyncio.Lock()
 
 
 def _require_asyncpg() -> None:
@@ -65,6 +68,32 @@ def _dsn_from_env() -> str:
     database = os.environ.get("LOOM_PG_DATABASE", "loom")
     encoded_credential = urllib.parse.quote_plus(credential)
     return f"postgresql://{user}:{encoded_credential}@{host}:{port}/{database}"
+
+
+async def get_shared_pool() -> Any:
+    """Return a module-level shared asyncpg pool, creating it on first call.
+
+    All PostgreSQL backends should share one pool to avoid redundant
+    connections.  Call :func:`close_shared_pool` during shutdown.
+
+    Uses an asyncio lock to prevent concurrent coroutines from creating
+    duplicate pools.
+    """
+    global _shared_pool
+    async with _shared_pool_lock:
+        if _shared_pool is None:
+            _require_asyncpg()
+            _shared_pool = await asyncpg.create_pool(dsn=_dsn_from_env())
+    return _shared_pool
+
+
+async def close_shared_pool() -> None:
+    """Close the shared pool if it was created.  Safe to call multiple times."""
+    global _shared_pool
+    async with _shared_pool_lock:
+        if _shared_pool is not None:
+            await _shared_pool.close()
+            _shared_pool = None
 
 
 # ======================================================================
@@ -90,11 +119,11 @@ class PostgresqlStorageBackend:
         self._pool = pool
 
     @classmethod
-    async def from_env(cls) -> PostgresqlStorageBackend:
+    async def from_env(cls, *, pool: Any = None) -> PostgresqlStorageBackend:
         """Create an instance using ``LOOM_PG_*`` env vars."""
         _require_asyncpg()
-        pool = await asyncpg.create_pool(dsn=_dsn_from_env())
-        return cls(pool)
+        p = pool if pool is not None else await get_shared_pool()
+        return cls(p)
 
     # -- Documents --------------------------------------------------------
 
@@ -328,11 +357,11 @@ class PostgresqlSearchBackend:
         self._pool = pool
 
     @classmethod
-    async def from_env(cls) -> PostgresqlSearchBackend:
+    async def from_env(cls, *, pool: Any = None) -> PostgresqlSearchBackend:
         """Create an instance using ``LOOM_PG_*`` env vars."""
         _require_asyncpg()
-        pool = await asyncpg.create_pool(dsn=_dsn_from_env())
-        return cls(pool)
+        p = pool if pool is not None else await get_shared_pool()
+        return cls(p)
 
     async def index(
         self,
@@ -503,11 +532,11 @@ class PostgresqlSecretsBackend:
         self._pool = pool
 
     @classmethod
-    async def from_env(cls) -> PostgresqlSecretsBackend:
+    async def from_env(cls, *, pool: Any = None) -> PostgresqlSecretsBackend:
         """Create an instance using ``LOOM_PG_*`` env vars."""
         _require_asyncpg()
-        pool = await asyncpg.create_pool(dsn=_dsn_from_env())
-        return cls(pool)
+        p = pool if pool is not None else await get_shared_pool()
+        return cls(p)
 
     async def get(self, name: str) -> str | None:
         async with self._pool.acquire() as conn:
@@ -559,11 +588,11 @@ class PostgresqlPersistentMemory:
         self._pool = pool
 
     @classmethod
-    async def from_env(cls) -> PostgresqlPersistentMemory:
+    async def from_env(cls, *, pool: Any = None) -> PostgresqlPersistentMemory:
         """Create an instance using ``LOOM_PG_*`` env vars."""
         _require_asyncpg()
-        pool = await asyncpg.create_pool(dsn=_dsn_from_env())
-        return cls(pool)
+        p = pool if pool is not None else await get_shared_pool()
+        return cls(p)
 
     async def store(
         self,
@@ -799,13 +828,14 @@ class PostgresqlKnowledgeStore:
     async def from_env(
         cls,
         *,
+        pool: Any = None,
         max_tokens: int = 512,
         overlap: int = 50,
     ) -> PostgresqlKnowledgeStore:
         """Create an instance using ``LOOM_PG_*`` env vars."""
         _require_asyncpg()
-        pool = await asyncpg.create_pool(dsn=_dsn_from_env())
-        return cls(pool, max_tokens=max_tokens, overlap=overlap)
+        p = pool if pool is not None else await get_shared_pool()
+        return cls(p, max_tokens=max_tokens, overlap=overlap)
 
     async def ingest(
         self,

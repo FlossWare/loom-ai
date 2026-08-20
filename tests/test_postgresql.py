@@ -28,7 +28,10 @@ from loom_ai.backends.postgresql import (  # noqa: E402
     PostgresqlSecretsBackend,
     PostgresqlStorageBackend,
     _require_asyncpg,
+    close_shared_pool,
+    get_shared_pool,
 )
+import loom_ai.backends.postgresql as pg_mod  # noqa: E402
 
 # ── Fixtures ────────────────────────────────────────────────────────────
 
@@ -662,3 +665,70 @@ class TestPostgresqlSearchIndex:
         # Re-index with updated content also succeeds (upsert).
         assert await backend.index(chunk, document_title="T2") is True
         assert conn.execute.await_count == 2
+
+
+# ── Shared pool lifecycle (#665) ───────────────────────────────────────
+
+
+class TestSharedPoolLifecycle:
+    """Verify that all PG backends share a single pool when created via from_env."""
+
+    @pytest.fixture(autouse=True)
+    async def _reset_shared_pool(self):
+        """Ensure shared pool is cleared before and after each test."""
+        pg_mod._shared_pool = None
+        yield
+        pg_mod._shared_pool = None
+
+    async def test_get_shared_pool_creates_once(self, monkeypatch):
+        fake_pool = MagicMock()
+        call_count = 0
+
+        async def _fake_create_pool(dsn):
+            nonlocal call_count
+            call_count += 1
+            return fake_pool
+
+        import asyncpg as real_asyncpg
+
+        monkeypatch.setattr(real_asyncpg, "create_pool", _fake_create_pool)
+
+        p1 = await get_shared_pool()
+        p2 = await get_shared_pool()
+        assert p1 is p2 is fake_pool
+        assert call_count == 1
+
+    async def test_close_shared_pool(self, monkeypatch):
+        fake_pool = AsyncMock()
+
+        async def _fake_create_pool(dsn):
+            return fake_pool
+
+        import asyncpg as real_asyncpg
+
+        monkeypatch.setattr(real_asyncpg, "create_pool", _fake_create_pool)
+
+        await get_shared_pool()
+        assert pg_mod._shared_pool is not None
+        await close_shared_pool()
+        assert pg_mod._shared_pool is None
+        fake_pool.close.assert_awaited_once()
+
+    async def test_close_shared_pool_idempotent(self):
+        assert pg_mod._shared_pool is None
+        await close_shared_pool()
+        assert pg_mod._shared_pool is None
+
+    async def test_from_env_with_pool_reuses(self, pool_conn):
+        pool, _ = pool_conn
+        storage = await PostgresqlStorageBackend.from_env(pool=pool)
+        search = await PostgresqlSearchBackend.from_env(pool=pool)
+        secrets = await PostgresqlSecretsBackend.from_env(pool=pool)
+        memory = await PostgresqlPersistentMemory.from_env(pool=pool)
+        knowledge = await PostgresqlKnowledgeStore.from_env(pool=pool)
+
+        assert storage._pool is pool
+        assert search._pool is pool
+        assert secrets._pool is pool
+        assert memory._pool is pool
+        assert knowledge._pool is pool
