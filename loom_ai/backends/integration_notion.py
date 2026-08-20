@@ -186,9 +186,7 @@ class InMemoryNotionCapability:
             res = client.pages.create(
                 parent={"database_id": arguments["parent_id"]},
                 properties={
-                    "title": {
-                        "title": [{"text": {"content": arguments["title"]}}]
-                    }
+                    "title": {"title": [{"text": {"content": arguments["title"]}}]}
                 },
             )
             return CapabilityResult(success=True, result=dict(res), error=None)
@@ -201,9 +199,7 @@ class InMemoryNotionCapability:
         if name == "update_page":
             props = {}
             if "title" in arguments:
-                props["title"] = {
-                    "title": [{"text": {"content": arguments["title"]}}]
-                }
+                props["title"] = {"title": [{"text": {"content": arguments["title"]}}]}
             res = client.pages.update(
                 page_id=arguments["page_id"],
                 properties=props,
@@ -213,9 +209,7 @@ class InMemoryNotionCapability:
             success=False, result=None, error=f"Unknown capability: {name}"
         )
 
-    def _invoke_in_memory(
-        self, name: str, arguments: dict
-    ) -> CapabilityResult:
+    def _invoke_in_memory(self, name: str, arguments: dict) -> CapabilityResult:
         if name == "create_page":
             new_page = {
                 "id": f"p_{uuid.uuid4().hex[:8]}",
@@ -224,14 +218,10 @@ class InMemoryNotionCapability:
                 "parent_db": arguments["parent_id"],
             }
             self._pages.append(new_page)
-            return CapabilityResult(
-                success=True, result={"page": new_page}, error=None
-            )
+            return CapabilityResult(success=True, result={"page": new_page}, error=None)
         if name == "search":
             query = arguments["query"].lower()
-            matches = [
-                p for p in self._pages if query in p.get("title", "").lower()
-            ]
+            matches = [p for p in self._pages if query in p.get("title", "").lower()]
             matches += [
                 d for d in self._databases if query in d.get("title", "").lower()
             ]
@@ -241,9 +231,7 @@ class InMemoryNotionCapability:
         if name == "query_database":
             db_id = arguments["database_id"]
             pages = [p for p in self._pages if p.get("parent_db") == db_id]
-            return CapabilityResult(
-                success=True, result={"results": pages}, error=None
-            )
+            return CapabilityResult(success=True, result={"results": pages}, error=None)
         if name == "update_page":
             page_id = arguments["page_id"]
             page = next((p for p in self._pages if p["id"] == page_id), None)
