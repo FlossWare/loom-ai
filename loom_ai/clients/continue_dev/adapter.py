@@ -84,8 +84,11 @@ def main() -> None:
         models = [m for m in models if m.get("title") != "loom-ai"]
         models.append(generate_model_config(loom_url, api_key, model))
         config["models"] = models
-        path.parent.mkdir(parents=True, exist_ok=True)
-        path.write_text(json.dumps(config, indent=2) + "\n")
+        resolved = path.resolve()
+        if not resolved.is_relative_to(Path.home()):
+            raise ValueError(f"Refusing to write outside home directory: {resolved}")
+        resolved.parent.mkdir(parents=True, exist_ok=True)
+        resolved.write_text(json.dumps(config, indent=2) + "\n")
         print(f"Added loom-ai model to {path}")
     else:
         print(json.dumps(generate_full_config(loom_url, api_key, model), indent=2))

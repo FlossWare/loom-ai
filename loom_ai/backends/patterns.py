@@ -41,18 +41,24 @@ async def _call_model(
 ) -> ChatResponse:
     """Send *task* to a single model via *router* or *backend*.
 
+    *_config*, when provided, is forwarded as keyword arguments
+    (e.g. ``temperature``, ``max_tokens``) to the chat call.
+
     Raises ``ValueError`` if neither *router* nor *backend* is provided.
     """
+    kwargs = _config or {}
     if router is not None:
         resolved_backend = await router.route(model)
         return await resolved_backend.chat(
             [ChatMessage(role="user", content=task)],
+            **kwargs,
         )
 
     if backend is not None:
         return await backend.chat(
             [ChatMessage(role="user", content=task)],
             model=model,
+            **kwargs,
         )
 
     raise ValueError(_MISSING_BACKEND_MSG)
@@ -198,11 +204,16 @@ class MapReducePattern:
         start = time.perf_counter()
         cfg = config or {}
         map_prompt = cfg.get("map_prompt", task)
+        chat_config = {k: v for k, v in cfg.items() if k != "map_prompt"} or None
 
         async def _worker(model: str) -> dict:
             try:
                 resp = await _call_model(
-                    map_prompt, model, router=router, backend=backend, _config=config
+                    map_prompt,
+                    model,
+                    router=router,
+                    backend=backend,
+                    _config=chat_config,
                 )
                 return {"model": model, "content": resp.content, "success": True}
             except Exception as exc:
