@@ -6,10 +6,13 @@ inner backend and recording each interaction for future recall.
 
 from __future__ import annotations
 
+import logging
 import time
 from collections.abc import AsyncIterator
 from datetime import datetime, timezone
 from typing import TYPE_CHECKING, Any
+
+logger = logging.getLogger(__name__)
 
 if TYPE_CHECKING:
     from loom_ai.contracts_phase1 import KnowledgePipeline, PersistentMemoryBackend
@@ -104,8 +107,8 @@ class CapturingLLMBackend:
                         "latency_ms": round(latency_ms, 1),
                     },
                 )
-            except Exception:
-                pass
+            except Exception as exc:
+                logger.debug("Knowledge capture failed: %s", exc)
 
         if self._memory is not None:
             try:
@@ -119,5 +122,5 @@ class CapturingLLMBackend:
                         "latency_ms": round(latency_ms, 1),
                     },
                 )
-            except Exception:
-                pass
+            except Exception as exc:
+                logger.debug("Memory capture failed: %s", exc)

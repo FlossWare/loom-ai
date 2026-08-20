@@ -411,8 +411,8 @@ class FreeModelRouter:
                     )
                     if s == 200 and val_body.get("value"):
                         rows.append((key_name, val_body["value"]))
-                except Exception:
-                    pass
+                except Exception as exc:
+                    logger.debug("Failed to fetch key %s: %s", key_name, exc)
             return rows
         except Exception as exc:
             logger.debug("REST secrets API unavailable: %s", exc)
@@ -497,9 +497,10 @@ class FreeModelRouter:
                 ]
 
         elif provider == "gemini":
-            url = f"{base}/models?key={api_key}"
+            url = f"{base}/models"
+            headers = {"x-goog-api-key": api_key}
             status, body = await _async_request(
-                "GET", url, timeout=_PROBE_TIMEOUT,
+                "GET", url, headers, timeout=_PROBE_TIMEOUT,
             )
             if status == 200:
                 return [
@@ -641,12 +642,10 @@ class FreeModelRouter:
         max_tokens: int | None,
     ) -> ChatResponse:
         base = _PROVIDER_URLS["gemini"]
-        url = (
-            f"{base}/models/{ep.model_id}:generateContent"
-            f"?key={ep.api_key}"
-        )
+        url = f"{base}/models/{ep.model_id}:generateContent"
+        headers = {"x-goog-api-key": ep.api_key}
         body = _gemini_body(messages, max_tokens)
-        status, resp = await _async_request("POST", url, body=body)
+        status, resp = await _async_request("POST", url, headers, body)
         if status != 200:
             raise RuntimeError(f"Gemini HTTP {status}: {resp}")
         return _parse_gemini_response(resp, ep.model_id)
