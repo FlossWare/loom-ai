@@ -67,7 +67,11 @@ class TestAgentRun:
             '[{"file": "sample.py", "search": '
             '"\\"old\\"", "replace": "\\"new\\""}]'
         )
-        llm = _make_llm([plan_json, changes_json])
+        llm = _make_llm([
+            plan_json,
+            changes_json,
+            "APPROVE", "APPROVE", "APPROVE",
+        ])
         agent = DemoAgent(llm=llm, workspace=str(tmp_path))
 
         result = await agent.run(
@@ -111,6 +115,97 @@ class TestAgentRun:
         agent = DemoAgent(llm=llm, workspace=str(tmp_path))
         result = await agent.run(issue_text="Bad JSON test")
         assert result.error == "No changes applied"
+
+
+class TestReviewLoop:
+    async def test_review_approves_with_majority(self, tmp_path):
+        llm = _make_llm(["APPROVE", "REJECT: bad style", "APPROVE"])
+        agent = DemoAgent(llm=llm, workspace=str(tmp_path))
+        review = await agent._review_changes("diff content", "context")
+        assert review["approved"] is True
+        assert review["votes"] == 2
+
+    async def test_review_rejects_without_majority(self, tmp_path):
+        llm = _make_llm([
+            "REJECT: bug on line 5",
+            "APPROVE",
+            "REJECT: missing test",
+        ])
+        agent = DemoAgent(llm=llm, workspace=str(tmp_path))
+        review = await agent._review_changes("diff content", "context")
+        assert review["approved"] is False
+        assert review["votes"] == 1
+        assert len(review["issues"]) > 0
+
+    async def test_review_handles_llm_errors(self, tmp_path):
+        llm = _make_llm(["APPROVE"])
+
+        async def _failing_chat(messages, **kwargs):
+            raise RuntimeError("LLM down")
+
+        llm.chat = _failing_chat
+        agent = DemoAgent(llm=llm, workspace=str(tmp_path))
+        review = await agent._review_changes("diff", "ctx")
+        assert review["approved"] is False
+        assert review["votes"] == 0
+
+    async def test_get_diff(self, tmp_path):
+        import subprocess
+        (tmp_path / "f.txt").write_text("hello\n")
+        subprocess.run(
+            ["git", "init", "-q"], cwd=tmp_path, check=True,
+        )
+        subprocess.run(
+            ["git", "-c", "user.name=t", "-c", "user.email=t@t",
+             "add", ".", "-A"],
+            cwd=tmp_path, check=True,
+        )
+        subprocess.run(
+            ["git", "-c", "user.name=t", "-c", "user.email=t@t",
+             "commit", "-m", "init", "-q"],
+            cwd=tmp_path, check=True,
+        )
+        (tmp_path / "f.txt").write_text("world\n")
+        agent = DemoAgent(
+            llm=_make_llm(), workspace=str(tmp_path),
+        )
+        diff = await agent._get_diff()
+        assert "hello" in diff
+        assert "world" in diff
+
+    async def test_retry_on_rejection(self, tmp_path):
+        import subprocess
+        (tmp_path / "sample.py").write_text('x = "old"\n')
+        subprocess.run(
+            ["git", "init", "-q"], cwd=tmp_path, check=True,
+        )
+        subprocess.run(
+            ["git", "-c", "user.name=t", "-c", "user.email=t@t",
+             "add", ".", "-A"],
+            cwd=tmp_path, check=True,
+        )
+        subprocess.run(
+            ["git", "-c", "user.name=t", "-c", "user.email=t@t",
+             "commit", "-m", "init", "-q"],
+            cwd=tmp_path, check=True,
+        )
+        plan_json = '{"files": [{"path": "sample.py"}]}'
+        changes_json = (
+            '[{"file": "sample.py", "search": '
+            '"\\"old\\"", "replace": "\\"new\\""}]'
+        )
+        llm = _make_llm([
+            plan_json,
+            changes_json,
+            "REJECT: needs test", "REJECT", "REJECT",
+            changes_json,
+            "APPROVE", "APPROVE", "APPROVE",
+        ])
+        agent = DemoAgent(llm=llm, workspace=str(tmp_path))
+        result = await agent.run(
+            issue_text="Change old to new",
+        )
+        assert result.plan == plan_json
 
 
 class TestAgentResult:
