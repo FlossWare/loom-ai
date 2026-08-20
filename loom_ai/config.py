@@ -141,9 +141,7 @@ class LoomConfig:
         )
 
     @staticmethod
-    async def _build_storage(
-        kind: str, *, pool: Any = None
-    ) -> StorageBackend:
+    async def _build_storage(kind: str, *, pool: Any = None) -> StorageBackend:
         if kind == "memory":
             from loom_ai.backends.memory import MemoryStorageBackend
 
@@ -185,9 +183,7 @@ class LoomConfig:
         )
 
     @staticmethod
-    async def _build_secrets(
-        kind: str, *, pool: Any = None
-    ) -> SecretsBackend:
+    async def _build_secrets(kind: str, *, pool: Any = None) -> SecretsBackend:
         if kind == "env":
             from loom_ai.backends.env_secrets import EnvSecretsBackend
 
@@ -251,9 +247,7 @@ class LoomConfig:
         )
 
     @staticmethod
-    async def _build_search(
-        kind: str, *, pool: Any = None
-    ) -> SearchBackend:
+    async def _build_search(kind: str, *, pool: Any = None) -> SearchBackend:
         if kind == "memory":
             from loom_ai.backends.memory import MemorySearchBackend
 

@@ -28,7 +28,10 @@ def workspace(tmp_path):
 class TestApplyDiff:
     async def test_applies_replacement(self, workspace):
         result = await apply_diff(
-            "sample.py", '"world"', '"earth"', workspace=str(workspace),
+            "sample.py",
+            '"world"',
+            '"earth"',
+            workspace=str(workspace),
         )
         assert result["applied"] is True
         content = (workspace / "sample.py").read_text()
@@ -36,14 +39,20 @@ class TestApplyDiff:
 
     async def test_rejects_missing_file(self, workspace):
         result = await apply_diff(
-            "missing.py", "x", "y", workspace=str(workspace),
+            "missing.py",
+            "x",
+            "y",
+            workspace=str(workspace),
         )
         assert result["applied"] is False
         assert "not found" in result["error"]
 
     async def test_rejects_missing_search_text(self, workspace):
         result = await apply_diff(
-            "sample.py", "nonexistent", "y", workspace=str(workspace),
+            "sample.py",
+            "nonexistent",
+            "y",
+            workspace=str(workspace),
         )
         assert result["applied"] is False
         assert "not found" in result["error"]
@@ -58,7 +67,10 @@ class TestApplyDiff:
     async def test_rejects_path_traversal(self, workspace):
         with pytest.raises(ValueError, match="escapes"):
             await apply_diff(
-                "../../../etc/passwd", "x", "y", workspace=str(workspace),
+                "../../../etc/passwd",
+                "x",
+                "y",
+                workspace=str(workspace),
             )
 
 
@@ -80,7 +92,9 @@ class TestFormatCode:
 
     async def test_unknown_formatter(self, workspace):
         result = await format_code(
-            "sample.py", tool="unknown", workspace=str(workspace),
+            "sample.py",
+            tool="unknown",
+            workspace=str(workspace),
         )
         assert "error" in result
 
@@ -99,7 +113,9 @@ class TestValidateChange:
         test_file = workspace / "test_hello.py"
         test_file.write_text("def test_one(): assert 1 + 1 == 2\n")
         result = await validate_change(
-            "sample.py", '"world"', '"earth"',
+            "sample.py",
+            '"world"',
+            '"earth"',
             test_path="test_hello.py",
             workspace=str(workspace),
         )
@@ -107,7 +123,10 @@ class TestValidateChange:
 
     async def test_fails_on_bad_diff(self, workspace):
         result = await validate_change(
-            "sample.py", "nonexistent", "y", workspace=str(workspace),
+            "sample.py",
+            "nonexistent",
+            "y",
+            workspace=str(workspace),
         )
         assert result["validated"] is False
         assert result["stage"] == "apply"
@@ -118,8 +137,7 @@ class TestGitStage:
         os.system(f"git -C {workspace} init -q")
         os.system(f"git -C {workspace} add sample.py")
         os.system(
-            f'git -C {workspace} -c user.name=test -c user.email=t@t '
-            f'commit -m init -q',
+            f"git -C {workspace} -c user.name=test -c user.email=t@t commit -m init -q",
         )
         (workspace / "sample.py").write_text("# changed\n")
         result = await git_stage(["sample.py"], workspace=str(workspace))

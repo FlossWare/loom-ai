@@ -572,9 +572,7 @@ class PostgresqlSecretsBackend:
 
     async def get(self, name: str) -> str | None:
         async with self._pool.acquire() as conn:
-            raw = await conn.fetchval(
-                "SELECT value FROM secrets WHERE name = $1", name
-            )
+            raw = await conn.fetchval("SELECT value FROM secrets WHERE name = $1", name)
         if raw is None:
             return None
         return self._decrypt(raw)

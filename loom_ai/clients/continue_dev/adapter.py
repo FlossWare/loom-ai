@@ -86,9 +86,7 @@ def main() -> None:
         config["models"] = models
         resolved = path.resolve()
         if not resolved.is_relative_to(Path.home()):
-            raise ValueError(
-                f"Refusing to write outside home: {resolved}"
-            )
+            raise ValueError(f"Refusing to write outside home: {resolved}")
         resolved.parent.mkdir(parents=True, exist_ok=True)
         resolved.write_text(  # NOSONAR — path is hardcoded via _config_path()
             json.dumps(config, indent=2) + "\n"

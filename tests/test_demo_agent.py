@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import subprocess
 from unittest.mock import MagicMock
 
 from loom_ai.demo_agent import AgentResult, DemoAgent
@@ -22,6 +23,37 @@ def _make_llm(responses: list[str] | None = None) -> MagicMock:
 
     llm.chat = _chat
     return llm
+
+
+def _git_init(path, *, add_all: bool = False):
+    """Initialise a git repo, optionally staging and committing all files."""
+    subprocess.run(
+        ["git", "init", "-q"],
+        cwd=path,
+        check=True,
+    )
+    if add_all:
+        subprocess.run(
+            ["git", "-c", "user.name=t", "-c", "user.email=t@t", "add", ".", "-A"],
+            cwd=path,
+            check=True,
+        )
+    subprocess.run(
+        [
+            "git",
+            "-c",
+            "user.name=t",
+            "-c",
+            "user.email=t@t",
+            "commit",
+            "--allow-empty",
+            "-m",
+            "init",
+            "-q",
+        ],
+        cwd=path,
+        check=True,
+    )
 
 
 class TestDemoAgentInit:
@@ -46,32 +78,21 @@ class TestAgentRun:
 
     async def test_plans_and_reports(self, tmp_path):
         (tmp_path / "sample.py").write_text('x = "old"\n')
-
-        import subprocess
-        subprocess.run(
-            ["git", "init", "-q"], cwd=tmp_path, check=True,
-        )
-        subprocess.run(
-            ["git", "-c", "user.name=t", "-c", "user.email=t@t",
-             "add", ".", "-A"],
-            cwd=tmp_path, check=True,
-        )
-        subprocess.run(
-            ["git", "-c", "user.name=t", "-c", "user.email=t@t",
-             "commit", "-m", "init", "-q"],
-            cwd=tmp_path, check=True,
-        )
+        _git_init(tmp_path, add_all=True)
 
         plan_json = '{"files": [{"path": "sample.py"}]}'
         changes_json = (
-            '[{"file": "sample.py", "search": '
-            '"\\"old\\"", "replace": "\\"new\\""}]'
+            '[{"file": "sample.py", "search": "\\"old\\"", "replace": "\\"new\\""}]'
         )
-        llm = _make_llm([
-            plan_json,
-            changes_json,
-            "APPROVE", "APPROVE", "APPROVE",
-        ])
+        llm = _make_llm(
+            [
+                plan_json,
+                changes_json,
+                "APPROVE",
+                "APPROVE",
+                "APPROVE",
+            ]
+        )
         agent = DemoAgent(llm=llm, workspace=str(tmp_path))
 
         result = await agent.run(
@@ -85,15 +106,7 @@ class TestAgentRun:
         assert '"new"' in content
 
     async def test_handles_no_changes(self, tmp_path):
-        import subprocess
-        subprocess.run(
-            ["git", "init", "-q"], cwd=tmp_path, check=True,
-        )
-        subprocess.run(
-            ["git", "-c", "user.name=t", "-c", "user.email=t@t",
-             "commit", "--allow-empty", "-m", "init", "-q"],
-            cwd=tmp_path, check=True,
-        )
+        _git_init(tmp_path)
 
         llm = _make_llm(["plan", "[]"])
         agent = DemoAgent(llm=llm, workspace=str(tmp_path))
@@ -101,15 +114,7 @@ class TestAgentRun:
         assert result.error == "No changes applied"
 
     async def test_handles_bad_json(self, tmp_path):
-        import subprocess
-        subprocess.run(
-            ["git", "init", "-q"], cwd=tmp_path, check=True,
-        )
-        subprocess.run(
-            ["git", "-c", "user.name=t", "-c", "user.email=t@t",
-             "commit", "--allow-empty", "-m", "init", "-q"],
-            cwd=tmp_path, check=True,
-        )
+        _git_init(tmp_path)
 
         llm = _make_llm(["plan", "not valid json"])
         agent = DemoAgent(llm=llm, workspace=str(tmp_path))
@@ -126,11 +131,13 @@ class TestReviewLoop:
         assert review["votes"] == 2
 
     async def test_review_rejects_without_majority(self, tmp_path):
-        llm = _make_llm([
-            "REJECT: bug on line 5",
-            "APPROVE",
-            "REJECT: missing test",
-        ])
+        llm = _make_llm(
+            [
+                "REJECT: bug on line 5",
+                "APPROVE",
+                "REJECT: missing test",
+            ]
+        )
         agent = DemoAgent(llm=llm, workspace=str(tmp_path))
         review = await agent._review_changes("diff content", "context")
         assert review["approved"] is False
@@ -150,62 +157,64 @@ class TestReviewLoop:
         assert review["votes"] == 0
 
     async def test_get_diff(self, tmp_path):
-        import subprocess
         (tmp_path / "f.txt").write_text("hello\n")
-        subprocess.run(
-            ["git", "init", "-q"], cwd=tmp_path, check=True,
-        )
-        subprocess.run(
-            ["git", "-c", "user.name=t", "-c", "user.email=t@t",
-             "add", ".", "-A"],
-            cwd=tmp_path, check=True,
-        )
-        subprocess.run(
-            ["git", "-c", "user.name=t", "-c", "user.email=t@t",
-             "commit", "-m", "init", "-q"],
-            cwd=tmp_path, check=True,
-        )
+        _git_init(tmp_path, add_all=True)
         (tmp_path / "f.txt").write_text("world\n")
+
         agent = DemoAgent(
-            llm=_make_llm(), workspace=str(tmp_path),
+            llm=_make_llm(),
+            workspace=str(tmp_path),
         )
         diff = await agent._get_diff()
         assert "hello" in diff
         assert "world" in diff
 
     async def test_retry_on_rejection(self, tmp_path):
-        import subprocess
         (tmp_path / "sample.py").write_text('x = "old"\n')
-        subprocess.run(
-            ["git", "init", "-q"], cwd=tmp_path, check=True,
-        )
-        subprocess.run(
-            ["git", "-c", "user.name=t", "-c", "user.email=t@t",
-             "add", ".", "-A"],
-            cwd=tmp_path, check=True,
-        )
-        subprocess.run(
-            ["git", "-c", "user.name=t", "-c", "user.email=t@t",
-             "commit", "-m", "init", "-q"],
-            cwd=tmp_path, check=True,
-        )
+        _git_init(tmp_path, add_all=True)
+
         plan_json = '{"files": [{"path": "sample.py"}]}'
         changes_json = (
-            '[{"file": "sample.py", "search": '
-            '"\\"old\\"", "replace": "\\"new\\""}]'
+            '[{"file": "sample.py", "search": "\\"old\\"", "replace": "\\"new\\""}]'
         )
-        llm = _make_llm([
-            plan_json,
-            changes_json,
-            "REJECT: needs test", "REJECT", "REJECT",
-            changes_json,
-            "APPROVE", "APPROVE", "APPROVE",
-        ])
+        llm = _make_llm(
+            [
+                plan_json,
+                changes_json,
+                "REJECT: needs test",
+                "REJECT",
+                "REJECT",
+                changes_json,
+                "APPROVE",
+                "APPROVE",
+                "APPROVE",
+            ]
+        )
         agent = DemoAgent(llm=llm, workspace=str(tmp_path))
         result = await agent.run(
             issue_text="Change old to new",
         )
         assert result.plan == plan_json
+
+
+class TestParseReviewResponse:
+    def test_approve(self):
+        ok, issues = DemoAgent._parse_review_response("APPROVE")
+        assert ok is True
+        assert issues == []
+
+    def test_reject_with_issues(self):
+        ok, issues = DemoAgent._parse_review_response(
+            "REJECT: bug on line 5\nmissing test",
+        )
+        assert ok is False
+        assert "bug on line 5" in issues
+        assert "missing test" in issues
+
+    def test_bare_reject(self):
+        ok, issues = DemoAgent._parse_review_response("REJECT")
+        assert ok is False
+        assert issues == []
 
 
 class TestAgentResult:

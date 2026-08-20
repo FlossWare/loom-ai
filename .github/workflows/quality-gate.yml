@@ -54,8 +54,8 @@ jobs:
         run: |
           ruff check loom_ai/ tests/ 2>&1 | tee ruff-output.txt
           echo "exit_code=${PIPESTATUS[0]}" >> $GITHUB_OUTPUT
-          ERRORS=$(grep -c "^loom_ai\|^tests" ruff-output.txt || echo "0")
-          echo "error_count=$ERRORS" >> $GITHUB_OUTPUT
+          ERRORS=$(grep -c "^loom_ai\|^tests" ruff-output.txt 2>/dev/null || true)
+          echo "error_count=${ERRORS:-0}" >> $GITHUB_OUTPUT
 
       - name: Format check with ruff
         id: format

@@ -48,10 +48,12 @@ class AgentResult:
 
 
 async def _git(
-    *args: str, cwd: str,
+    *args: str,
+    cwd: str,
 ) -> str:
     proc = await asyncio.create_subprocess_exec(
-        "git", *args,
+        "git",
+        *args,
         cwd=cwd,
         stdout=asyncio.subprocess.PIPE,
         stderr=asyncio.subprocess.PIPE,
@@ -103,7 +105,8 @@ class DemoAgent:
                 base_url=base_url,
                 api_key=os.environ.get("LOOM_LLM_API_KEY", ""),
                 default_model=os.environ.get(
-                    "LOOM_LLM_MODEL", "gpt-4o-mini",
+                    "LOOM_LLM_MODEL",
+                    "gpt-4o-mini",
                 ),
             )
 
@@ -146,10 +149,17 @@ class DemoAgent:
         """Gather repo context relevant to the issue."""
         ws = self._workspace
         recent_log = await _git(
-            "log", "--oneline", "-20", cwd=ws,
+            "log",
+            "--oneline",
+            "-20",
+            cwd=ws,
         )
         tree = await _git(
-            "ls-tree", "-r", "--name-only", "HEAD", cwd=ws,
+            "ls-tree",
+            "-r",
+            "--name-only",
+            "HEAD",
+            cwd=ws,
         )
         file_list = tree[:3000]
 
@@ -190,9 +200,7 @@ class DemoAgent:
 
         changes: list[dict] = []
         try:
-            parsed = json.loads(
-                raw[raw.find("["):raw.rfind("]") + 1] or "[]"
-            )
+            parsed = json.loads(raw[raw.find("[") : raw.rfind("]") + 1] or "[]")
         except ValueError:
             logger.warning("Failed to parse LLM diff output")
             return changes
@@ -217,6 +225,27 @@ class DemoAgent:
         """Return git diff of uncommitted changes in the workspace."""
         return await _git("diff", cwd=self._workspace)
 
+    @staticmethod
+    def _parse_review_response(
+        response: str,
+    ) -> tuple[bool, list[str]]:
+        """Parse a single review response into (approved, issues)."""
+        if "APPROVE" in response.upper():
+            return True, []
+        issues: list[str] = []
+        for line in response.splitlines():
+            stripped = line.strip()
+            if not stripped:
+                continue
+            upper = stripped.upper()
+            if upper == "REJECT":
+                continue
+            if upper.startswith("REJECT"):
+                stripped = stripped.split(":", 1)[-1].strip()
+            if stripped:
+                issues.append(stripped)
+        return False, issues
+
     async def _review_changes(
         self,
         diff: str,
@@ -238,33 +267,134 @@ class DemoAgent:
         prompt = f"## Context\n{context[:2000]}\n\n## Diff\n{diff[:4000]}"
 
         votes = 0
-        issues: list[str] = []
+        all_issues: list[str] = []
 
         for _ in range(self._REVIEW_ROUNDS):
             try:
                 response = await self._chat(prompt, system=system)
-                if "APPROVE" in response.upper():
+                ok, issues = self._parse_review_response(response)
+                if ok:
                     votes += 1
                 else:
-                    for line in response.splitlines():
-                        stripped = line.strip()
-                        if not stripped:
-                            continue
-                        upper = stripped.upper()
-                        if upper == "REJECT":
-                            continue
-                        if upper.startswith("REJECT"):
-                            stripped = stripped.split(":", 1)[-1].strip()
-                        if stripped:
-                            issues.append(stripped)
+                    all_issues.extend(issues)
             except Exception as exc:
                 logger.warning("Review call failed: %s", exc)
 
         return {
             "approved": votes >= self._REVIEW_VOTES_NEEDED,
-            "issues": issues,
+            "issues": all_issues,
             "votes": votes,
         }
+
+    async def _fetch_issue(
+        self,
+        issue_number: int,
+    ) -> str:
+        """Fetch issue text from GitHub CLI."""
+        proc = await asyncio.create_subprocess_exec(
+            "gh",
+            "issue",
+            "view",
+            str(issue_number),
+            "--repo",
+            "FlossWare/loom-ai",
+            cwd=self._workspace,
+            stdout=asyncio.subprocess.PIPE,
+            stderr=asyncio.subprocess.PIPE,
+        )
+        stdout, _ = await proc.communicate()
+        return stdout.decode(errors="replace")
+
+    async def _build_context(
+        self,
+        issue_text: str,
+        sid: str,
+    ) -> str:
+        """Gather repo context and append prior knowledge."""
+        context = await self._gather_context(issue_text)
+        logger.info("Gathered repo context (%d chars)", len(context))
+
+        prior = await self._session.recover_context(
+            project="loom-ai",
+            query=issue_text[:200],
+        )
+        if prior.knowledge:
+            context += "\n\n## Prior knowledge\n" + "\n".join(
+                k["content"][:500] for k in prior.knowledge[:3]
+            )
+            await self._session.record_event(
+                sid,
+                f"recovered {len(prior.knowledge)} prior findings",
+                kind="observation",
+            )
+        return context
+
+    async def _try_attempt(
+        self,
+        plan: str,
+        context: str,
+        attempt: int,
+        result: AgentResult,
+        sid: str,
+    ) -> tuple[bool | None, str]:
+        """Run one implement-review attempt.
+
+        Returns ``(approved_or_none, updated_context)``.
+        ``None`` means no changes were applied (caller should stop).
+        """
+        changes = await self._implement(plan, context)
+        result.changes = changes
+        applied = [c for c in changes if c.get("result", {}).get("applied")]
+        logger.info(
+            "Applied %d/%d changes (attempt %d)",
+            len(applied),
+            len(changes),
+            attempt + 1,
+        )
+
+        for c in applied:
+            await self._session.record_event(
+                sid,
+                f"applied diff to {c.get('file', '?')}",
+                kind="fix",
+            )
+
+        if not applied:
+            result.error = "No changes applied"
+            return None, context
+
+        diff = await self._get_diff()
+        if not diff:
+            logger.info("No diff detected, skipping review")
+            return True, context
+
+        review = await self._review_changes(diff, context)
+        logger.info(
+            "Review attempt %d: %d/%d votes, approved=%s",
+            attempt + 1,
+            review["votes"],
+            self._REVIEW_ROUNDS,
+            review["approved"],
+        )
+        await self._session.record_event(
+            sid,
+            f"review attempt {attempt + 1}: "
+            f"{review['votes']}/{self._REVIEW_ROUNDS} approved",
+            kind="observation",
+        )
+
+        if review["approved"]:
+            return True, context
+
+        if review["issues"]:
+            feedback = "\n".join(review["issues"][:5])
+            context += f"\n\n## Review feedback (attempt {attempt + 1})\n{feedback}"
+            logger.warning(
+                "Review rejected (attempt %d), retrying: %s",
+                attempt + 1,
+                feedback[:200],
+            )
+        return False, context
 
     async def run(
         self,
@@ -281,15 +411,7 @@ class DemoAgent:
 
         if not issue_text and issue_number:
             try:
-                proc = await asyncio.create_subprocess_exec(
-                    "gh", "issue", "view", str(issue_number),
-                    "--repo", "FlossWare/loom-ai",
-                    cwd=self._workspace,
-                    stdout=asyncio.subprocess.PIPE,
-                    stderr=asyncio.subprocess.PIPE,
-                )
-                stdout, _ = await proc.communicate()
-                issue_text = stdout.decode(errors="replace")
+                issue_text = await self._fetch_issue(issue_number)
             except Exception as exc:
                 result.error = f"Failed to fetch issue: {exc}"
                 return result
@@ -299,90 +421,31 @@ class DemoAgent:
             return result
 
         try:
-            context = await self._gather_context(issue_text)
-            logger.info("Gathered repo context (%d chars)", len(context))
-
-            prior = await self._session.recover_context(
-                project="loom-ai",
-                query=issue_text[:200],
-            )
-            if prior.knowledge:
-                context += (
-                    "\n\n## Prior knowledge\n"
-                    + "\n".join(
-                        k["content"][:500] for k in prior.knowledge[:3]
-                    )
-                )
-                await self._session.record_event(
-                    sid,
-                    f"recovered {len(prior.knowledge)} prior findings",
-                    kind="observation",
-                )
+            context = await self._build_context(issue_text, sid)
 
             plan = await self._plan(context)
             result.plan = plan
             logger.info("Generated plan (%d chars)", len(plan))
             await self._session.record_event(
-                sid, f"planned {len(plan)} chars", kind="decision",
+                sid,
+                f"planned {len(plan)} chars",
+                kind="decision",
             )
 
             approved = False
             for attempt in range(self._MAX_REVIEW_ATTEMPTS):
-                changes = await self._implement(plan, context)
-                result.changes = changes
-                applied = [
-                    c for c in changes
-                    if c.get("result", {}).get("applied")
-                ]
-                logger.info(
-                    "Applied %d/%d changes (attempt %d)",
-                    len(applied), len(changes), attempt + 1,
-                )
-
-                for c in applied:
-                    await self._session.record_event(
-                        sid,
-                        f"applied diff to {c.get('file', '?')}",
-                        kind="fix",
-                    )
-
-                if not applied:
-                    result.error = "No changes applied"
-                    break
-
-                diff = await self._get_diff()
-                if not diff:
-                    logger.info("No diff detected, skipping review")
-                    approved = True
-                    break
-
-                review = await self._review_changes(diff, context)
-                logger.info(
-                    "Review attempt %d: %d/%d votes, approved=%s",
-                    attempt + 1, review["votes"],
-                    self._REVIEW_ROUNDS, review["approved"],
-                )
-                await self._session.record_event(
+                status, context = await self._try_attempt(
+                    plan,
+                    context,
+                    attempt,
+                    result,
                     sid,
-                    f"review attempt {attempt + 1}: "
-                    f"{review['votes']}/{self._REVIEW_ROUNDS} approved",
-                    kind="observation",
                 )
-
-                if review["approved"]:
+                if status is None:
+                    break
+                if status:
                     approved = True
                     break
-
-                if review["issues"]:
-                    feedback = "\n".join(review["issues"][:5])
-                    context += (
-                        f"\n\n## Review feedback (attempt {attempt + 1})"
-                        f"\n{feedback}"
-                    )
-                    logger.warning(
-                        "Review rejected (attempt %d), retrying: %s",
-                        attempt + 1, feedback[:200],
-                    )
 
             if approved:
                 lint = await run_linter(workspace=self._workspace)
@@ -393,8 +456,7 @@ class DemoAgent:
                 result.success = tests.get("exit_code") == 0
             elif not result.error:
                 result.error = (
-                    f"Review not approved after "
-                    f"{self._MAX_REVIEW_ATTEMPTS} attempts"
+                    f"Review not approved after {self._MAX_REVIEW_ATTEMPTS} attempts"
                 )
 
         except Exception as exc:
@@ -412,13 +474,19 @@ async def _main() -> None:
         description="Loom demo agent — resolve a GitHub issue",
     )
     parser.add_argument(
-        "--issue", type=int, help="GitHub issue number",
+        "--issue",
+        type=int,
+        help="GitHub issue number",
     )
     parser.add_argument(
-        "--workspace", default=os.getcwd(), help="Repo path",
+        "--workspace",
+        default=os.getcwd(),
+        help="Repo path",
     )
     parser.add_argument(
-        "--issue-text", default="", help="Issue text (instead of fetching)",
+        "--issue-text",
+        default="",
+        help="Issue text (instead of fetching)",
     )
     args = parser.parse_args()
 
@@ -429,17 +497,21 @@ async def _main() -> None:
         issue_text=args.issue_text,
     )
 
-    print(json.dumps({
-        "issue": result.issue,
-        "success": result.success,
-        "changes_applied": len([
-            c for c in result.changes
-            if c.get("result", {}).get("applied")
-        ]),
-        "test_passed": result.test_result.get("passed", 0),
-        "test_failed": result.test_result.get("failed", 0),
-        "error": result.error,
-    }, indent=2))
+    print(
+        json.dumps(
+            {
+                "issue": result.issue,
+                "success": result.success,
+                "changes_applied": len(
+                    [c for c in result.changes if c.get("result", {}).get("applied")]
+                ),
+                "test_passed": result.test_result.get("passed", 0),
+                "test_failed": result.test_result.get("failed", 0),
+                "error": result.error,
+            },
+            indent=2,
+        )
+    )
 
 
 def main() -> None:

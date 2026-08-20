@@ -43,7 +43,11 @@ def _init_secure(self, config: ClientConfig | None = None) -> None:
     cfg = config or ClientConfig.from_env()
     if config is not None:
         insecure = bool(getattr(cfg, "allow_insecure_http", False))
-        validate_api_key_transport(cfg.base_url, cfg.api_key, allow_insecure_http=insecure)
+        validate_api_key_transport(
+            cfg.base_url,
+            cfg.api_key,
+            allow_insecure_http=insecure,
+        )
     _orig_init(self, cfg)
 
 

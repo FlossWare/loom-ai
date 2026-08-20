@@ -51,13 +51,15 @@ class FakeKnowledgePipeline:
         q_lower = question.lower()
         for doc_id, (content, meta) in self._docs.items():
             if q_lower in content.lower():
-                results.append(RetrievalResult(
-                    content=content,
-                    score=1.0,
-                    source=meta.get("source", doc_id),
-                    chunk_id=doc_id,
-                    metadata=meta,
-                ))
+                results.append(
+                    RetrievalResult(
+                        content=content,
+                        score=1.0,
+                        source=meta.get("source", doc_id),
+                        chunk_id=doc_id,
+                        metadata=meta,
+                    )
+                )
                 if len(results) >= limit:
                     break
         return results
@@ -99,7 +101,8 @@ class TestSessionCreate:
     async def test_create_with_metadata(self):
         mgr = SessionManager()
         sid = await mgr.create_session(
-            project="test", metadata={"tag": "dev"},
+            project="test",
+            metadata={"tag": "dev"},
         )
         state = await mgr.get_session(sid)
         assert state is not None
@@ -224,7 +227,8 @@ class TestRecoverContext:
         await mgr.persist(sid)
 
         ctx = await mgr.recover_context(
-            project="loom-ai", query="parser",
+            project="loom-ai",
+            query="parser",
         )
         assert len(ctx.memories) == 1
         assert "parser has bug" in ctx.memories[0]["content"]
@@ -238,7 +242,8 @@ class TestRecoverContext:
         await mgr.persist(sid)
 
         ctx = await mgr.recover_context(
-            project="loom-ai", query="parser",
+            project="loom-ai",
+            query="parser",
         )
         assert len(ctx.knowledge) == 1
         assert "parser has bug" in ctx.knowledge[0]["content"]
@@ -253,7 +258,8 @@ class TestRecoverContext:
         await mgr.persist(sid)
 
         ctx = await mgr.recover_context(
-            project="loom-ai", query="parser",
+            project="loom-ai",
+            query="parser",
         )
         assert len(ctx.memories) >= 1
         assert len(ctx.knowledge) >= 1
@@ -272,7 +278,8 @@ class TestRecoverContext:
     async def test_no_backends_returns_empty(self):
         mgr = SessionManager()
         ctx = await mgr.recover_context(
-            project="test", query="anything",
+            project="test",
+            query="anything",
         )
         assert ctx.memories == []
         assert ctx.knowledge == []
@@ -296,7 +303,8 @@ class TestFollowUpWithRecoveredKnowledge:
 
         mgr2 = SessionManager(memory=memory, knowledge=knowledge)
         ctx = await mgr2.recover_context(
-            project="loom-ai", query="parser",
+            project="loom-ai",
+            query="parser",
         )
 
         assert len(ctx.knowledge) >= 1
@@ -330,7 +338,8 @@ class TestFollowUpWithRecoveredKnowledge:
 
         fresh = SessionManager(memory=memory, knowledge=knowledge)
         ctx = await fresh.recover_context(
-            project="loom-ai", query="parser",
+            project="loom-ai",
+            query="parser",
         )
 
         assert len(ctx.knowledge) == 3

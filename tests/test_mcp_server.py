@@ -76,17 +76,24 @@ class TestHandle:
     @patch("loom_ai.mcp_server._api")
     def test_dispatches_chat(self, mock_api):
         mock_api.return_value = {"content": "hello", "model": "m1"}
-        result = _handle("loom_chat", {
-            "messages": [{"role": "user", "content": "hi"}],
-        })
+        result = _handle(
+            "loom_chat",
+            {
+                "messages": [{"role": "user", "content": "hi"}],
+            },
+        )
         assert "isError" not in result
 
     @patch("loom_ai.mcp_server._api")
     def test_dispatches_store(self, mock_api):
         mock_api.return_value = {"id": "doc-1", "stored": True}
-        result = _handle("loom_store", {
-            "title": "Test", "content": "body",
-        })
+        result = _handle(
+            "loom_store",
+            {
+                "title": "Test",
+                "content": "body",
+            },
+        )
         assert "isError" not in result
 
 
@@ -100,33 +107,46 @@ class TestDispatch:
     @patch("loom_ai.mcp_server._api")
     def test_queue_status(self, mock_api):
         mock_api.return_value = {"pending": 5}
-        result = _dispatch("loom_queue_status", {
-            "queue_name": "test-q",
-        })
+        result = _dispatch(
+            "loom_queue_status",
+            {
+                "queue_name": "test-q",
+            },
+        )
         assert result["pending"] == 5
 
     @patch("loom_ai.mcp_server._api")
     def test_queue_enqueue(self, mock_api):
         mock_api.return_value = {"enqueued": 1}
-        result = _dispatch("loom_queue_enqueue", {
-            "queue_name": "q", "payload": {"x": 1},
-        })
+        result = _dispatch(
+            "loom_queue_enqueue",
+            {
+                "queue_name": "q",
+                "payload": {"x": 1},
+            },
+        )
         assert result["enqueued"] == 1
 
     @patch("loom_ai.mcp_server._api")
     def test_graph_add_node(self, mock_api):
         mock_api.return_value = {"id": "node-1"}
-        result = _dispatch("loom_graph_add_node", {
-            "label": "test",
-        })
+        result = _dispatch(
+            "loom_graph_add_node",
+            {
+                "label": "test",
+            },
+        )
         assert result["id"] == "node-1"
 
     @patch("loom_ai.mcp_server._api")
     def test_router_select(self, mock_api):
         mock_api.return_value = {"model": "gpt-4o", "task_type": "code"}
-        result = _dispatch("loom_router_select", {
-            "task_type": "code",
-        })
+        result = _dispatch(
+            "loom_router_select",
+            {
+                "task_type": "code",
+            },
+        )
         assert result["model"] == "gpt-4o"
 
 
