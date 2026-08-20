@@ -30,7 +30,7 @@ jobs:
     timeout-minutes: 15
     strategy:
       matrix:
-        python-version: ['3.11', '3.12', '3.13']
+        python-version: ['3.10', '3.11', '3.12', '3.13']
 
     steps:
       - uses: actions/checkout@v4
@@ -60,10 +60,10 @@ jobs:
     name: PostgreSQL tests (Python ${{ matrix.python-version }})
     runs-on: ubuntu-latest
     timeout-minutes: 10
-    continue-on-error: true
+
     strategy:
       matrix:
-        python-version: ['3.11', '3.12', '3.13']
+        python-version: ['3.10', '3.11', '3.12', '3.13']
 
     steps:
       - uses: actions/checkout@v4
@@ -84,10 +84,10 @@ jobs:
     name: Redis tests (Python ${{ matrix.python-version }})
     runs-on: ubuntu-latest
     timeout-minutes: 10
-    continue-on-error: true
+
     strategy:
       matrix:
-        python-version: ['3.11', '3.12', '3.13']
+        python-version: ['3.10', '3.11', '3.12', '3.13']
 
     steps:
       - uses: actions/checkout@v4
@@ -108,10 +108,10 @@ jobs:
     name: OrientDB tests (Python ${{ matrix.python-version }})
     runs-on: ubuntu-latest
     timeout-minutes: 10
-    continue-on-error: true
+
     strategy:
       matrix:
-        python-version: ['3.11', '3.12', '3.13']
+        python-version: ['3.10', '3.11', '3.12', '3.13']
 
     steps:
       - uses: actions/checkout@v4
@@ -132,10 +132,10 @@ jobs:
     name: OpenAI tests (Python ${{ matrix.python-version }})
     runs-on: ubuntu-latest
     timeout-minutes: 10
-    continue-on-error: true
+
     strategy:
       matrix:
-        python-version: ['3.11', '3.12', '3.13']
+        python-version: ['3.10', '3.11', '3.12', '3.13']
 
     steps:
       - uses: actions/checkout@v4
@@ -156,10 +156,10 @@ jobs:
     name: LiteLLM tests (Python ${{ matrix.python-version }})
     runs-on: ubuntu-latest
     timeout-minutes: 10
-    continue-on-error: true
+
     strategy:
       matrix:
-        python-version: ['3.11', '3.12', '3.13']
+        python-version: ['3.10', '3.11', '3.12', '3.13']
 
     steps:
       - uses: actions/checkout@v4
@@ -180,10 +180,10 @@ jobs:
     name: Server tests (Python ${{ matrix.python-version }})
     runs-on: ubuntu-latest
     timeout-minutes: 10
-    continue-on-error: true
+
     strategy:
       matrix:
-        python-version: ['3.11', '3.12', '3.13']
+        python-version: ['3.10', '3.11', '3.12', '3.13']
 
     steps:
       - uses: actions/checkout@v4

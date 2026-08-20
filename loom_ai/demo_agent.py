@@ -134,7 +134,26 @@ class DemoAgent:
                 "configure FreeModelRouter."
             )
 
-        return cls(llm=llm, workspace=ws)
+        session_mgr = cls._build_session_manager()
+        return cls(llm=llm, workspace=ws, session_manager=session_mgr)
+
+    @staticmethod
+    def _build_session_manager() -> SessionManager:
+        """Build a SessionManager with available backends."""
+        try:
+            from loom_ai.backends.knowledge import (
+                InMemoryKnowledgePipeline,
+                TokenChunker,
+            )
+            from loom_ai.backends.memory import InMemoryPersistentMemory
+
+            memory = InMemoryPersistentMemory()
+            knowledge = InMemoryKnowledgePipeline(TokenChunker())
+            logger.info("SessionManager wired with in-memory backends")
+            return SessionManager(memory=memory, knowledge=knowledge)
+        except Exception as exc:
+            logger.warning("Session backend init failed: %s", exc)
+            return SessionManager()
 
     async def _chat(
         self,
