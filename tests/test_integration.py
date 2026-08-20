@@ -18,8 +18,8 @@ from loom_ai import (
     Task,
 )
 from loom_ai.backends.env_secrets import EnvSecretsBackend
+from loom_ai.backends.graph import InMemoryKnowledgeGraph
 from loom_ai.backends.memory import (
-    MemoryGraphBackend,
     MemoryQueueBackend,
     MemorySearchBackend,
     MemoryStorageBackend,
@@ -38,7 +38,7 @@ def config() -> LoomConfig:
         secrets=EnvSecretsBackend(),
         embedding=NoopEmbeddingBackend(),
         search=MemorySearchBackend(),
-        graph=MemoryGraphBackend(),
+        graph=InMemoryKnowledgeGraph(),
     )
 
 
@@ -156,49 +156,60 @@ async def test_graph_with_storage_workflow(config):
     )
     await config.storage.store_document(doc)
 
-    # 2. Build graph nodes from document metadata
-    from loom_ai import GraphEdge, GraphNode
+    # 2. Build graph entities from document metadata
+    from loom_ai.models_graph import KnowledgeEntity, KnowledgeRelationship
 
-    doc_node = GraphNode(id="gn-doc", label="Document", properties={"title": doc.title})
-    topic_node = GraphNode(
-        id="gn-arch", label="Topic", properties={"name": "Architecture"}
+    doc_entity = KnowledgeEntity(
+        id="gn-doc", label="Document", entity_type="Document",
+        properties={"title": doc.title},
     )
-    await config.graph.add_node(doc_node)
-    await config.graph.add_node(topic_node)
+    topic_entity = KnowledgeEntity(
+        id="gn-arch", label="Topic", entity_type="Topic",
+        properties={"name": "Architecture"},
+    )
+    await config.graph.add_entity(doc_entity)
+    await config.graph.add_entity(topic_entity)
 
-    edge = GraphEdge(id="ge-1", source="gn-doc", target="gn-arch", label="covers")
-    await config.graph.add_edge(edge)
+    rel = KnowledgeRelationship(
+        id="ge-1", source_id="gn-doc", target_id="gn-arch", relation_type="covers",
+    )
+    await config.graph.add_relationship(rel)
 
     # 3. Query the graph
-    neighbors = await config.graph.get_neighbors("gn-doc")
-    assert len(neighbors) == 1
-    assert neighbors[0].id == "gn-arch"
+    rels = await config.graph.get_relationships("gn-doc")
+    assert len(rels) == 1
+    assert rels[0].target_id == "gn-arch"
 
 
-async def test_graph_add_edge_cleans_stale_adjacency(config):
-    """Reusing an edge ID with different endpoints must not leave stale adjacency."""
-    from loom_ai import GraphEdge, GraphNode
+async def test_graph_add_relationship_cleans_stale_adjacency(config):
+    """Reusing a rel ID with different endpoints must not leave stale adjacency."""
+    from loom_ai.models_graph import KnowledgeEntity, KnowledgeRelationship
 
-    a = GraphNode(id="a", label="A", properties={})
-    b = GraphNode(id="b", label="B", properties={})
-    c = GraphNode(id="c", label="C", properties={})
-    for n in (a, b, c):
-        await config.graph.add_node(n)
+    a = KnowledgeEntity(id="a", label="A", entity_type="Test")
+    b = KnowledgeEntity(id="b", label="B", entity_type="Test")
+    c = KnowledgeEntity(id="c", label="C", entity_type="Test")
+    for e in (a, b, c):
+        await config.graph.add_entity(e)
 
-    edge = GraphEdge(id="e1", source="a", target="b", label="link")
-    await config.graph.add_edge(edge)
-    assert len(await config.graph.get_neighbors("a")) == 1
-    assert (await config.graph.get_neighbors("a"))[0].id == "b"
+    rel = KnowledgeRelationship(
+        id="e1", source_id="a", target_id="b", relation_type="link",
+    )
+    await config.graph.add_relationship(rel)
+    rels_a = await config.graph.get_relationships("a")
+    assert len(rels_a) == 1
+    assert rels_a[0].target_id == "b"
 
-    updated = GraphEdge(id="e1", source="a", target="c", label="link")
-    await config.graph.add_edge(updated)
+    updated = KnowledgeRelationship(
+        id="e1", source_id="a", target_id="c", relation_type="link",
+    )
+    await config.graph.add_relationship(updated)
 
-    neighbors_a = await config.graph.get_neighbors("a")
-    assert len(neighbors_a) == 1
-    assert neighbors_a[0].id == "c"
+    rels_a = await config.graph.get_relationships("a")
+    assert len(rels_a) == 1
+    assert rels_a[0].target_id == "c"
 
-    neighbors_b = await config.graph.get_neighbors("b")
-    assert len(neighbors_b) == 0
+    rels_b = await config.graph.get_relationships("b")
+    assert len(rels_b) == 0
 
 
 async def test_multi_backend_roundtrip(config):

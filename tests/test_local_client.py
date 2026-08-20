@@ -269,13 +269,13 @@ class TestLocalClientGraph:
         client = await _make_local_client()
         if not client._cfg.graph:
             with pytest.raises(RuntimeError, match="Graph backend"):
-                await client.add_node("test")
+                await client.add_entity("test", "thing")
             with pytest.raises(RuntimeError, match="Graph backend"):
-                await client.get_node("x")
+                await client.get_entity("x")
             with pytest.raises(RuntimeError, match="Graph backend"):
-                await client.get_neighbors("x")
+                await client.get_relationships("x")
             with pytest.raises(RuntimeError, match="Graph backend"):
-                await client.add_edge("a", "b", "rel")
+                await client.add_relationship("a", "b", "rel")
 
     @pytest.mark.asyncio
     async def test_graph_operations_with_memory_backend(self):
@@ -283,36 +283,37 @@ class TestLocalClientGraph:
         with patch.dict(os.environ, env, clear=True):
             client = await LocalClient.create()
 
-        node_resp = await client.add_node(
+        entity_resp = await client.add_entity(
             "person",
-            node_id="n1",
+            "Person",
+            entity_id="n1",
             properties={"name": "Alice"},
         )
-        assert node_resp["id"] == "n1"
-        assert node_resp["label"] == "person"
+        assert entity_resp["id"] == "n1"
+        assert entity_resp["label"] == "person"
 
-        get_resp = await client.get_node("n1")
+        get_resp = await client.get_entity("n1")
         assert get_resp["label"] == "person"
 
-        await client.add_node("person", node_id="n2")
-        edge_resp = await client.add_edge(
+        await client.add_entity("person", "Person", entity_id="n2")
+        rel_resp = await client.add_relationship(
             "n1",
             "n2",
             "knows",
-            edge_id="e1",
+            relationship_id="e1",
         )
-        assert edge_resp["id"] == "e1"
+        assert rel_resp["id"] == "e1"
 
-        neighbors = await client.get_neighbors("n1")
-        assert "neighbors" in neighbors
+        rels = await client.get_relationships("n1")
+        assert "relationships" in rels
 
     @pytest.mark.asyncio
-    async def test_get_node_not_found(self):
+    async def test_get_entity_not_found(self):
         env = {**_clean_env(), "LOOM_GRAPH": "memory"}
         with patch.dict(os.environ, env, clear=True):
             client = await LocalClient.create()
 
-        resp = await client.get_node("nonexistent")
+        resp = await client.get_entity("nonexistent")
         assert resp.get("error") == "not found"
 
 

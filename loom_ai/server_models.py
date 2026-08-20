@@ -70,15 +70,16 @@ try:
         name: str
         arguments: dict = Field(default_factory=dict)
 
-    class AddNodeRequest(BaseModel):
+    class AddEntityRequest(BaseModel):
         label: str
+        entity_type: str
         id: str | None = None
         properties: dict = Field(default_factory=dict)
 
-    class AddEdgeRequest(BaseModel):
-        source: str
-        target: str
-        label: str
+    class AddRelationshipRequest(BaseModel):
+        source_id: str
+        target_id: str
+        relation_type: str
         id: str | None = None
         properties: dict = Field(default_factory=dict)
 
@@ -172,10 +173,21 @@ try:
         description: str = ""
         mime_type: str | None = None
 
-    class GraphNodeOut(BaseModel):
+    class EntityOut(BaseModel):
         id: str
         label: str
+        entity_type: str = ""
         properties: dict = Field(default_factory=dict)
+        metadata: dict = Field(default_factory=dict)
+
+    class RelationshipOut(BaseModel):
+        id: str
+        source_id: str
+        target_id: str
+        relation_type: str
+        properties: dict = Field(default_factory=dict)
+        confidence: float = 1.0
+        metadata: dict = Field(default_factory=dict)
 
     class QueueItemOut(BaseModel):
         id: str
@@ -293,13 +305,15 @@ try:
     class IdResponse(BaseModel):
         id: str
 
-    class NodeResponse(BaseModel):
+    class EntityResponse(BaseModel):
         id: str
         label: str
+        entity_type: str = ""
         properties: dict = Field(default_factory=dict)
+        metadata: dict = Field(default_factory=dict)
 
-    class NeighborsResponse(BaseModel):
-        neighbors: list[GraphNodeOut]
+    class RelationshipsResponse(BaseModel):
+        relationships: list[RelationshipOut]
 
     class QueueStatusResponse(BaseModel):
         pending: int

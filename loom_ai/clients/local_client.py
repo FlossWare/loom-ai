@@ -20,10 +20,9 @@ if TYPE_CHECKING:
 from loom_ai.models import (
     ChatMessage,
     Document,
-    GraphEdge,
-    GraphNode,
     QueueItem,
 )
+from loom_ai.models_graph import KnowledgeEntity, KnowledgeRelationship
 
 _NO_GRAPH = "Graph backend not configured"
 
@@ -272,65 +271,67 @@ class LocalClient:
 
     # ── Graph ────────────────────────────────────────────────────
 
-    async def add_node(
+    async def add_entity(
         self,
         label: str,
+        entity_type: str,
         *,
-        node_id: str | None = None,
+        entity_id: str | None = None,
         properties: dict | None = None,
     ) -> dict[str, Any]:
         if not self._cfg.graph:
             raise RuntimeError(_NO_GRAPH)
-        node = GraphNode(
-            id=node_id or uuid.uuid4().hex,
+        entity = KnowledgeEntity(
+            id=entity_id or uuid.uuid4().hex,
             label=label,
+            entity_type=entity_type,
             properties=properties or {},
         )
-        nid = await self._cfg.graph.add_node(node)
-        return {"id": nid, "label": label}
-
-    async def get_node(self, node_id: str) -> dict[str, Any]:
-        if not self._cfg.graph:
-            raise RuntimeError(_NO_GRAPH)
-        node = await self._cfg.graph.get_node(node_id)
-        if node is None:
-            return {"error": "not found"}
-        return _asdict(node)
-
-    async def get_neighbors(
-        self,
-        node_id: str,
-        *,
-        edge_label: str | None = None,
-    ) -> dict[str, Any]:
-        if not self._cfg.graph:
-            raise RuntimeError(_NO_GRAPH)
-        nodes = await self._cfg.graph.get_neighbors(
-            node_id,
-            edge_label=edge_label,
-        )
-        return {"neighbors": [_asdict(n) for n in nodes]}
-
-    async def add_edge(
-        self,
-        source: str,
-        target: str,
-        label: str,
-        *,
-        edge_id: str | None = None,
-        properties: dict | None = None,
-    ) -> dict[str, Any]:
-        if not self._cfg.graph:
-            raise RuntimeError(_NO_GRAPH)
-        edge = GraphEdge(
-            id=edge_id or uuid.uuid4().hex,
-            source=source,
-            target=target,
-            label=label,
-            properties=properties or {},
-        )
-        eid = await self._cfg.graph.add_edge(edge)
+        eid = await self._cfg.graph.add_entity(entity)
         return {"id": eid, "label": label}
+
+    async def get_entity(self, entity_id: str) -> dict[str, Any]:
+        if not self._cfg.graph:
+            raise RuntimeError(_NO_GRAPH)
+        entity = await self._cfg.graph.get_entity(entity_id)
+        if entity is None:
+            return {"error": "not found"}
+        return _asdict(entity)
+
+    async def get_relationships(
+        self,
+        entity_id: str,
+        *,
+        relation_type: str | None = None,
+    ) -> dict[str, Any]:
+        if not self._cfg.graph:
+            raise RuntimeError(_NO_GRAPH)
+        rels = await self._cfg.graph.get_relationships(
+            entity_id,
+            relation_type=relation_type,
+        )
+        return {"relationships": [_asdict(r) for r in rels]}
+
+    async def add_relationship(
+        self,
+        source_id: str,
+        target_id: str,
+        relation_type: str,
+        *,
+        relationship_id: str | None = None,
+        properties: dict | None = None,
+    ) -> dict[str, Any]:
+        if not self._cfg.graph:
+            raise RuntimeError(_NO_GRAPH)
+        rel = KnowledgeRelationship(
+            id=relationship_id or uuid.uuid4().hex,
+            source_id=source_id,
+            target_id=target_id,
+            relation_type=relation_type,
+            properties=properties or {},
+        )
+        rid = await self._cfg.graph.add_relationship(rel)
+        return {"id": rid, "relation_type": relation_type}
 
     # ── Tools ────────────────────────────────────────────────────
 

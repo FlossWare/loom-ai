@@ -256,18 +256,24 @@ def test_list_resources_response_shape(monkeypatch):
     assert isinstance(body["count"], int)
 
 
-def test_add_node_response_shape(monkeypatch):
+def test_add_entity_response_shape(monkeypatch):
     client = _make_client(monkeypatch)
-    resp = client.post("/graph/nodes", json={"label": "Person"})
+    resp = client.post(
+        "/graph/entities",
+        json={"label": "Person", "entity_type": "Person"},
+    )
     assert resp.status_code == 200
     body = resp.json()
     assert isinstance(body["id"], str)
 
 
-def test_get_node_response_shape(monkeypatch):
+def test_get_entity_response_shape(monkeypatch):
     client = _make_client(monkeypatch)
-    client.post("/graph/nodes", json={"id": "n1", "label": "Person"})
-    resp = client.get("/graph/nodes/n1")
+    client.post(
+        "/graph/entities",
+        json={"id": "n1", "label": "Person", "entity_type": "Person"},
+    )
+    resp = client.get("/graph/entities/n1")
     assert resp.status_code == 200
     body = resp.json()
     assert body["id"] == "n1"
@@ -275,22 +281,35 @@ def test_get_node_response_shape(monkeypatch):
     assert isinstance(body["properties"], dict)
 
 
-def test_neighbors_response_shape(monkeypatch):
+def test_relationships_response_shape(monkeypatch):
     client = _make_client(monkeypatch)
-    client.post("/graph/nodes", json={"id": "n1", "label": "Person"})
-    resp = client.get("/graph/nodes/n1/neighbors")
+    client.post(
+        "/graph/entities",
+        json={"id": "n1", "label": "Person", "entity_type": "Person"},
+    )
+    resp = client.get("/graph/entities/n1/relationships")
     assert resp.status_code == 200
     body = resp.json()
-    assert isinstance(body["neighbors"], list)
+    assert isinstance(body["relationships"], list)
 
 
-def test_add_edge_response_shape(monkeypatch):
+def test_add_relationship_response_shape(monkeypatch):
     client = _make_client(monkeypatch)
-    client.post("/graph/nodes", json={"id": "n1", "label": "A"})
-    client.post("/graph/nodes", json={"id": "n2", "label": "B"})
+    client.post(
+        "/graph/entities",
+        json={"id": "n1", "label": "A", "entity_type": "Test"},
+    )
+    client.post(
+        "/graph/entities",
+        json={"id": "n2", "label": "B", "entity_type": "Test"},
+    )
     resp = client.post(
-        "/graph/edges",
-        json={"source": "n1", "target": "n2", "label": "KNOWS"},
+        "/graph/relationships",
+        json={
+            "source_id": "n1",
+            "target_id": "n2",
+            "relation_type": "KNOWS",
+        },
     )
     assert resp.status_code == 200
     body = resp.json()

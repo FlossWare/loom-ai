@@ -221,7 +221,7 @@ def create_app(config: LoomConfig) -> FastAPI:
             checks["llm"] = await _check_backend("llm", config.llm.list_models())
         if config.graph is not None:
             checks["graph"] = await _check_backend(
-                "graph", config.graph.get_node("__readiness_probe__")
+                "graph", config.graph.get_entity("__readiness_probe__")
             )
         all_healthy = all(c["healthy"] for c in checks.values())
         status = "ready" if all_healthy else "not_ready"

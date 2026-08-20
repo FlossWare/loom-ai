@@ -13,6 +13,8 @@ from __future__ import annotations
 
 from typing import TYPE_CHECKING, Any, AsyncIterator, Protocol, runtime_checkable
 
+from loom_ai.contracts_graph import KnowledgeGraph
+
 if TYPE_CHECKING:
     from loom_ai.config import LoomConfig
     from loom_ai.models import (
@@ -21,8 +23,6 @@ if TYPE_CHECKING:
         Chunk,
         Document,
         Embedding,
-        GraphEdge,
-        GraphNode,
         QueueItem,
         ResourceContent,
         ResourceDefinition,
@@ -263,45 +263,8 @@ class SearchBackend(Protocol):
         ...
 
 
-@runtime_checkable
-class GraphBackend(Protocol):
-    """Optional knowledge-graph storage."""
-
-    async def add_node(self, node: GraphNode) -> str:
-        """Persist a graph node."""
-        ...
-
-    async def get_node(self, node_id: str) -> GraphNode | None:
-        """Return a graph node by id."""
-        ...
-
-    async def add_edge(self, edge: GraphEdge) -> str:
-        """Persist a graph edge."""
-        ...
-
-    async def get_neighbors(
-        self, node_id: str, *, edge_label: str | None = None
-    ) -> list[GraphNode]:
-        """Return connected nodes."""
-        ...
-
-    async def traverse(
-        self,
-        start_id: str,
-        *,
-        edge_label: str | None = None,
-        depth: int = 1,
-    ) -> list[GraphNode]:
-        """Traverse the graph from a starting node."""
-        ...
-
-    async def delete_node(self, node_id: str) -> bool:
-        """Delete a node and incident edges."""
-        ...
-
-    async def delete_edge(self, edge_id: str) -> bool:
-        """Delete an edge."""
-        ...
+# Deprecated: use KnowledgeGraph from contracts_graph instead.
+GraphBackend = KnowledgeGraph
 
 
 @runtime_checkable

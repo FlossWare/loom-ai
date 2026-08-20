@@ -162,56 +162,77 @@ def test_tool_call_valid(monkeypatch):
     assert resp.status_code != 422
 
 
-# ── /graph/nodes ──────────────────────────────────────────────────────
+# ── /graph/entities ──────────────────────────────────────────────────
 
 
-def test_add_node_missing_label(monkeypatch):
+def test_add_entity_missing_label(monkeypatch):
     client = _make_client(monkeypatch)
-    resp = client.post("/graph/nodes", json={})
+    resp = client.post("/graph/entities", json={})
     assert resp.status_code == 422
 
 
-def test_add_node_valid(monkeypatch):
+def test_add_entity_valid(monkeypatch):
     client = _make_client(monkeypatch)
-    resp = client.post("/graph/nodes", json={"label": "Person"})
+    resp = client.post(
+        "/graph/entities",
+        json={"label": "Person", "entity_type": "Person"},
+    )
     assert resp.status_code == 200
 
 
-# ── /graph/edges ──────────────────────────────────────────────────────
+# ── /graph/relationships ─────────────────────────────────────────────
 
 
-def test_add_edge_missing_source(monkeypatch):
+def test_add_relationship_missing_source(monkeypatch):
     client = _make_client(monkeypatch)
-    resp = client.post("/graph/edges", json={"target": "n2", "label": "KNOWS"})
-    assert resp.status_code == 422
-
-
-def test_add_edge_missing_target(monkeypatch):
-    client = _make_client(monkeypatch)
-    resp = client.post("/graph/edges", json={"source": "n1", "label": "KNOWS"})
-    assert resp.status_code == 422
-
-
-def test_add_edge_missing_label(monkeypatch):
-    client = _make_client(monkeypatch)
-    resp = client.post("/graph/edges", json={"source": "n1", "target": "n2"})
-    assert resp.status_code == 422
-
-
-def test_add_edge_empty_body(monkeypatch):
-    client = _make_client(monkeypatch)
-    resp = client.post("/graph/edges", json={})
-    assert resp.status_code == 422
-
-
-def test_add_edge_valid(monkeypatch):
-    client = _make_client(monkeypatch)
-    # Edges require existing nodes in the memory backend.
-    client.post("/graph/nodes", json={"id": "n1", "label": "Person"})
-    client.post("/graph/nodes", json={"id": "n2", "label": "Person"})
     resp = client.post(
-        "/graph/edges",
-        json={"source": "n1", "target": "n2", "label": "KNOWS"},
+        "/graph/relationships",
+        json={"target_id": "n2", "relation_type": "KNOWS"},
+    )
+    assert resp.status_code == 422
+
+
+def test_add_relationship_missing_target(monkeypatch):
+    client = _make_client(monkeypatch)
+    resp = client.post(
+        "/graph/relationships",
+        json={"source_id": "n1", "relation_type": "KNOWS"},
+    )
+    assert resp.status_code == 422
+
+
+def test_add_relationship_missing_relation_type(monkeypatch):
+    client = _make_client(monkeypatch)
+    resp = client.post(
+        "/graph/relationships",
+        json={"source_id": "n1", "target_id": "n2"},
+    )
+    assert resp.status_code == 422
+
+
+def test_add_relationship_empty_body(monkeypatch):
+    client = _make_client(monkeypatch)
+    resp = client.post("/graph/relationships", json={})
+    assert resp.status_code == 422
+
+
+def test_add_relationship_valid(monkeypatch):
+    client = _make_client(monkeypatch)
+    client.post(
+        "/graph/entities",
+        json={"id": "n1", "label": "Person", "entity_type": "Person"},
+    )
+    client.post(
+        "/graph/entities",
+        json={"id": "n2", "label": "Person", "entity_type": "Person"},
+    )
+    resp = client.post(
+        "/graph/relationships",
+        json={
+            "source_id": "n1",
+            "target_id": "n2",
+            "relation_type": "KNOWS",
+        },
     )
     assert resp.status_code == 200
 

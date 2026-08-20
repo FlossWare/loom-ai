@@ -45,8 +45,8 @@ class TestToolDefinitions:
         assert "loom_queue_status" in names
         assert "loom_secret_list" in names
         assert "loom_secret_get" in names
-        assert "loom_graph_add_node" in names
-        assert "loom_graph_neighbors" in names
+        assert "loom_graph_add_entity" in names
+        assert "loom_graph_relationships" in names
         assert "loom_router_select" in names
         assert "loom_router_stats" in names
         assert "loom_health" in names
@@ -128,15 +128,16 @@ class TestDispatch:
         assert result["enqueued"] == 1
 
     @patch("loom_ai.mcp_server._api")
-    def test_graph_add_node(self, mock_api):
-        mock_api.return_value = {"id": "node-1"}
+    def test_graph_add_entity(self, mock_api):
+        mock_api.return_value = {"id": "entity-1"}
         result = _dispatch(
-            "loom_graph_add_node",
+            "loom_graph_add_entity",
             {
                 "label": "test",
+                "entity_type": "TestEntity",
             },
         )
-        assert result["id"] == "node-1"
+        assert result["id"] == "entity-1"
 
     @patch("loom_ai.mcp_server._api")
     def test_router_select(self, mock_api):

@@ -18,9 +18,9 @@ from typing import Any
 
 from loom_ai.backends.adaptive_router import AdaptiveModelRouter
 from loom_ai.consensus import ConsensusEngine
+from loom_ai.contracts_graph import KnowledgeGraph
 from loom_ai.protocols import (
     EmbeddingBackend,
-    GraphBackend,
     LLMBackend,
     QueueBackend,
     ResourceProvider,
@@ -30,7 +30,7 @@ from loom_ai.protocols import (
     ToolProvider,
 )
 
-GraphLike = GraphBackend
+GraphLike = KnowledgeGraph
 logger = logging.getLogger(__name__)
 
 
@@ -278,13 +278,13 @@ class LoomConfig:
         )
 
     @staticmethod
-    async def _build_graph(kind: str) -> GraphBackend | None:
+    async def _build_graph(kind: str) -> KnowledgeGraph | None:
         if kind == "disabled":
             return None
         if kind == "memory":
-            from loom_ai.backends.memory import MemoryGraphBackend
+            from loom_ai.backends.graph import InMemoryKnowledgeGraph
 
-            return MemoryGraphBackend()
+            return InMemoryKnowledgeGraph()
         if kind == "orientdb":
             try:
                 from loom_ai.backends.orientdb import (

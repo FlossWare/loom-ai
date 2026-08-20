@@ -12,11 +12,11 @@ if TYPE_CHECKING:
 
 from loom_ai.server_models import (
     _NOT_FOUND_RESPONSES,
-    AddEdgeRequest,
-    AddNodeRequest,
+    AddEntityRequest,
+    AddRelationshipRequest,
+    EntityResponse,
     IdResponse,
-    NeighborsResponse,
-    NodeResponse,
+    RelationshipsResponse,
 )
 
 
@@ -25,53 +25,56 @@ def _mount_graph_routes(app: FastAPI, config: LoomConfig, auth_deps: list) -> No
 
     router = APIRouter(prefix="/graph", tags=["graph"], dependencies=auth_deps)
 
-    @router.post("/nodes", response_model=IdResponse)
-    async def add_node(body: AddNodeRequest):
-        from loom_ai.models import GraphNode
+    @router.post("/entities", response_model=IdResponse)
+    async def add_entity(body: AddEntityRequest):
+        from loom_ai.models_graph import KnowledgeEntity
 
-        node = GraphNode(
-            id=body.id or f"node-{uuid.uuid4().hex[:12]}",
+        entity = KnowledgeEntity(
+            id=body.id or f"entity-{uuid.uuid4().hex[:12]}",
             label=body.label,
+            entity_type=body.entity_type,
             properties=body.properties,
         )
-        node_id = await config.graph.add_node(node)
-        return {"id": node_id}
+        entity_id = await config.graph.add_entity(entity)
+        return {"id": entity_id}
 
     @router.get(
-        "/nodes/{node_id}",
-        response_model=NodeResponse,
+        "/entities/{entity_id}",
+        response_model=EntityResponse,
         responses=_NOT_FOUND_RESPONSES,
     )
-    async def get_node(node_id: str):
-        node = await config.graph.get_node(node_id)
-        if node is None:
-            raise HTTPException(status_code=404, detail="Node not found")
-        return node.__dict__
+    async def get_entity(entity_id: str):
+        entity = await config.graph.get_entity(entity_id)
+        if entity is None:
+            raise HTTPException(status_code=404, detail="Entity not found")
+        return entity.__dict__
 
-    @router.get("/nodes/{node_id}/neighbors", response_model=NeighborsResponse)
-    async def get_neighbors(node_id: str, edge_label: str | None = None):
-        neighbors = await config.graph.get_neighbors(node_id, edge_label=edge_label)
-        return {"neighbors": [n.__dict__ for n in neighbors]}
+    @router.get(
+        "/entities/{entity_id}/relationships",
+        response_model=RelationshipsResponse,
+    )
+    async def get_relationships(
+        entity_id: str,
+        relation_type: str | None = None,
+        direction: str = "outgoing",
+    ):
+        rels = await config.graph.get_relationships(
+            entity_id, relation_type=relation_type, direction=direction,
+        )
+        return {"relationships": [r.__dict__ for r in rels]}
 
-    @router.post("/edges", response_model=IdResponse)
-    async def add_edge(body: AddEdgeRequest):
-        from loom_ai.models import GraphEdge
+    @router.post("/relationships", response_model=IdResponse)
+    async def add_relationship(body: AddRelationshipRequest):
+        from loom_ai.models_graph import KnowledgeRelationship
 
-        edge = GraphEdge(
-            id=body.id or f"edge-{uuid.uuid4().hex[:12]}",
-            source=body.source,
-            target=body.target,
-            label=body.label,
+        rel = KnowledgeRelationship(
+            id=body.id or f"rel-{uuid.uuid4().hex[:12]}",
+            source_id=body.source_id,
+            target_id=body.target_id,
+            relation_type=body.relation_type,
             properties=body.properties,
         )
-        edge_id = await config.graph.add_edge(edge)
-        return {"id": edge_id}
+        rel_id = await config.graph.add_relationship(rel)
+        return {"id": rel_id}
 
     app.include_router(router)
-
-
-# ---------------------------------------------------------------------------
-# Application factory
-# ---------------------------------------------------------------------------
-
-

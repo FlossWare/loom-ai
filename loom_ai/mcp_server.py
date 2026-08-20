@@ -184,30 +184,31 @@ _TOOLS: list[dict] = [
         },
     },
     {
-        "name": "loom_graph_add_node",
-        "description": "Add a node to the knowledge graph",
+        "name": "loom_graph_add_entity",
+        "description": "Add an entity to the knowledge graph",
         "inputSchema": {
             "type": "object",
             "properties": {
-                "label": _str_prop("Node label"),
+                "label": _str_prop("Entity label"),
+                "entity_type": _str_prop("Entity type"),
                 "properties": {
                     "type": "object",
-                    "description": "Node properties",
+                    "description": "Entity properties",
                 },
             },
-            "required": ["label"],
+            "required": ["label", "entity_type"],
         },
     },
     {
-        "name": "loom_graph_neighbors",
-        "description": "Get neighbors of a graph node",
+        "name": "loom_graph_relationships",
+        "description": "Get relationships of a knowledge graph entity",
         "inputSchema": {
             "type": "object",
             "properties": {
-                "node_id": _str_prop("Node ID"),
-                "edge_label": _str_prop("Filter by edge label"),
+                "entity_id": _str_prop("Entity ID"),
+                "relation_type": _str_prop("Filter by relation type"),
             },
-            "required": ["node_id"],
+            "required": ["entity_id"],
         },
     },
     {
@@ -351,11 +352,11 @@ def _dispatch_search(args: dict) -> dict:
     return _api("GET", f"/search/text?q={q}&limit={limit}")
 
 
-def _dispatch_graph_neighbors(args: dict) -> dict:
-    nid = urllib.parse.quote(args["node_id"])
-    edge = args.get("edge_label", "")
-    qs = f"?edge_label={edge}" if edge else ""
-    return _api("GET", f"/graph/nodes/{nid}/neighbors{qs}")
+def _dispatch_graph_relationships(args: dict) -> dict:
+    eid = urllib.parse.quote(args["entity_id"])
+    rtype = args.get("relation_type", "")
+    qs = f"?relation_type={rtype}" if rtype else ""
+    return _api("GET", f"/graph/entities/{eid}/relationships{qs}")
 
 
 _DISPATCH_TABLE = {
@@ -408,15 +409,16 @@ _DISPATCH_TABLE = {
     ),
     "loom_secret_list": lambda a: _api("GET", "/secrets/"),
     "loom_secret_get": _dispatch_secret_get,
-    "loom_graph_add_node": lambda a: _api(
+    "loom_graph_add_entity": lambda a: _api(
         "POST",
-        "/graph/nodes",
+        "/graph/entities",
         {
             "label": a["label"],
+            "entity_type": a["entity_type"],
             "properties": a.get("properties", {}),
         },
     ),
-    "loom_graph_neighbors": _dispatch_graph_neighbors,
+    "loom_graph_relationships": _dispatch_graph_relationships,
     "loom_router_select": lambda a: _api(
         "POST",
         "/router/select",
