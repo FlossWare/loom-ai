@@ -40,7 +40,7 @@ synthesis), `ExecutionEngine` (DAG-based task scheduling), and higher-level
 coordination such as adaptive routing and fleet management.  These components
 depend on the contract layer but never on a specific backend.
 
-**Contract layer** -- 97 `@runtime_checkable` Protocol classes across
+**Contract layer** -- 94 `@runtime_checkable` Protocol classes across
 `protocols.py` and `contracts_phase1.py` through `contracts_phase9.py` plus
 `contracts_api.py` and `contracts_execution.py`.  Nearly all methods are `async` (exceptions include
 `IdempotentStore.is_idempotent`).  The only imports are from the
@@ -513,26 +513,36 @@ intentionally does not -- `enqueue` appends duplicates by design.
 
 ## Contract Phases
 
-The 81 protocol contracts are organized into phases reflecting the order they
+The 94 protocol contracts are organized into phases reflecting the order they
 were designed:
 
 | Phase | File | Count | Focus |
 |-------|------|-------|-------|
-| Core | `protocols.py` | 11 | Storage, queue, secrets, LLM, tools, graph |
-| API | `contracts_api.py` | 3 | Request lifecycle, error handling, middleware |
-| 1 | `contracts_phase1.py` | 7 | Structured output, conversation, memory, router, RAG |
-| 2 | `contracts_phase2.py` | 8 | Workflow, learning, strategy, budget, resilience |
-| 3 | `contracts_phase3.py` | 6 | Session, worker registry, cache, evaluation |
-| 4 | `contracts_phase4.py` | 5 | Knowledge graphs, temporal stores, beliefs |
-| 5 | `contracts_phase5.py` | 8 | Eval suites, telemetry, agent lifecycle, security |
-| 6 | `contracts_phase6.py` | 7 | Agent loops, recipes, ACP, context, trajectories |
-| 7 | `contracts_phase7.py` | 4 | Provider/capability/policy registries, catalog sync |
-| 8 | `contracts_phase8.py` | 9 | Tournaments, consensus strategies, evaluation |
-| 9 | `contracts_phase9.py` | 10 | Context compression, prompt cache, runtimes, health |
-| Execution | `contracts_execution.py` | 3 | Execution steps, pipelines, observers |
+| Core | `protocols.py` | 13 | Storage, queue, secrets, LLM, tools, graph |
+| API | `contracts_api.py` | 4 | Request lifecycle, error handling, middleware |
+| 1 | `contracts_phase1.py` | 8 | Structured output, conversation, memory, router, RAG |
+| 2 | `contracts_phase2.py` | 9 | Workflow, learning, strategy, budget, resilience |
+| 3 | `contracts_phase3.py` | 7 | Session, worker registry, cache, evaluation |
+| 4 | `contracts_phase4.py` | 6 | Knowledge graphs, temporal stores, beliefs |
+| 5 | `contracts_phase5.py` | 9 | Eval suites, telemetry, agent lifecycle, security |
+| 6 | `contracts_phase6.py` | 8 | Agent loops, recipes, ACP, context, trajectories |
+| 7 | `contracts_phase7.py` | 5 | Provider/capability/policy registries, catalog sync |
+| 8 | `contracts_phase8.py` | 10 | Tournaments, consensus strategies, evaluation |
+| 9 | `contracts_phase9.py` | 11 | Context compression, prompt cache, runtimes, health |
+| Execution | `contracts_execution.py` | 4 | Execution steps, pipelines, observers |
 
 Phases are additive -- later phases never modify earlier contracts.  Each phase
 has a corresponding `models_phaseN.py` with its data models.
+
+---
+
+## Session Persistence
+
+The canonical persistence path for production use is `SessionManager`
+(`loom_ai/session_persistence.py`).  It tracks session lifecycle, events, and
+knowledge recovery through whatever `StorageBackend` is configured in
+`LoomConfig`.  The showcase vault (`docs/demo/`) is a demonstration convenience
+only and should not be used for production persistence.
 
 ---
 

@@ -363,7 +363,7 @@ See [docs/architecture.md](docs/architecture.md#extension-model) for the full ex
 
 ## Protocol Contracts
 
-Loom defines **81 `@runtime_checkable` Protocol contracts** across 12 modules, all using structural subtyping (no ABC inheritance required). The recommended import path is `from loom_ai.contracts import ...` which re-exports every contract through a single stable facade. See [docs/contracts.md](docs/contracts.md) for the full inventory.
+Loom defines **94 `@runtime_checkable` Protocol contracts** across 12 modules, all using structural subtyping (no ABC inheritance required). The recommended import path is `from loom_ai.contracts import ...` which re-exports every contract through a single stable facade. See [docs/contracts.md](docs/contracts.md) for the full inventory.
 
 ### Core Protocols (`protocols.py`)
 

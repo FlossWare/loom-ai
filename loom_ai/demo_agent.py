@@ -84,10 +84,16 @@ class DemoAgent:
         workspace: str,
         *,
         session_manager: SessionManager | None = None,
+        git_name: str | None = None,
+        git_email: str | None = None,
     ) -> None:
         self._llm = llm
         self._workspace = workspace
         self._session = session_manager or SessionManager()
+        self._git_name = git_name or os.environ.get("LOOM_GIT_NAME", "loom-ai")
+        self._git_email = git_email or os.environ.get(
+            "LOOM_GIT_EMAIL", "loom-ai@users.noreply.github.com"
+        )
 
     @classmethod
     async def create(
@@ -234,9 +240,9 @@ class DemoAgent:
             await _git("add", f, cwd=self._workspace)
         await _git(
             "-c",
-            "user.name=Scot P. Floess",
+            f"user.name={self._git_name}",
             "-c",
-            "user.email=scot.floess@gmail.com",
+            f"user.email={self._git_email}",
             "commit",
             "-m",
             f"fix: resolve issue #{issue_number}",
@@ -448,6 +454,57 @@ class DemoAgent:
             )
         return False, context
 
+    async def _resolve_issue_text(
+        self,
+        issue_number: int | None,
+        issue_text: str,
+    ) -> str:
+        """Return issue text, fetching from GitHub if needed."""
+        if not issue_text and issue_number:
+            issue_text = await self._fetch_issue(issue_number)
+        return issue_text
+
+    async def _finalize(
+        self,
+        result: AgentResult,
+        auto_pr: bool,
+        issue_number: int | None,
+    ) -> None:
+        """Run lint, tests, and optionally create a PR."""
+        result.lint_result = await run_linter(workspace=self._workspace)
+        result.test_result = await run_tests(workspace=self._workspace)
+        result.success = result.test_result.get("exit_code") == 0
+        if not (auto_pr and result.success):
+            return
+        changed = [
+            c["file"] for c in result.changes if c.get("result", {}).get("applied")
+        ]
+        if changed:
+            pr_info = await self._commit_and_pr(issue_number or 0, changed)
+            result.pr_url = pr_info["pr_url"]
+
+    async def _run_review_loop(
+        self,
+        plan: str,
+        context: str,
+        result: AgentResult,
+        sid: str,
+    ) -> bool:
+        """Run implement-review attempts, returning whether approved."""
+        for attempt in range(self._MAX_REVIEW_ATTEMPTS):
+            status, context = await self._try_attempt(
+                plan,
+                context,
+                attempt,
+                result,
+                sid,
+            )
+            if status is None:
+                return False
+            if status:
+                return True
+        return False
+
     async def run(
         self,
         issue_number: int | None = None,
@@ -476,7 +533,6 @@ class DemoAgent:
 
         try:
             context = await self._build_context(issue_text, sid)
-
             plan = await self._plan(context)
             result.plan = plan
             logger.info("Generated plan (%d chars)", len(plan))
@@ -486,38 +542,15 @@ class DemoAgent:
                 kind="decision",
             )
 
-            approved = False
-            for attempt in range(self._MAX_REVIEW_ATTEMPTS):
-                status, context = await self._try_attempt(
-                    plan,
-                    context,
-                    attempt,
-                    result,
-                    sid,
-                )
-                if status is None:
-                    break
-                if status:
-                    approved = True
-                    break
+            approved = await self._run_review_loop(
+                plan,
+                context,
+                result,
+                sid,
+            )
 
             if approved:
-                lint = await run_linter(workspace=self._workspace)
-                result.lint_result = lint
-
-                tests = await run_tests(workspace=self._workspace)
-                result.test_result = tests
-                result.success = tests.get("exit_code") == 0
-
-                if auto_pr and result.success:
-                    changed = [
-                        c["file"]
-                        for c in result.changes
-                        if c.get("result", {}).get("applied")
-                    ]
-                    if changed:
-                        pr_info = await self._commit_and_pr(issue_number or 0, changed)
-                        result.pr_url = pr_info["pr_url"]
+                await self._finalize(result, auto_pr, issue_number)
             elif not result.error:
                 result.error = (
                     f"Review not approved after {self._MAX_REVIEW_ATTEMPTS} attempts"

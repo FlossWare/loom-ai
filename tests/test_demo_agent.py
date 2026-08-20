@@ -237,9 +237,7 @@ class TestCommitAndPr:
     async def test_creates_branch_and_returns_pr_url(self, tmp_path):
         agent = DemoAgent(llm=_make_llm(), workspace=str(tmp_path))
 
-        with patch(
-            "loom_ai.demo_agent._git", new_callable=AsyncMock
-        ) as mock_git:
+        with patch("loom_ai.demo_agent._git", new_callable=AsyncMock) as mock_git:
             mock_git.return_value = ""
 
             mock_proc = AsyncMock()
@@ -256,9 +254,7 @@ class TestCommitAndPr:
                 result = await agent._commit_and_pr(42, ["test.py"])
 
         assert result["branch"] == "fix/issue-42"
-        assert result["pr_url"] == (
-            "https://github.com/FlossWare/loom-ai/pull/99"
-        )
+        assert result["pr_url"] == ("https://github.com/FlossWare/loom-ai/pull/99")
         assert mock_git.call_count >= 4
 
 
@@ -277,9 +273,7 @@ class TestMcpResolveIssue:
         assert "loom_resolve_issue" in names
 
     def test_tool_requires_issue_number(self):
-        tool = next(
-            t for t in _TOOLS if t["name"] == "loom_resolve_issue"
-        )
+        tool = next(t for t in _TOOLS if t["name"] == "loom_resolve_issue")
         assert "issue_number" in tool["inputSchema"]["required"]
 
     def test_dispatch_table_has_entry(self):
