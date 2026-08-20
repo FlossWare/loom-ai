@@ -191,8 +191,9 @@ Used by `LoomClient` when connecting to a remote loom-ai server.
 | `LOOM_API_KEY` | *(empty)* | Bearer token for server auth |
 | `LOOM_TIMEOUT` | `60` | Request timeout in seconds |
 
-When neither `LOOM_URL` nor `LOOM_HOST` is set, `get_client()` returns a
-`LocalClient` (embedded mode, no server needed).
+When `LOOM_URL` is not set, `get_client()` returns a `LocalClient`
+(embedded mode, no server needed).  `LOOM_HOST` alone does **not**
+trigger remote mode — use `LOOM_URL` for an explicit remote endpoint.
 
 ### Security note
 
@@ -269,8 +270,8 @@ Loom ships a dual-mode client SDK with auto-detection:
 from loom_ai.clients import get_client
 
 client = await get_client()
-# Returns LocalClient (embedded, no server) when LOOM_URL/LOOM_HOST unset
-# Returns LoomClient (REST) when LOOM_URL or LOOM_HOST is set
+# Returns LocalClient (embedded, no server) when LOOM_URL unset
+# Returns LoomClient (REST) when LOOM_URL is set
 
 resp = await client.chat([{"role": "user", "content": "Hello"}])
 ```

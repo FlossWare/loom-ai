@@ -40,7 +40,7 @@ synthesis), `ExecutionEngine` (DAG-based task scheduling), and higher-level
 coordination such as adaptive routing and fleet management.  These components
 depend on the contract layer but never on a specific backend.
 
-**Contract layer** -- 81 `@runtime_checkable` Protocol classes across
+**Contract layer** -- 97 `@runtime_checkable` Protocol classes across
 `protocols.py` and `contracts_phase1.py` through `contracts_phase9.py` plus
 `contracts_api.py` and `contracts_execution.py`.  Nearly all methods are `async` (exceptions include
 `IdempotentStore.is_idempotent`).  The only imports are from the
