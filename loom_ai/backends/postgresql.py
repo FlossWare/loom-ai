@@ -43,6 +43,15 @@ except ImportError:
     asyncpg = None  # type: ignore[assignment]
     _HAS_ASYNCPG = False
 
+try:
+    from cryptography.fernet import Fernet, InvalidToken
+
+    _HAS_FERNET = True
+except ImportError:
+    Fernet = None  # type: ignore[assignment,misc]
+    InvalidToken = Exception  # type: ignore[assignment,misc]
+    _HAS_FERNET = False
+
 
 _DELETE_ONE = "DELETE 1"
 _shared_pool: Any = None
@@ -516,35 +525,57 @@ class PostgresqlSearchBackend:
 
 
 class PostgresqlSecretsBackend:
-    """PostgreSQL-backed secret storage.
+    """PostgreSQL-backed secret storage with optional Fernet encryption.
 
     Satisfies :class:`~loom_ai.protocols.SecretsBackend` via structural
     subtyping.
 
-    .. note::
-
-       Values are stored as plain text.  For production use, layer
-       application-level encryption (e.g. Fernet) on top.
+    When ``LOOM_SECRETS_KEY`` is set (a valid Fernet key), values are
+    encrypted before storage and decrypted on retrieval.  When unset,
+    values are stored as plaintext for backward compatibility.
     """
 
-    def __init__(self, pool: Any) -> None:
+    def __init__(self, pool: Any, *, encryption_key: str | None = None) -> None:
         _require_asyncpg()
         self._pool = pool
+        self._fernet: Any = None
+        if encryption_key:
+            if not _HAS_FERNET:
+                raise ImportError(
+                    "Encrypted secrets require 'cryptography'.  "
+                    "Install with: pip install cryptography"
+                )
+            self._fernet = Fernet(encryption_key.encode() if isinstance(encryption_key, str) else encryption_key)
 
     @classmethod
     async def from_env(cls, *, pool: Any = None) -> PostgresqlSecretsBackend:
         """Create an instance using ``LOOM_PG_*`` env vars."""
         _require_asyncpg()
         p = pool if pool is not None else await get_shared_pool()
-        return cls(p)
+        key = os.environ.get("LOOM_SECRETS_KEY")
+        return cls(p, encryption_key=key)
+
+    def _encrypt(self, plaintext: str) -> str:
+        if self._fernet is None:
+            return plaintext
+        return self._fernet.encrypt(plaintext.encode()).decode()
+
+    def _decrypt(self, ciphertext: str) -> str:
+        if self._fernet is None:
+            return ciphertext
+        return self._fernet.decrypt(ciphertext.encode()).decode()
 
     async def get(self, name: str) -> str | None:
         async with self._pool.acquire() as conn:
-            return await conn.fetchval(
+            raw = await conn.fetchval(
                 "SELECT value FROM secrets WHERE name = $1", name
             )
+        if raw is None:
+            return None
+        return self._decrypt(raw)
 
     async def set(self, name: str, value: str) -> bool:
+        encrypted = self._encrypt(value)
         async with self._pool.acquire() as conn:
             await conn.execute(
                 """
@@ -553,7 +584,7 @@ class PostgresqlSecretsBackend:
                 ON CONFLICT (name) DO UPDATE SET value = EXCLUDED.value
                 """,
                 name,
-                value,
+                encrypted,
             )
         return True
 

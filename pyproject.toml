@@ -22,7 +22,7 @@ classifiers = [
 ]
 
 [project.optional-dependencies]
-postgresql = ["asyncpg>=0.29", "pgvector>=0.2"]
+postgresql = ["asyncpg>=0.29", "pgvector>=0.2", "cryptography>=42.0"]
 redis = ["redis[hiredis]>=5.0"]
 orientdb = ["pyorient>=1.5"]
 openai = ["openai>=1.0"]

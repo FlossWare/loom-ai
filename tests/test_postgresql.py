@@ -296,6 +296,95 @@ class TestPostgresqlSecretsBackend:
         assert await backend.delete("missing") is False
 
 
+# ── PostgresqlSecretsBackend encryption (#666) ─────────────────────────
+
+
+class TestPostgresqlSecretsEncryption:
+    """Tests for Fernet encryption in secret storage."""
+
+    def _make_key(self):
+        from cryptography.fernet import Fernet
+
+        return Fernet.generate_key().decode()
+
+    async def test_encrypt_decrypt_roundtrip(self, pool_conn):
+        pool, conn = pool_conn
+        key = self._make_key()
+        backend = PostgresqlSecretsBackend(pool, encryption_key=key)
+
+        stored_value = None
+
+        async def _capture_execute(query, name, value):
+            nonlocal stored_value
+            stored_value = value
+
+        conn.execute = AsyncMock(side_effect=_capture_execute)
+        await backend.set("mykey", "super-secret")
+
+        assert stored_value is not None
+        assert stored_value != "super-secret"
+
+        conn.fetchval = AsyncMock(return_value=stored_value)
+        result = await backend.get("mykey")
+        assert result == "super-secret"
+
+    async def test_plaintext_when_no_key(self, pool_conn):
+        pool, conn = pool_conn
+        backend = PostgresqlSecretsBackend(pool)
+
+        stored_value = None
+
+        async def _capture_execute(query, name, value):
+            nonlocal stored_value
+            stored_value = value
+
+        conn.execute = AsyncMock(side_effect=_capture_execute)
+        await backend.set("mykey", "plain-value")
+        assert stored_value == "plain-value"
+
+    async def test_get_returns_none_for_missing(self, pool_conn):
+        pool, conn = pool_conn
+        key = self._make_key()
+        backend = PostgresqlSecretsBackend(pool, encryption_key=key)
+        conn.fetchval = AsyncMock(return_value=None)
+        assert await backend.get("missing") is None
+
+    async def test_wrong_key_raises(self, pool_conn):
+        pool, conn = pool_conn
+        key1 = self._make_key()
+        key2 = self._make_key()
+        backend1 = PostgresqlSecretsBackend(pool, encryption_key=key1)
+        backend2 = PostgresqlSecretsBackend(pool, encryption_key=key2)
+
+        stored_value = None
+
+        async def _capture_execute(query, name, value):
+            nonlocal stored_value
+            stored_value = value
+
+        conn.execute = AsyncMock(side_effect=_capture_execute)
+        await backend1.set("mykey", "secret")
+
+        conn.fetchval = AsyncMock(return_value=stored_value)
+        from cryptography.fernet import InvalidToken
+
+        with pytest.raises(InvalidToken):
+            await backend2.get("mykey")
+
+    async def test_from_env_picks_up_key(self, pool_conn, monkeypatch):
+        pool, _ = pool_conn
+        key = self._make_key()
+        monkeypatch.setenv("LOOM_SECRETS_KEY", key)
+        backend = await PostgresqlSecretsBackend.from_env(pool=pool)
+        assert backend._fernet is not None
+
+    async def test_from_env_no_key(self, pool_conn, monkeypatch):
+        pool, _ = pool_conn
+        monkeypatch.delenv("LOOM_SECRETS_KEY", raising=False)
+        backend = await PostgresqlSecretsBackend.from_env(pool=pool)
+        assert backend._fernet is None
+
+
 # ── PostgresqlSearchBackend ─────────────────────────────────────────────
 
 
