@@ -15,7 +15,7 @@ WORKDIR /build
 COPY pyproject.toml README.md ./
 COPY loom_ai/ loom_ai/
 
-RUN pip install --no-cache-dir --prefix=/install \
+RUN pip install --no-cache-dir --only-binary :all: --prefix=/install \
     ".[server,postgresql]"
 
 # ── server (default) ────────────────────────────────────────────────
@@ -49,7 +49,7 @@ WORKDIR /build
 COPY pyproject.toml README.md ./
 COPY loom_ai/ loom_ai/
 
-RUN pip install --no-cache-dir "." && rm -rf /build
+RUN pip install --no-cache-dir --only-binary :all: "." && rm -rf /build
 
 USER loom
 WORKDIR /home/loom
