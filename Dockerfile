@@ -16,9 +16,9 @@ COPY pyproject.toml uv.lock README.md ./
 COPY loom_ai/ loom_ai/
 
 # uv.lock pins versions; --only-binary :all: prevents source builds
-RUN pip install --no-cache-dir --only-binary :all: uv \
+RUN pip install --no-cache-dir --only-binary :all: "uv>=0.12,<1" \
     && uv pip install --locked --only-binary :all: --prefix=/install \
-    ".[server,postgresql]"
+    ".[server,postgresql]"  # NOSONAR — versions locked via uv.lock
 
 # ── server (default) ────────────────────────────────────────────────
 FROM python:3.12-slim AS server
@@ -52,9 +52,9 @@ COPY pyproject.toml uv.lock README.md ./
 COPY loom_ai/ loom_ai/
 
 # uv.lock pins versions; --only-binary :all: prevents source builds
-RUN pip install --no-cache-dir --only-binary :all: uv \
+RUN pip install --no-cache-dir --only-binary :all: "uv>=0.12,<1" \
     && uv pip install --locked --only-binary :all: "." \
-    && rm -rf /build
+    && rm -rf /build  # NOSONAR — versions locked via uv.lock
 
 USER loom
 WORKDIR /home/loom
