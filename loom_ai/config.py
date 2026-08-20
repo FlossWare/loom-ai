@@ -13,6 +13,7 @@ from __future__ import annotations
 
 import os
 from dataclasses import dataclass
+from typing import Any
 
 from loom_ai.backends.adaptive_router import AdaptiveModelRouter
 from loom_ai.consensus import ConsensusEngine
@@ -61,6 +62,15 @@ class LoomConfig:
     resources: ResourceProvider | None = None
     router: AdaptiveModelRouter | None = None
 
+    async def close(self) -> None:
+        """Shut down shared resources (e.g. the PostgreSQL connection pool)."""
+        try:
+            from loom_ai.backends.postgresql import close_shared_pool
+
+            await close_shared_pool()
+        except ImportError:
+            pass
+
     @classmethod
     async def from_env(cls) -> LoomConfig:
         """Build a LoomConfig by reading ``LOOM_*`` environment variables.
@@ -85,23 +95,27 @@ class LoomConfig:
             LOOM_TOOLS          disabled | memory          (default: disabled)
             LOOM_RESOURCES      disabled | memory          (default: disabled)
         """
+        storage_kind = os.environ.get("LOOM_STORAGE", "memory")
+        secrets_kind = os.environ.get("LOOM_SECRETS", "env")
+        search_kind = os.environ.get("LOOM_SEARCH", "memory")
+
+        pg_pool: Any = None
+        if "postgresql" in (storage_kind, secrets_kind, search_kind):
+            from loom_ai.backends.postgresql import get_shared_pool
+
+            pg_pool = await get_shared_pool()
+
         llm = cls._build_llm()
         return cls(
-            storage=await cls._build_storage(
-                os.environ.get("LOOM_STORAGE", "memory"),
-            ),
+            storage=await cls._build_storage(storage_kind, pool=pg_pool),
             queue=await cls._build_queue(
                 os.environ.get("LOOM_QUEUE", "memory"),
             ),
-            secrets=await cls._build_secrets(
-                os.environ.get("LOOM_SECRETS", "env"),
-            ),
+            secrets=await cls._build_secrets(secrets_kind, pool=pg_pool),
             embedding=await cls._build_embedding(
                 os.environ.get("LOOM_EMBEDDING", "noop"),
             ),
-            search=await cls._build_search(
-                os.environ.get("LOOM_SEARCH", "memory"),
-            ),
+            search=await cls._build_search(search_kind, pool=pg_pool),
             graph=await cls._build_graph(
                 os.environ.get("LOOM_GRAPH", "disabled"),
             ),
@@ -119,7 +133,9 @@ class LoomConfig:
         )
 
     @staticmethod
-    async def _build_storage(kind: str) -> StorageBackend:
+    async def _build_storage(
+        kind: str, *, pool: Any = None
+    ) -> StorageBackend:
         if kind == "memory":
             from loom_ai.backends.memory import MemoryStorageBackend
 
@@ -134,7 +150,7 @@ class LoomConfig:
                     "PostgreSQL storage requires 'asyncpg'.  "
                     "Install with: pip install flossware-loom-ai[postgresql]"
                 ) from exc
-            return await PostgresqlStorageBackend.from_env()  # type: ignore[attr-defined]
+            return await PostgresqlStorageBackend.from_env(pool=pool)  # type: ignore[attr-defined]
         raise ValueError(
             f"Unknown storage backend: {kind!r}.  Valid options: memory, postgresql"
         )
@@ -161,7 +177,9 @@ class LoomConfig:
         )
 
     @staticmethod
-    async def _build_secrets(kind: str) -> SecretsBackend:
+    async def _build_secrets(
+        kind: str, *, pool: Any = None
+    ) -> SecretsBackend:
         if kind == "env":
             from loom_ai.backends.env_secrets import EnvSecretsBackend
 
@@ -185,7 +203,7 @@ class LoomConfig:
                     "PostgreSQL secrets requires 'asyncpg'.  "
                     "Install with: pip install flossware-loom-ai[postgresql]"
                 ) from exc
-            return await PostgresqlSecretsBackend.from_env()  # type: ignore[attr-defined]
+            return await PostgresqlSecretsBackend.from_env(pool=pool)  # type: ignore[attr-defined]
         raise ValueError(
             f"Unknown secrets backend: {kind!r}.  "
             f"Valid options: env, dotenv, postgresql"
@@ -225,7 +243,9 @@ class LoomConfig:
         )
 
     @staticmethod
-    async def _build_search(kind: str) -> SearchBackend:
+    async def _build_search(
+        kind: str, *, pool: Any = None
+    ) -> SearchBackend:
         if kind == "memory":
             from loom_ai.backends.memory import MemorySearchBackend
 
@@ -240,7 +260,7 @@ class LoomConfig:
                     "PostgreSQL search requires 'asyncpg' and 'pgvector'.  "
                     "Install with: pip install flossware-loom-ai[postgresql]"
                 ) from exc
-            return await PostgresqlSearchBackend.from_env()  # type: ignore[attr-defined]
+            return await PostgresqlSearchBackend.from_env(pool=pool)  # type: ignore[attr-defined]
         raise ValueError(
             f"Unknown search backend: {kind!r}.  Valid options: memory, postgresql"
         )

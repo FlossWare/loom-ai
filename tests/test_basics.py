@@ -39,6 +39,12 @@ async def test_from_env_defaults():
     assert cfg.llm is None
 
 
+async def test_close_is_safe_without_postgresql():
+    cfg = await LoomConfig.from_env()
+    await cfg.close()
+    await cfg.close()
+
+
 async def test_memory_storage_roundtrip():
     cfg = await LoomConfig.from_env()
     doc = Document(
