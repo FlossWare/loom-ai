@@ -1,0 +1,56 @@
+name: restore-server-py
+on:
+  workflow_dispatch:
+jobs:
+  restore:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: fix/ruff-security-670-664-669
+          fetch-depth: 0
+      - name: Restore server.py from main and wire security_bind
+        run: |
+          set -euo pipefail
+          git fetch origin main
+          git show origin/main:loom_ai/server.py > loom_ai/server.py
+          python3 <<'PY'
+          from pathlib import Path
+          p = Path("loom_ai/server.py")
+          text = p.read_text()
+          old = """    from loom_ai.config import LoomConfig
+
+    config = asyncio.run(LoomConfig.from_env())
+    app = create_app(config)
+    host = os.environ.get("LOOM_HOST", "127.0.0.1")
+    raw_port = os.environ.get("LOOM_PORT", "5000")
+"""
+          new = """    from loom_ai.config import LoomConfig
+    from loom_ai.security_bind import require_api_key_for_non_loopback
+
+    config = asyncio.run(LoomConfig.from_env())
+    app = create_app(config)
+    host = os.environ.get("LOOM_HOST", "127.0.0.1")
+    api_key = os.environ.get("LOOM_API_KEY")
+    require_api_key_for_non_loopback(host, api_key)
+    raw_port = os.environ.get("LOOM_PORT", "5000")
+"""
+          if old not in text:
+              raise SystemExit("pattern not found in server.py from main")
+          p.write_text(text.replace(old, new, 1))
+          print("wired ok, size", p.stat().st_size)
+          PY
+          pip install ruff -q || true
+          ruff format loom_ai/ tests/ || true
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add loom_ai/server.py
+          git add -u || true
+          if git diff --cached --quiet; then
+            echo "No changes to commit"
+          else
+            git commit -m "fix: restore server.py + wire require_api_key_for_non_loopback (#664)"
+            git push origin HEAD:fix/ruff-security-670-664-669
+          fi
