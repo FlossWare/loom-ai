@@ -31,8 +31,8 @@ _PUBLIC_PATH_PREFIXES = (
 def _path_is_public(path: str) -> bool:
     if path in _PUBLIC_PATH_PREFIXES:
         return True
-    return path.startswith(tuple(f"{p}/" for p in _PUBLIC_PATH_PREFIXES)) or path.startswith(
-        tuple(f"{p}{{" for p in _PUBLIC_PATH_PREFIXES)
+    return path.startswith(
+        tuple(f"{p}{s}" for p in _PUBLIC_PATH_PREFIXES for s in ("/", "{"))
     )
 
 
@@ -79,11 +79,10 @@ def main() -> None:
     app.description = "OpenAI-compatible free model gateway"
     app.version = "0.1.0"
 
-    if config.llm is not None:
-        if not any(
-            (getattr(r, "path", "") or "").startswith("/v1") for r in app.routes
-        ):
-            mount_public_v1_routes(app, config)
+    if config.llm is not None and not any(
+        (getattr(r, "path", "") or "").startswith("/v1") for r in app.routes
+    ):
+        mount_public_v1_routes(app, config)
 
     if demo_public_enabled():
         _strip_non_public_routes(app)

@@ -36,6 +36,7 @@ class ClientConfig:
         return cls(
             base_url=os.environ.get(
                 "LOOM_URL",
+                # HTTP is intentional for loopback; transport_security enforces HTTPS for non-loopback
                 "http://{}:{}".format(
                     os.environ.get("LOOM_HOST", "127.0.0.1"),
                     os.environ.get("LOOM_PORT", "5000"),

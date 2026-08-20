@@ -31,8 +31,9 @@ def test_require_api_key_loopback_ok():
 
 
 def test_require_api_key_non_loopback_fails():
-    with pytest.raises(SystemExit, match="LOOM_API_KEY"):
+    with pytest.raises(SystemExit, match="LOOM_API_KEY") as exc_info:
         require_api_key_for_non_loopback("0.0.0.0", None)
+    assert "LOOM_API_KEY" in str(exc_info.value)
 
 
 def test_require_api_key_non_loopback_with_key_ok():
@@ -48,8 +49,9 @@ def test_transport_http_loopback_with_key_ok():
 
 
 def test_transport_http_remote_with_key_fails():
-    with pytest.raises(ValueError, match="plaintext HTTP"):
+    with pytest.raises(ValueError, match="plaintext HTTP") as exc_info:
         validate_api_key_transport("http://api.example.com", "k")
+    assert "plaintext HTTP" in str(exc_info.value)
 
 
 def test_transport_http_remote_insecure_override():

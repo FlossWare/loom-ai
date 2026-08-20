@@ -49,7 +49,7 @@ class ThompsonSamplingStrategy:
         return random.betavariate(successes + 1, failures + 1)
 
     def record(self, *, success: bool, **kwargs: Any) -> None:
-        pass
+        """Protocol conformance; no per-call state to track."""
 
 
 class RoundRobinStrategy:
@@ -59,11 +59,12 @@ class RoundRobinStrategy:
         self._counter = 0
 
     def score(self, *, successes: int, failures: int, **kwargs: Any) -> float:
+        _ = successes, failures
         self._counter += 1
         return 1.0 / self._counter
 
     def record(self, *, success: bool, **kwargs: Any) -> None:
-        pass
+        """Protocol conformance; no per-call state to track."""
 
 
 class LatencyWeightedStrategy:
@@ -84,6 +85,7 @@ class LatencyWeightedStrategy:
         return 1.0 / (avg + 0.001)
 
     def record(self, *, success: bool, **kwargs: Any) -> None:
+        _ = success
         key = kwargs.get("endpoint_key", "")
         latency = kwargs.get("latency_s", 0.0)
         if key and latency > 0:
@@ -106,7 +108,7 @@ class CascadeStrategy:
         return bonus + random.betavariate(successes + 1, failures + 1)
 
     def record(self, *, success: bool, **kwargs: Any) -> None:
-        pass
+        """Protocol conformance; no per-call state to track."""
 
 
 STRATEGIES: dict[str, type] = {
@@ -216,7 +218,7 @@ async def _async_request(
     timeout: int = _CHAT_TIMEOUT,
 ) -> tuple[int, dict]:
     return await asyncio.to_thread(
-        _http_request, method, url, headers, body, timeout
+        _http_request, method, url, headers, body, timeout=timeout
     )
 
 
@@ -316,10 +318,7 @@ class FreeModelRouter:
         | CascadeStrategy
         | None = None,
     ) -> None:
-        self._pg_dsn = pg_dsn or os.environ.get(
-            "LOOM_PG_DSN",
-            "postgresql://claude@localhost:5432/learning",
-        )
+        self._pg_dsn = pg_dsn or os.environ.get("LOOM_PG_DSN", "")
         self._env_fallback = env_fallback
         self._strategy = strategy or ThompsonSamplingStrategy()
         self._endpoints: list[_ModelEndpoint] = []
@@ -435,7 +434,7 @@ class FreeModelRouter:
         if not base:
             return []
 
-        if provider in ("groq", "cerebras", "deepinfra"):
+        if provider in ("groq", "cerebras", "deepinfra", "nvidia"):
             url = f"{base}/models"
             headers = {"Authorization": f"Bearer {api_key}"}
             status, body = await _async_request(
@@ -474,15 +473,6 @@ class FreeModelRouter:
 
         elif provider == "cohere":
             return ["command-a-03-2025", "command-r-plus", "command-r"]
-
-        elif provider == "nvidia":
-            url = f"{base}/models"
-            headers = {"Authorization": f"Bearer {api_key}"}
-            status, body = await _async_request(
-                "GET", url, headers, timeout=_PROBE_TIMEOUT,
-            )
-            if status == 200:
-                return [m["id"] for m in body.get("data", [])]
 
         return []
 
@@ -629,7 +619,8 @@ class FreeModelRouter:
         url = f"{_PROVIDER_URLS['cohere']}/chat"
         headers = {"Authorization": f"Bearer {ep.api_key}"}
         msgs = [{"role": m.role, "content": m.content} for m in messages]
-        body: dict = {"model": ep.model_id, "messages": msgs}
+        body: dict = {"model": ep.model_id, "messages": msgs,
+                      "temperature": temperature}
         if max_tokens is not None:
             body["max_tokens"] = max_tokens
         status, resp = await _async_request("POST", url, headers, body)
