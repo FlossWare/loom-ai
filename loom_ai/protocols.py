@@ -341,6 +341,24 @@ class LLMBackend(Protocol):
 
 
 @runtime_checkable
+class ModelSelectionStrategy(Protocol):
+    """Pluggable scoring strategy for model endpoint selection.
+
+    Implementations return a float score for each candidate endpoint.
+    Higher scores are tried first.  Called by ``FreeModelRouter`` on
+    every ``chat()`` invocation.
+    """
+
+    def score(self, *, successes: int, failures: int, **kwargs: Any) -> float:
+        """Return a priority score for a candidate endpoint."""
+        ...
+
+    def record(self, *, success: bool, **kwargs: Any) -> None:
+        """Notify the strategy of an outcome so it can update state."""
+        ...
+
+
+@runtime_checkable
 class ToolProvider(Protocol):
     """Transport-neutral Loom contract for MCP-shaped tool access."""
 
