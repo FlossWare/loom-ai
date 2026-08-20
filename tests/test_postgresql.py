@@ -21,6 +21,7 @@ from loom_ai.models_phase1 import RetrievalResult
 # still loads — which would let the tests run and then fail.
 pytest.importorskip("asyncpg", reason="asyncpg not installed")
 
+import loom_ai.backends.postgresql as pg_mod  # noqa: E402
 from loom_ai.backends.postgresql import (  # noqa: E402
     PostgresqlKnowledgeStore,
     PostgresqlPersistentMemory,
@@ -31,7 +32,6 @@ from loom_ai.backends.postgresql import (  # noqa: E402
     close_shared_pool,
     get_shared_pool,
 )
-import loom_ai.backends.postgresql as pg_mod  # noqa: E402
 
 # ── Fixtures ────────────────────────────────────────────────────────────
 

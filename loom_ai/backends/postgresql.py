@@ -545,7 +545,12 @@ class PostgresqlSecretsBackend:
                     "Encrypted secrets require 'cryptography'.  "
                     "Install with: pip install cryptography"
                 )
-            self._fernet = Fernet(encryption_key.encode() if isinstance(encryption_key, str) else encryption_key)
+            key_bytes = (
+                encryption_key.encode()
+                if isinstance(encryption_key, str)
+                else encryption_key
+            )
+            self._fernet = Fernet(key_bytes)
 
     @classmethod
     async def from_env(cls, *, pool: Any = None) -> PostgresqlSecretsBackend:
