@@ -29,7 +29,7 @@ def validate_api_key_transport(
     url = base_url.strip()
     if url.lower().startswith("https://"):
         return
-    if not url.lower().startswith("http://"):
+    if not url.lower().startswith("http://"):  # NOSONAR
         return
     if allow_insecure_http:
         logger.warning(

@@ -53,7 +53,7 @@ def _cosine_similarity(a: list[float], b: list[float]) -> float:
         dot += x * y
         mag_a_sq += x * x
         mag_b_sq += y * y
-    if mag_a_sq == 0.0 or mag_b_sq == 0.0:
+    if not mag_a_sq or not mag_b_sq:
         return 0.0
     return dot / (math.sqrt(mag_a_sq) * math.sqrt(mag_b_sq))
 

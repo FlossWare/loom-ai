@@ -195,6 +195,54 @@ class SessionManager:
         header += f"Session: {state.session_id}\n\n"
         return header + "\n".join(parts)
 
+    async def _recover_memories(
+        self,
+        ctx: RecoveredContext,
+        query: str,
+        project: str,
+        limit: int,
+    ) -> None:
+        """Search memory backend and append matching records."""
+        if self._memory is None:
+            return
+        records = await self._memory.search(
+            query, limit=limit, memory_type="session",
+        )
+        for r in records:
+            if project and r.metadata.get("project") != project:
+                continue
+            ctx.memories.append({
+                "name": r.name,
+                "content": r.content,
+                "type": r.memory_type,
+                "metadata": r.metadata,
+            })
+            ctx.provenance.append(f"memory:{r.name}")
+
+    async def _recover_knowledge(
+        self,
+        ctx: RecoveredContext,
+        query: str,
+        project: str,
+        limit: int,
+    ) -> None:
+        """Search knowledge backend and append matching results."""
+        if self._knowledge is None:
+            return
+        results = await self._knowledge.query(
+            query, limit=limit,
+        )
+        for r in results:
+            if project and r.metadata.get("project") != project:
+                continue
+            ctx.knowledge.append({
+                "content": r.content,
+                "score": r.score,
+                "source": r.source,
+                "metadata": r.metadata,
+            })
+            ctx.provenance.append(f"knowledge:{r.source}")
+
     async def recover_context(
         self,
         *,
@@ -209,41 +257,9 @@ class SessionManager:
         is given, results are filtered to that project.
         """
         ctx = RecoveredContext()
-
-        if self._memory is not None and query:
-            records = await self._memory.search(
-                query, limit=limit, memory_type="session",
-            )
-            for r in records:
-                if project and r.metadata.get("project") != project:
-                    continue
-                ctx.memories.append({
-                    "name": r.name,
-                    "content": r.content,
-                    "type": r.memory_type,
-                    "metadata": r.metadata,
-                })
-                ctx.provenance.append(
-                    f"memory:{r.name}"
-                )
-
-        if self._knowledge is not None and query:
-            results = await self._knowledge.query(
-                query, limit=limit,
-            )
-            for r in results:
-                if project and r.metadata.get("project") != project:
-                    continue
-                ctx.knowledge.append({
-                    "content": r.content,
-                    "score": r.score,
-                    "source": r.source,
-                    "metadata": r.metadata,
-                })
-                ctx.provenance.append(
-                    f"knowledge:{r.source}"
-                )
-
+        if query:
+            await self._recover_memories(ctx, query, project, limit)
+            await self._recover_knowledge(ctx, query, project, limit)
         return ctx
 
     async def get_session(

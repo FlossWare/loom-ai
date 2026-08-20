@@ -434,7 +434,7 @@ class InMemoryTournamentRunner:
                     )
                 )
 
-        verdicts = await self.judge(candidates, task=task)
+        verdicts = await self.judge(candidates, _task=task)
         winner_id = verdicts[0].candidate_id if verdicts else None
 
         result = TournamentResult(
