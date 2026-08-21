@@ -69,19 +69,26 @@ class LoomConfig:
     async def close(self) -> None:
         """Shut down all resource-owning backends."""
         try:
-            from loom_ai.backends.postgresql import close_shared_pool
+            from loom_ai.backends.postgresql import (
+                close_shared_pool,
+            )
 
             await close_shared_pool()
         except ImportError:
             pass
 
-        for name in ("graph", "queue", "llm"):
+        for name in self.__dataclass_fields__:
             backend = getattr(self, name, None)
-            if backend is not None and hasattr(backend, "close"):
-                try:
-                    await backend.close()
-                except Exception:
-                    logger.warning("Failed to close %s backend", name)
+            if backend is None:
+                continue
+            if not hasattr(backend, "close"):
+                continue
+            try:
+                await backend.close()
+            except Exception:
+                logger.warning(
+                    "Failed to close %s backend", name
+                )
 
     @classmethod
     async def from_env(cls) -> LoomConfig:
@@ -114,41 +121,114 @@ class LoomConfig:
         search_kind = os.environ.get("LOOM_SEARCH", "memory")
 
         pg_pool: Any = None
-        if "postgresql" in (storage_kind, secrets_kind, search_kind):
-            from loom_ai.backends.postgresql import get_shared_pool
+        built: list[tuple[str, Any]] = []
+        try:
+            if "postgresql" in (
+                storage_kind,
+                secrets_kind,
+                search_kind,
+            ):
+                from loom_ai.backends.postgresql import (
+                    get_shared_pool,
+                )
 
-            pg_pool = await get_shared_pool()
+                pg_pool = await get_shared_pool()
 
-        llm = cls._build_llm()
-        if llm is not None and os.environ.get("LOOM_CAPTURE_LLM") == "1":
-            from loom_ai.backends.capturing_llm import CapturingLLMBackend
+            storage = await cls._build_storage(
+                storage_kind, pool=pg_pool
+            )
+            built.append(("storage", storage))
 
-            llm = CapturingLLMBackend(llm)
-        return cls(
-            storage=await cls._build_storage(storage_kind, pool=pg_pool),
-            queue=await cls._build_queue(
+            queue = await cls._build_queue(
                 os.environ.get("LOOM_QUEUE", "memory"),
-            ),
-            secrets=await cls._build_secrets(secrets_kind, pool=pg_pool),
-            embedding=await cls._build_embedding(
+            )
+            built.append(("queue", queue))
+
+            secrets = await cls._build_secrets(
+                secrets_kind, pool=pg_pool
+            )
+            built.append(("secrets", secrets))
+
+            embedding = await cls._build_embedding(
                 os.environ.get("LOOM_EMBEDDING", "noop"),
-            ),
-            search=await cls._build_search(search_kind, pool=pg_pool),
-            graph=await cls._build_graph(
+            )
+            built.append(("embedding", embedding))
+
+            search = await cls._build_search(
+                search_kind, pool=pg_pool
+            )
+            built.append(("search", search))
+
+            graph = await cls._build_graph(
                 os.environ.get("LOOM_GRAPH", "disabled"),
-            ),
-            llm=llm,
-            consensus=(ConsensusEngine(llm) if llm is not None else None),
-            tools=cls._build_tools(
+            )
+            built.append(("graph", graph))
+
+            llm = cls._build_llm()
+            if llm is not None and (
+                os.environ.get("LOOM_CAPTURE_LLM") == "1"
+            ):
+                from loom_ai.backends.capturing_llm import (
+                    CapturingLLMBackend,
+                )
+
+                llm = CapturingLLMBackend(llm)
+            built.append(("llm", llm))
+
+            consensus = (
+                ConsensusEngine(llm)
+                if llm is not None
+                else None
+            )
+
+            tools = cls._build_tools(
                 os.environ.get("LOOM_TOOLS", "disabled"),
-            ),
-            resources=cls._build_resources(
+            )
+            resources = cls._build_resources(
                 os.environ.get("LOOM_RESOURCES", "disabled"),
-            ),
-            router=cls._build_router(
+            )
+            router = cls._build_router(
                 os.environ.get("LOOM_ROUTER", "disabled"),
-            ),
-        )
+            )
+
+            return cls(
+                storage=storage,
+                queue=queue,
+                secrets=secrets,
+                embedding=embedding,
+                search=search,
+                graph=graph,
+                llm=llm,
+                consensus=consensus,
+                tools=tools,
+                resources=resources,
+                router=router,
+            )
+        except Exception:
+            for name, backend in reversed(built):
+                if backend is None:
+                    continue
+                if not hasattr(backend, "close"):
+                    continue
+                try:
+                    await backend.close()
+                except Exception:
+                    logger.warning(
+                        "Cleanup: failed to close %s",
+                        name,
+                    )
+            if pg_pool is not None:
+                try:
+                    from loom_ai.backends.postgresql import (
+                        close_shared_pool,
+                    )
+
+                    await close_shared_pool()
+                except Exception:
+                    logger.warning(
+                        "Cleanup: failed to close PG pool"
+                    )
+            raise
 
     @staticmethod
     async def _build_storage(kind: str, *, pool: Any = None) -> StorageBackend:

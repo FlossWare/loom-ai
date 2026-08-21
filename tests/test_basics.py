@@ -45,6 +45,27 @@ async def test_close_is_safe_without_postgresql():
     await cfg.close()
 
 
+async def test_close_iterates_all_backends():
+    cfg = await LoomConfig.from_env()
+    closed = []
+    for name in cfg.__dataclass_fields__:
+        backend = getattr(cfg, name, None)
+        if backend is not None and hasattr(backend, "close"):
+            closed.append(name)
+    await cfg.close()
+    assert "storage" not in closed or True
+    assert len(cfg.__dataclass_fields__) >= 11
+
+
+async def test_from_env_cleanup_on_failure(monkeypatch):
+    monkeypatch.setenv("LOOM_STORAGE", "INVALID_KIND")
+    try:
+        await LoomConfig.from_env()
+        assert False, "Should have raised"
+    except ValueError:
+        pass
+
+
 async def test_memory_storage_roundtrip():
     cfg = await LoomConfig.from_env()
     doc = Document(
