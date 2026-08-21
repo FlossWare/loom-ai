@@ -60,11 +60,20 @@ async def test_demo_agent_emits_progress_stages(tmp_path):
     import subprocess
 
     subprocess.run(["git", "init", "-q"], cwd=tmp_path, check=True)
+    subprocess.run(["git", "add", ".", "-A"], cwd=tmp_path, check=True)
     subprocess.run(
-        ["git", "add", ".", "-A"], cwd=tmp_path, check=True
-    )
-    subprocess.run(
-        ["git", "-c", "user.name=t", "-c", "user.email=t@t", "commit", "--allow-empty", "-m", "init", "-q"],
+        [
+            "git",
+            "-c",
+            "user.name=t",
+            "-c",
+            "user.email=t@t",
+            "commit",
+            "--allow-empty",
+            "-m",
+            "init",
+            "-q",
+        ],
         cwd=tmp_path,
         check=True,
     )
