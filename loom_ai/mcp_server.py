@@ -77,7 +77,3 @@ def _float_prop(desc: str, default: float | None = None) -> dict:
     if default is not None:
         d["default"] = default
     return d
-
-
-# TOOL DEFINITIONS truncated for length - WILL FIX with full content
-PLACEHOLDER_PARTIAL
