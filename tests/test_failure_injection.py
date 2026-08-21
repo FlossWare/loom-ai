@@ -20,11 +20,13 @@ from loom_ai.resilience import (
 # 1. probability=1.0 always triggers
 async def test_always_triggers():
     inj = FailureInjector()
-    inj.add(FailureInjection(
-        mode=FailureMode.LLM_TIMEOUT,
-        target="llm",
-        probability=1.0,
-    ))
+    inj.add(
+        FailureInjection(
+            mode=FailureMode.LLM_TIMEOUT,
+            target="llm",
+            probability=1.0,
+        )
+    )
     with pytest.raises(InjectedFailure):
         await inj.maybe_fail("llm")
 
@@ -32,11 +34,13 @@ async def test_always_triggers():
 # 2. probability=0.0 never triggers
 async def test_never_triggers():
     inj = FailureInjector()
-    inj.add(FailureInjection(
-        mode=FailureMode.LLM_TIMEOUT,
-        target="llm",
-        probability=0.0,
-    ))
+    inj.add(
+        FailureInjection(
+            mode=FailureMode.LLM_TIMEOUT,
+            target="llm",
+            probability=0.0,
+        )
+    )
     await inj.maybe_fail("llm")
 
 
@@ -56,28 +60,29 @@ def test_injected_failure_info():
 # 4. maybe_fail raises InjectedFailure
 async def test_maybe_fail_raises():
     inj = FailureInjector()
-    inj.add(FailureInjection(
-        mode=FailureMode.GIT_PUSH_FAILURE,
-        target="git",
-        probability=1.0,
-    ))
+    inj.add(
+        FailureInjection(
+            mode=FailureMode.GIT_PUSH_FAILURE,
+            target="git",
+            probability=1.0,
+        )
+    )
     with pytest.raises(InjectedFailure) as exc_info:
         await inj.maybe_fail("git")
-    assert (
-        exc_info.value.injection.mode
-        == FailureMode.GIT_PUSH_FAILURE
-    )
+    assert exc_info.value.injection.mode == FailureMode.GIT_PUSH_FAILURE
 
 
 # 5. maybe_fail with delay adds latency
 async def test_maybe_fail_delay():
     inj = FailureInjector()
-    inj.add(FailureInjection(
-        mode=FailureMode.NETWORK_PARTITION,
-        target="net",
-        probability=1.0,
-        delay_ms=200,
-    ))
+    inj.add(
+        FailureInjection(
+            mode=FailureMode.NETWORK_PARTITION,
+            target="net",
+            probability=1.0,
+            delay_ms=200,
+        )
+    )
     loop = asyncio.get_event_loop()
     t0 = loop.time()
     with pytest.raises(InjectedFailure):
@@ -90,7 +95,9 @@ async def test_maybe_fail_delay():
 def test_recovery_policy_register():
     rp = RecoveryPolicy()
     rp.register(
-        "fetch", retries=2, idempotent=True,
+        "fetch",
+        retries=2,
+        idempotent=True,
     )
     p = rp.get("fetch")
     assert p["retries"] == 2
@@ -120,9 +127,15 @@ def test_is_idempotent():
 def test_default_policies():
     rp = default_recovery_policies()
     stages = [
-        "fetch", "plan", "implement", "review",
-        "lint", "test", "persist",
-        "git_push", "pr_create",
+        "fetch",
+        "plan",
+        "implement",
+        "review",
+        "lint",
+        "test",
+        "persist",
+        "git_push",
+        "pr_create",
     ]
     for stage in stages:
         p = rp.get(stage)
@@ -130,19 +143,19 @@ def test_default_policies():
     assert rp.get("fetch")["retries"] == 2
     assert rp.get("fetch")["idempotent"] is True
     assert rp.get("implement")["preserves_partial"]
-    assert rp.get("git_push")[
-        "requires_reconciliation"
-    ]
+    assert rp.get("git_push")["requires_reconciliation"]
 
 
 # 10. triggered audit trail
 async def test_triggered_audit():
     inj = FailureInjector()
-    inj.add(FailureInjection(
-        mode=FailureMode.LLM_TIMEOUT,
-        target="llm",
-        probability=1.0,
-    ))
+    inj.add(
+        FailureInjection(
+            mode=FailureMode.LLM_TIMEOUT,
+            target="llm",
+            probability=1.0,
+        )
+    )
     try:
         await inj.maybe_fail("llm")
     except InjectedFailure:
@@ -156,11 +169,13 @@ async def test_triggered_audit():
 # 11. clear removes all
 def test_clear():
     inj = FailureInjector()
-    inj.add(FailureInjection(
-        mode=FailureMode.LLM_TIMEOUT,
-        target="llm",
-        probability=1.0,
-    ))
+    inj.add(
+        FailureInjection(
+            mode=FailureMode.LLM_TIMEOUT,
+            target="llm",
+            probability=1.0,
+        )
+    )
     assert inj.should_fail("llm") is not None
     inj.clear()
     assert inj.should_fail("llm") is None
@@ -170,28 +185,26 @@ def test_clear():
 # 12. Multiple injections for different targets
 async def test_multiple_targets():
     inj = FailureInjector()
-    inj.add(FailureInjection(
-        mode=FailureMode.LLM_TIMEOUT,
-        target="llm",
-        probability=1.0,
-    ))
-    inj.add(FailureInjection(
-        mode=FailureMode.DB_UNAVAILABLE,
-        target="db",
-        probability=1.0,
-    ))
+    inj.add(
+        FailureInjection(
+            mode=FailureMode.LLM_TIMEOUT,
+            target="llm",
+            probability=1.0,
+        )
+    )
+    inj.add(
+        FailureInjection(
+            mode=FailureMode.DB_UNAVAILABLE,
+            target="db",
+            probability=1.0,
+        )
+    )
     with pytest.raises(InjectedFailure) as e1:
         await inj.maybe_fail("llm")
-    assert (
-        e1.value.injection.mode
-        == FailureMode.LLM_TIMEOUT
-    )
+    assert e1.value.injection.mode == FailureMode.LLM_TIMEOUT
     with pytest.raises(InjectedFailure) as e2:
         await inj.maybe_fail("db")
-    assert (
-        e2.value.injection.mode
-        == FailureMode.DB_UNAVAILABLE
-    )
+    assert e2.value.injection.mode == FailureMode.DB_UNAVAILABLE
     await inj.maybe_fail("other")
 
 
@@ -213,11 +226,16 @@ def test_recovery_result():
 def test_failure_mode_completeness():
     assert len(FailureMode) == 10
     expected = {
-        "llm_timeout", "llm_partial",
-        "arbiter_failure", "db_unavailable",
-        "embedding_failure", "process_crash",
-        "git_push_failure", "cancellation",
-        "duplicate_submit", "network_partition",
+        "llm_timeout",
+        "llm_partial",
+        "arbiter_failure",
+        "db_unavailable",
+        "embedding_failure",
+        "process_crash",
+        "git_push_failure",
+        "cancellation",
+        "duplicate_submit",
+        "network_partition",
     }
     actual = {m.value for m in FailureMode}
     assert actual == expected
@@ -234,10 +252,12 @@ def test_unknown_stage():
 # Extra: non-matching target doesn't trigger
 async def test_target_mismatch():
     inj = FailureInjector()
-    inj.add(FailureInjection(
-        mode=FailureMode.LLM_TIMEOUT,
-        target="llm",
-        probability=1.0,
-    ))
+    inj.add(
+        FailureInjection(
+            mode=FailureMode.LLM_TIMEOUT,
+            target="llm",
+            probability=1.0,
+        )
+    )
     await inj.maybe_fail("db")
     assert len(inj.triggered) == 0
