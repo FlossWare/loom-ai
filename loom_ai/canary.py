@@ -92,13 +92,17 @@ class CanaryGuard:
         self._check_killed()
         self._tool_calls += 1
         if self._tool_calls > self._policy.max_tool_calls:
-            raise LimitExceeded("max_tool_calls", self._tool_calls, self._policy.max_tool_calls)
+            raise LimitExceeded(
+                "max_tool_calls", self._tool_calls, self._policy.max_tool_calls
+            )
 
     def check_subprocess(self) -> None:
         self._check_killed()
         self._subprocesses += 1
         if self._subprocesses > self._policy.max_subprocesses:
-            raise LimitExceeded("max_subprocesses", self._subprocesses, self._policy.max_subprocesses)
+            raise LimitExceeded(
+                "max_subprocesses", self._subprocesses, self._policy.max_subprocesses
+            )
 
     def check_file_change(self, path: str) -> None:
         self._check_killed()
@@ -116,27 +120,35 @@ class CanaryGuard:
         self._files_changed.add(normalized)
         count = len(self._files_changed)
         if count > self._policy.max_files_changed:
-            raise LimitExceeded("max_files_changed", count, self._policy.max_files_changed)
+            raise LimitExceeded(
+                "max_files_changed", count, self._policy.max_files_changed
+            )
 
     def check_file_size(self, size_bytes: int) -> None:
         self._check_killed()
         if size_bytes < 0:
             raise ValueError("size_bytes must be non-negative")
         if size_bytes > self._policy.max_file_size_bytes:
-            raise LimitExceeded("max_file_size_bytes", size_bytes, self._policy.max_file_size_bytes)
+            raise LimitExceeded(
+                "max_file_size_bytes", size_bytes, self._policy.max_file_size_bytes
+            )
 
     def check_duration(self) -> None:
         self._check_killed()
         assert self._start_time is not None
         elapsed = time.monotonic() - self._start_time
         if elapsed > self._policy.max_duration_seconds:
-            raise LimitExceeded("max_duration_seconds", elapsed, self._policy.max_duration_seconds)
+            raise LimitExceeded(
+                "max_duration_seconds", elapsed, self._policy.max_duration_seconds
+            )
 
     def check_pr_attempt(self) -> None:
         self._check_killed()
         self._pr_attempts += 1
         if self._pr_attempts > self._policy.max_pr_attempts:
-            raise LimitExceeded("max_pr_attempts", self._pr_attempts, self._policy.max_pr_attempts)
+            raise LimitExceeded(
+                "max_pr_attempts", self._pr_attempts, self._policy.max_pr_attempts
+            )
 
     def check_publication(self) -> None:
         self._check_killed()
