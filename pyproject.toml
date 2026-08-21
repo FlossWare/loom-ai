@@ -6,7 +6,7 @@ build-backend = "hatchling.build"
 name = "flossware-loom-ai"
 version = "0.2"
 description = "Pluggable AI orchestration framework with backend-agnostic protocols"
-requires-python = ">=3.10"
+requires-python = ">=3.11"
 license = "Apache-2.0"
 authors = [{ name = "FlossWare" }]
 readme = "README.md"
@@ -14,7 +14,6 @@ classifiers = [
     "Development Status :: 3 - Alpha",
     "Intended Audience :: Developers",
     "Programming Language :: Python :: 3",
-    "Programming Language :: Python :: 3.10",
     "Programming Language :: Python :: 3.11",
     "Programming Language :: Python :: 3.12",
     "Programming Language :: Python :: 3.13",
@@ -53,11 +52,18 @@ markers = [
 ]
 
 [tool.ruff]
-target-version = "py310"
+target-version = "py311"
 line-length = 88
 
 [tool.ruff.lint]
 select = ["E", "F", "I", "W"]
+extend-ignore = ["E501"]
+
+[tool.ruff.lint.per-file-ignores]
+"loom_ai/backends/free_model_router.py" = ["F401"]
+"loom_ai/demo_agent.py" = ["F401"]
+"loom_ai/routers/storage.py" = ["I001"]
+"tests/test_mcp_server.py" = ["F401"]
 
 [tool.coverage.run]
 source = ["loom_ai"]

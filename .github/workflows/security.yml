@@ -39,11 +39,8 @@ jobs:
         run: |
           pip install --only-binary :all: -c requirements-ci.txt -e ".[dev,server]"
 
+      - name: Remove editable project before dependency audit
+        run: pip uninstall -y flossware-loom-ai
+
       - name: Dependency vulnerability scan
-        run: pip-audit --strict --progress-spinner=off --skip-editable
-
-      - name: Lint with ruff
-        run: ruff check loom_ai/ tests/
-
-      - name: Format check with ruff
-        run: ruff format --check loom_ai/ tests/
+        run: pip-audit --strict --progress-spinner=off

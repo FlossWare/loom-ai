@@ -50,9 +50,7 @@ def test_empty_qualification_is_not_qualified() -> None:
 
 
 def test_canary_allowed_directory_accepts_descendants() -> None:
-    guard = CanaryGuard(
-        CanaryPolicy(allowed_paths=frozenset({"src"}))
-    )
+    guard = CanaryGuard(CanaryPolicy(allowed_paths=frozenset({"src"})))
     guard.start()
     guard.check_file_change("src/loom_ai/example.py")
     assert guard.summary()["files_changed"] == 1

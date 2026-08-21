@@ -127,8 +127,11 @@ def test_kill_sets_flag_and_emits():
     g.start()
     g.kill("test reason")
     assert g.is_killed is True
-    assert len(g.events) == 1
-    assert g.events[0]["reason"] == "test reason"
+    # start + kill both emit structured events (A+ observability)
+    assert len(g.events) == 2
+    assert g.events[0]["type"] == "start"
+    assert g.events[1]["type"] == "kill"
+    assert g.events[1]["reason"] == "test reason"
 
 
 def test_all_checks_raise_after_kill():

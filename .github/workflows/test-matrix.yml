@@ -1,3 +1,4 @@
+# Test matrix — binary-only constrained installs (Sonar S8541/S8544)
 name: Test Matrix
 
 on:
@@ -29,21 +30,19 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 15
     strategy:
+      fail-fast: false
       matrix:
-        python-version: ['3.10', '3.11', '3.12', '3.13']
+        python-version: ['3.11', '3.12', '3.13']
 
     steps:
       - uses: actions/checkout@v4
-
       - name: Set up Python ${{ matrix.python-version }}
         uses: actions/setup-python@v5
         with:
           python-version: ${{ matrix.python-version }}
           cache: pip
-
       - name: Install core dependencies
-        run: pip install -e ".[dev]"  # NOSONAR — editable install requires source build; version ranges intentional for library CI
-
+        run: pip install --only-binary :all: -c requirements-ci.txt -e ".[dev]"
       - name: Run core tests
         run: >-
           python -m pytest tests/ -x -q
@@ -60,23 +59,19 @@ jobs:
     name: PostgreSQL tests (Python ${{ matrix.python-version }})
     runs-on: ubuntu-latest
     timeout-minutes: 10
-
     strategy:
+      fail-fast: false
       matrix:
-        python-version: ['3.10', '3.11', '3.12', '3.13']
-
+        python-version: ['3.11', '3.12', '3.13']
     steps:
       - uses: actions/checkout@v4
-
       - name: Set up Python ${{ matrix.python-version }}
         uses: actions/setup-python@v5
         with:
           python-version: ${{ matrix.python-version }}
           cache: pip
-
       - name: Install dependencies
-        run: pip install -e ".[dev,postgresql]"  # NOSONAR — editable install requires source build; version ranges intentional for library CI
-
+        run: pip install --only-binary :all: -c requirements-ci.txt -e ".[dev,postgresql]"
       - name: Run postgresql tests
         run: python -m pytest tests/ -x -q -m postgresql
 
@@ -84,23 +79,19 @@ jobs:
     name: Redis tests (Python ${{ matrix.python-version }})
     runs-on: ubuntu-latest
     timeout-minutes: 10
-
     strategy:
+      fail-fast: false
       matrix:
-        python-version: ['3.10', '3.11', '3.12', '3.13']
-
+        python-version: ['3.11', '3.12', '3.13']
     steps:
       - uses: actions/checkout@v4
-
       - name: Set up Python ${{ matrix.python-version }}
         uses: actions/setup-python@v5
         with:
           python-version: ${{ matrix.python-version }}
           cache: pip
-
       - name: Install dependencies
-        run: pip install -e ".[dev,redis]"  # NOSONAR — editable install requires source build; version ranges intentional for library CI
-
+        run: pip install --only-binary :all: -c requirements-ci.txt -e ".[dev,redis]"
       - name: Run redis tests
         run: python -m pytest tests/ -x -q -m redis
 
@@ -108,23 +99,19 @@ jobs:
     name: OrientDB tests (Python ${{ matrix.python-version }})
     runs-on: ubuntu-latest
     timeout-minutes: 10
-
     strategy:
+      fail-fast: false
       matrix:
-        python-version: ['3.10', '3.11', '3.12', '3.13']
-
+        python-version: ['3.11', '3.12', '3.13']
     steps:
       - uses: actions/checkout@v4
-
       - name: Set up Python ${{ matrix.python-version }}
         uses: actions/setup-python@v5
         with:
           python-version: ${{ matrix.python-version }}
           cache: pip
-
       - name: Install dependencies
-        run: pip install -e ".[dev,orientdb]"  # NOSONAR — editable install requires source build; version ranges intentional for library CI
-
+        run: pip install --only-binary :all: -c requirements-ci.txt -e ".[dev,orientdb]"
       - name: Run orientdb tests
         run: python -m pytest tests/ -x -q -m orientdb
 
@@ -132,23 +119,19 @@ jobs:
     name: OpenAI tests (Python ${{ matrix.python-version }})
     runs-on: ubuntu-latest
     timeout-minutes: 10
-
     strategy:
+      fail-fast: false
       matrix:
-        python-version: ['3.10', '3.11', '3.12', '3.13']
-
+        python-version: ['3.11', '3.12', '3.13']
     steps:
       - uses: actions/checkout@v4
-
       - name: Set up Python ${{ matrix.python-version }}
         uses: actions/setup-python@v5
         with:
           python-version: ${{ matrix.python-version }}
           cache: pip
-
       - name: Install dependencies
-        run: pip install -e ".[dev,openai]"  # NOSONAR — editable install requires source build; version ranges intentional for library CI
-
+        run: pip install --only-binary :all: -c requirements-ci.txt -e ".[dev,openai]"
       - name: Run openai tests
         run: python -m pytest tests/ -x -q -m openai
 
@@ -156,23 +139,19 @@ jobs:
     name: LiteLLM tests (Python ${{ matrix.python-version }})
     runs-on: ubuntu-latest
     timeout-minutes: 10
-
     strategy:
+      fail-fast: false
       matrix:
-        python-version: ['3.10', '3.11', '3.12', '3.13']
-
+        python-version: ['3.11', '3.12', '3.13']
     steps:
       - uses: actions/checkout@v4
-
       - name: Set up Python ${{ matrix.python-version }}
         uses: actions/setup-python@v5
         with:
           python-version: ${{ matrix.python-version }}
           cache: pip
-
       - name: Install dependencies
-        run: pip install -e ".[dev,litellm]"  # NOSONAR — editable install requires source build; version ranges intentional for library CI
-
+        run: pip install --only-binary :all: -c requirements-ci.txt -e ".[dev,litellm]"
       - name: Run litellm tests
         run: python -m pytest tests/ -x -q -m litellm
 
@@ -180,22 +159,18 @@ jobs:
     name: Server tests (Python ${{ matrix.python-version }})
     runs-on: ubuntu-latest
     timeout-minutes: 10
-
     strategy:
+      fail-fast: false
       matrix:
-        python-version: ['3.10', '3.11', '3.12', '3.13']
-
+        python-version: ['3.11', '3.12', '3.13']
     steps:
       - uses: actions/checkout@v4
-
       - name: Set up Python ${{ matrix.python-version }}
         uses: actions/setup-python@v5
         with:
           python-version: ${{ matrix.python-version }}
           cache: pip
-
       - name: Install dependencies
-        run: pip install -e ".[dev,server]"  # NOSONAR — editable install requires source build; version ranges intentional for library CI
-
+        run: pip install --only-binary :all: -c requirements-ci.txt -e ".[dev,server]"
       - name: Run server tests
         run: python -m pytest tests/ -x -q -m server

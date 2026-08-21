@@ -65,9 +65,7 @@ def _mount_storage_routes(app: FastAPI, config: LoomConfig, auth_deps: list) -> 
                 status_code=400,
                 detail="Invalid document ID format",
             )
-        doc = await config.storage.get_document(
-            document_id
-        )
+        doc = await config.storage.get_document(document_id)
         if doc is None:
             raise HTTPException(
                 status_code=404,
@@ -78,9 +76,7 @@ def _mount_storage_routes(app: FastAPI, config: LoomConfig, auth_deps: list) -> 
             "stored": True,
             "title": getattr(doc, "title", ""),
             "content": getattr(doc, "content", ""),
-            "category": getattr(
-                doc, "category", ""
-            ),
+            "category": getattr(doc, "category", ""),
         }
 
     @router.post("/documents", response_model=StoreDocumentResponse)

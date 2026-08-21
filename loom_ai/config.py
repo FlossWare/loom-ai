@@ -86,9 +86,7 @@ class LoomConfig:
             try:
                 await backend.close()
             except Exception:
-                logger.warning(
-                    "Failed to close %s backend", name
-                )
+                logger.warning("Failed to close %s backend", name)
 
     @classmethod
     async def from_env(cls) -> LoomConfig:
@@ -135,9 +133,7 @@ class LoomConfig:
 
                 pg_pool = await get_shared_pool()
 
-            storage = await cls._build_storage(
-                storage_kind, pool=pg_pool
-            )
+            storage = await cls._build_storage(storage_kind, pool=pg_pool)
             built.append(("storage", storage))
 
             queue = await cls._build_queue(
@@ -145,9 +141,7 @@ class LoomConfig:
             )
             built.append(("queue", queue))
 
-            secrets = await cls._build_secrets(
-                secrets_kind, pool=pg_pool
-            )
+            secrets = await cls._build_secrets(secrets_kind, pool=pg_pool)
             built.append(("secrets", secrets))
 
             embedding = await cls._build_embedding(
@@ -155,9 +149,7 @@ class LoomConfig:
             )
             built.append(("embedding", embedding))
 
-            search = await cls._build_search(
-                search_kind, pool=pg_pool
-            )
+            search = await cls._build_search(search_kind, pool=pg_pool)
             built.append(("search", search))
 
             graph = await cls._build_graph(
@@ -166,9 +158,7 @@ class LoomConfig:
             built.append(("graph", graph))
 
             llm = await cls._build_llm()
-            if llm is not None and (
-                os.environ.get("LOOM_CAPTURE_LLM") == "1"
-            ):
+            if llm is not None and (os.environ.get("LOOM_CAPTURE_LLM") == "1"):
                 from loom_ai.backends.capturing_llm import (
                     CapturingLLMBackend,
                 )
@@ -176,11 +166,7 @@ class LoomConfig:
                 llm = CapturingLLMBackend(llm)
             built.append(("llm", llm))
 
-            consensus = (
-                ConsensusEngine(llm)
-                if llm is not None
-                else None
-            )
+            consensus = ConsensusEngine(llm) if llm is not None else None
 
             tools = cls._build_tools(
                 os.environ.get("LOOM_TOOLS", "disabled"),
@@ -226,9 +212,7 @@ class LoomConfig:
 
                     await close_shared_pool()
                 except Exception:
-                    logger.warning(
-                        "Cleanup: failed to close PG pool"
-                    )
+                    logger.warning("Cleanup: failed to close PG pool")
             raise
 
     @staticmethod

@@ -94,9 +94,13 @@ class GitTransaction:
         if not diff.strip():
             return await self._git("rev-parse", "HEAD")
         await self._git(
-            "-c", f"user.name={author_name}",
-            "-c", f"user.email={author_email}",
-            "commit", "-m", message,
+            "-c",
+            f"user.name={author_name}",
+            "-c",
+            f"user.email={author_email}",
+            "commit",
+            "-m",
+            message,
         )
         self._committed = True
         return await self._git("rev-parse", "HEAD")
@@ -136,8 +140,17 @@ class GitTransaction:
             return self._pr_url
         branch = self._branch or self._snapshot.branch  # type: ignore[union-attr]
         url = await self._run_cmd(
-            "gh", "pr", "create", "--title", title, "--body", body,
-            "--base", base, "--head", branch,
+            "gh",
+            "pr",
+            "create",
+            "--title",
+            title,
+            "--body",
+            body,
+            "--base",
+            base,
+            "--head",
+            branch,
         )
         self._pr_url = url
         return url
@@ -170,7 +183,8 @@ class GitTransaction:
                     "is_dirty": snap.is_dirty,
                     "tracked_files": sorted(snap.tracked_files),
                 }
-                if snap else None
+                if snap
+                else None
             ),
             "branch": self._branch,
             "committed": self._committed,
@@ -210,8 +224,10 @@ class GitTransaction:
 
     async def _run_cmd(self, *args: str) -> str:
         proc = await asyncio.create_subprocess_exec(
-            *args, cwd=self._ws,
-            stdout=subprocess.PIPE, stderr=subprocess.PIPE,
+            *args,
+            cwd=self._ws,
+            stdout=subprocess.PIPE,
+            stderr=subprocess.PIPE,
         )
         stdout, stderr = await proc.communicate()
         if proc.returncode != 0:

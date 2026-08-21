@@ -371,9 +371,7 @@ def _dict_to_task(d: dict) -> _AsyncTask:
         created_at=d.get("created_at", 0.0),
         cancelled=d.get("cancelled", False),
         timeout=d.get("timeout", 300.0),
-        progress_token=d.get(
-            "progress_token", ""
-        ),
+        progress_token=d.get("progress_token", ""),
     )
 
 
@@ -388,38 +386,25 @@ def _persist_task(task: _AsyncTask) -> None:
             "/knowledge/documents",
             {
                 "id": doc_id,
-                "title": (
-                    f"MCP Task {task.task_id}"
-                ),
+                "title": f"MCP Task {task.task_id}",
                 "content": json.dumps(snapshot),
                 "category": _MCP_TASK_CATEGORY,
             },
         )
     except Exception:
-        logger.debug(
-            "Failed to persist task %s",
-            task.task_id,
-        )
+        logger.debug("Failed to persist task %s", task.task_id)
 
 
-def _load_task(
-    task_id: str,
-) -> _AsyncTask | None:
+def _load_task(task_id: str) -> _AsyncTask | None:
     """Load a single task from storage."""
     doc_id = f"mcp-task-{task_id}"
     try:
-        resp = _api(
-            "GET",
-            f"/knowledge/documents/{doc_id}",
-        )
+        resp = _api("GET", f"/knowledge/documents/{doc_id}")
         raw = resp.get("content", "{}")
         data = json.loads(raw)
         return _dict_to_task(data)
     except json.JSONDecodeError:
-        logger.warning(
-            "Corrupt task data for %s",
-            task_id,
-        )
+        logger.warning("Corrupt task data for %s", task_id)
         return None
     except Exception:
         return None
@@ -428,10 +413,7 @@ def _load_task(
 def _recover_tasks() -> None:
     """Reload persisted tasks on startup."""
     try:
-        resp = _api(
-            "GET",
-            "/knowledge/documents?limit=200",
-        )
+        resp = _api("GET", "/knowledge/documents?limit=200")
         docs = resp.get("documents", [])
     except Exception:
         logger.debug("Task recovery skipped")
@@ -447,34 +429,21 @@ def _recover_tasks() -> None:
             try:
                 data = json.loads(raw)
                 task = _dict_to_task(data)
-            except (
-                json.JSONDecodeError,
-                KeyError,
-            ):
-                logger.warning(
-                    "Skipping corrupt task doc"
-                )
+            except (json.JSONDecodeError, KeyError):
+                logger.warning("Skipping corrupt task doc")
                 continue
             if task.task_id in _ASYNC_TASKS:
                 continue
             age = now - task.created_at
             if age > _TASK_TTL_SECONDS:
                 continue
-            if task.status in (
-                "running",
-                "queued",
-            ):
+            if task.status in ("running", "queued"):
                 task.status = "failed"
-                task.error = (
-                    "Interrupted by server restart"
-                )
+                task.error = "Interrupted by server restart"
             _ASYNC_TASKS[task.task_id] = task
             recovered += 1
     if recovered:
-        logger.info(
-            "Recovered %d tasks from storage",
-            recovered,
-        )
+        logger.info("Recovered %d tasks from storage", recovered)
 
 
 def _handle(name: str, args: dict) -> dict:
@@ -594,9 +563,7 @@ def _run_resolve_thread(task_id: str, args: dict) -> None:
                 return
             if elapsed > task.timeout:
                 task.status = "timed_out"
-                task.progress = (
-                    f"Exceeded {task.timeout}s"
-                )
+                task.progress = f"Exceeded {task.timeout}s"
                 task.result = result
                 _persist_task(task)
                 return
@@ -605,10 +572,7 @@ def _run_resolve_thread(task_id: str, args: dict) -> None:
             task.result = result
         _persist_task(task)
     except Exception as exc:
-        logger.exception(
-            "Async resolve task %s failed",
-            task_id,
-        )
+        logger.exception("Async resolve task %s failed", task_id)
         with _ASYNC_LOCK:
             task = _ASYNC_TASKS.get(task_id)
             if task is not None:
@@ -652,9 +616,7 @@ def _dispatch_resolve_issue_status(args: dict) -> dict:
             with _ASYNC_LOCK:
                 _ASYNC_TASKS[task_id] = task
     if task is None:
-        return {
-            "error": f"Task {task_id} not found"
-        }
+        return {"error": f"Task {task_id} not found"}
     return {
         "task_id": task.task_id,
         "status": task.status,
@@ -669,17 +631,8 @@ def _dispatch_resolve_issue_cancel(args: dict) -> dict:
     with _ASYNC_LOCK:
         task = _ASYNC_TASKS.get(task_id)
         if task is None:
-            return {
-                "error": (
-                    f"Task {task_id} not found"
-                )
-            }
-        if task.status in (
-            "complete",
-            "failed",
-            "cancelled",
-            "timed_out",
-        ):
+            return {"error": f"Task {task_id} not found"}
+        if task.status in ("complete", "failed", "cancelled", "timed_out"):
             return {
                 "task_id": task_id,
                 "status": task.status,
@@ -689,10 +642,7 @@ def _dispatch_resolve_issue_cancel(args: dict) -> dict:
         task.status = "cancelled"
         task.progress = "Task cancelled by user."
     _persist_task(task)
-    return {
-        "task_id": task_id,
-        "status": "cancelled",
-    }
+    return {"task_id": task_id, "status": "cancelled"}
 
 
 def _dispatch_search(args: dict) -> dict:
@@ -771,9 +721,7 @@ _DISPATCH_TABLE = {
     "loom_router_select": lambda a: _api(
         "POST",
         "/router/select",
-        {
-            "task_type": a["task_type"],
-        },
+        {"task_type": a["task_type"]},
     ),
     "loom_router_stats": lambda a: _api("GET", "/router/performance"),
     "loom_health": lambda a: _api("GET", "/health"),
@@ -820,9 +768,7 @@ def _respond(req_id: int | str | None, result: dict) -> None:
     _write_message({"jsonrpc": "2.0", "id": req_id, "result": result})
 
 
-def _negotiate_version(
-    client_version: str | None,
-) -> str:
+def _negotiate_version(client_version: str | None) -> str:
     if client_version in _SUPPORTED_VERSIONS:
         return client_version
     return _LATEST_VERSION
@@ -830,10 +776,7 @@ def _negotiate_version(
 
 def main() -> None:
     """Run the MCP server loop over stdin/stdout."""
-    logging.basicConfig(
-        level=logging.WARNING,
-        stream=sys.stderr,
-    )
+    logging.basicConfig(level=logging.WARNING, stream=sys.stderr)
     _recover_tasks()
     while True:
         msg = _read_message()
@@ -845,18 +788,13 @@ def main() -> None:
         params = msg.get("params", {})
 
         if method == "initialize":
-            version = _negotiate_version(
-                params.get("protocolVersion"),
-            )
+            version = _negotiate_version(params.get("protocolVersion"))
             _respond(
                 req_id,
                 {
                     "protocolVersion": version,
                     "capabilities": {"tools": {"listChanged": False}},
-                    "serverInfo": {
-                        "name": "loom-ai",
-                        "version": "1.0.0",
-                    },
+                    "serverInfo": {"name": "loom-ai", "version": "1.0.0"},
                 },
             )
         elif method == "notifications/initialized":

@@ -163,10 +163,13 @@ class TestAsyncResolve:
             _dispatch_resolve_issue_status,
         )
 
-        with patch(
-            "loom_ai.mcp_server._dispatch_resolve_issue",
-            return_value={"success": True, "error": "", "plan": "", "pr_url": ""},
-        ), patch("loom_ai.mcp_server._persist_task"):
+        with (
+            patch(
+                "loom_ai.mcp_server._dispatch_resolve_issue",
+                return_value={"success": True, "error": "", "plan": "", "pr_url": ""},
+            ),
+            patch("loom_ai.mcp_server._persist_task"),
+        ):
             result = _dispatch_resolve_issue_async({"issue_number": 1})
         assert "task_id" in result
         assert result["status"] == "queued"
@@ -266,10 +269,13 @@ class TestAsyncResolve:
             _dispatch_resolve_issue_async,
         )
 
-        with patch(
-            "loom_ai.mcp_server._dispatch_resolve_issue",
-            return_value={"success": True, "error": "", "plan": "", "pr_url": ""},
-        ), patch("loom_ai.mcp_server._persist_task"):
+        with (
+            patch(
+                "loom_ai.mcp_server._dispatch_resolve_issue",
+                return_value={"success": True, "error": "", "plan": "", "pr_url": ""},
+            ),
+            patch("loom_ai.mcp_server._persist_task"),
+        ):
             result = _dispatch_resolve_issue_async(
                 {
                     "issue_number": 99,
@@ -336,9 +342,7 @@ class TestTaskPersistence:
             progress="Queued.",
             created_at=1000.0,
         )
-        with patch(
-            "loom_ai.mcp_server._api"
-        ) as mock_api:
+        with patch("loom_ai.mcp_server._api") as mock_api:
             _persist_task(task)
         mock_api.assert_called_once()
         call_args = mock_api.call_args
@@ -441,9 +445,7 @@ class TestTaskPersistence:
                 "content": stored,
             },
         ):
-            result = _dispatch_resolve_issue_status(
-                {"task_id": "fb-test"}
-            )
+            result = _dispatch_resolve_issue_status({"task_id": "fb-test"})
         assert result["task_id"] == "fb-test"
         assert result["status"] == "complete"
         with _ASYNC_LOCK:

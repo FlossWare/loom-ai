@@ -25,6 +25,8 @@ LOOM_PUBLIC_MAX_TOKENS
     Hard cap on ``max_tokens`` for public requests (default ``2048``).
 """
 
+from __future__ import annotations
+
 import json
 import logging
 import os

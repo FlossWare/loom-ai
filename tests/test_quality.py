@@ -13,8 +13,13 @@ from loom_ai.quality import (
 def test_all_quality_gates():
     assert len(QualityGate) == 7
     expected = {
-        "lint", "format", "tests", "coverage",
-        "imports", "security_audit", "version_format",
+        "lint",
+        "format",
+        "tests",
+        "coverage",
+        "imports",
+        "security_audit",
+        "version_format",
     }
     actual = {g.value for g in QualityGate}
     assert actual == expected
@@ -29,7 +34,9 @@ def test_gate_result_passes():
 
 def test_gate_result_fails():
     r = GateResult(
-        QualityGate.TESTS, False, "3 failures",
+        QualityGate.TESTS,
+        False,
+        "3 failures",
     )
     assert not r.passed
     assert r.detail == "3 failures"
@@ -95,11 +102,11 @@ def test_roundtrip():
     assert not restored.qualified
 
 
-# 6. Empty gates = qualified (vacuous truth)
-def test_empty_gates_qualified():
+# 6. Empty gates = not qualified (fail-closed; no silent pass)
+def test_empty_gates_not_qualified():
     summary = QualificationSummary(
         timestamp="2026-08-21T00:00:00Z",
         commit_sha="000000",
         python_version="3.10",
     )
-    assert summary.qualified
+    assert not summary.qualified

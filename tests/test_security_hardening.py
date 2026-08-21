@@ -124,33 +124,37 @@ class TestDispatchAutoPr:
 
 class TestBranchCollision:
     async def test_uses_suffix_on_collision(self, tmp_path):
+        """Publication picks an unused fix/issue-N[-suffix] branch via GitTransaction."""
         _git_init(tmp_path)
         llm = MagicMock()
         agent = DemoAgent(llm=llm, workspace=str(tmp_path), allow_push=True)
 
-        git_calls = []
+        tx = MagicMock()
+        tx.begin = AsyncMock()
+        created = []
+
+        async def capture_branch(name):
+            created.append(name)
+            return name
+
+        tx.create_branch = AsyncMock(side_effect=capture_branch)
 
         async def mock_git(*args, cwd):
-            git_calls.append(args)
-            if args == ("branch", "--list", "fix/issue-42"):
-                return "  fix/issue-42"
-            if args == ("branch", "--list", "fix/issue-42-2"):
+            if args[:2] == ("branch", "--list"):
+                # first candidate exists; second is free
+                if args[2] == "fix/issue-42":
+                    return "  fix/issue-42"
                 return ""
             return ""
 
-        with patch("loom_ai.demo_agent._git", side_effect=mock_git):
-            with patch("asyncio.create_subprocess_exec") as mock_proc:
-                proc = AsyncMock()
-                proc.communicate.return_value = (
-                    b"https://github.com/test/pull/1\n",
-                    b"",
-                )
-                proc.returncode = 0
-                mock_proc.return_value = proc
-                await agent._commit_and_pr(42, ["test.py"])
+        with (
+            patch("loom_ai.demo_agent.GitTransaction", return_value=tx),
+            patch("loom_ai.demo_agent._git", side_effect=mock_git),
+        ):
+            await agent._begin_publication(42)
 
-        checkout_calls = [c for c in git_calls if c[0] == "checkout"]
-        assert any("fix/issue-42-2" in c for c in checkout_calls)
+        assert created == ["fix/issue-42-2"]
+        assert agent._transaction is tx
 
     async def test_push_blocked_without_allow_push(self, tmp_path):
         _git_init(tmp_path)
@@ -158,4 +162,4 @@ class TestBranchCollision:
         agent = DemoAgent(llm=llm, workspace=str(tmp_path))
 
         with pytest.raises(RuntimeError, match="Push/PR disabled"):
-            await agent._commit_and_pr(42, ["test.py"])
+            await agent._begin_publication(42)
