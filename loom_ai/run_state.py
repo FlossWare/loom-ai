@@ -1,197 +1,159 @@
-"""Agent run lifecycle state machine (#821).
+"""Agent run state machine (#821).
 
-Defines a single authoritative state machine for engineering
-runs. All surfaces (DemoAgent, MCP, CLI, API) must report
-the same semantic phase.
+Tracks the lifecycle of a dogfood agent run through ordered phases.
+Illegal transitions raise IllegalTransitionError. Terminal phases
+(COMPLETED, FAILED, CANCELLED, PUBLISHED) accept only self-transitions.
 """
 
 from __future__ import annotations
 
+from dataclasses import dataclass, field
 from datetime import datetime, timezone
 from enum import Enum
-from typing import Self
+from typing import Any
 
 
 class RunPhase(str, Enum):
-    """Lifecycle phase of an engineering run."""
+    """Lifecycle phases for a dogfood agent run."""
 
     CREATED = "created"
     FETCHING = "fetching"
     PLANNING = "planning"
     EXECUTING = "executing"
-    REVIEWING = "reviewing"
     VERIFYING = "verifying"
     PERSISTING = "persisting"
     COMPLETED = "completed"
     FAILED = "failed"
     CANCELLED = "cancelled"
-    NEEDS_REVIEW = "needs_review"
     PUBLISHED = "published"
 
 
-_TRANSITIONS: dict[RunPhase, set[RunPhase]] = {
-    RunPhase.CREATED: {
-        RunPhase.FETCHING,
-        RunPhase.FAILED,
-        RunPhase.CANCELLED,
-    },
-    RunPhase.FETCHING: {
-        RunPhase.PLANNING,
-        RunPhase.FAILED,
-        RunPhase.CANCELLED,
-    },
-    RunPhase.PLANNING: {
-        RunPhase.EXECUTING,
-        RunPhase.FAILED,
-        RunPhase.CANCELLED,
-    },
-    RunPhase.EXECUTING: {
-        # DemoAgent currently performs the review loop inside its
-        # execution phase. Keep the explicit REVIEWING state for
-        # callers that expose review as a separate phase, while also
-        # allowing the embedded-review execution path to proceed.
-        RunPhase.REVIEWING,
-        RunPhase.VERIFYING,
-        RunPhase.FAILED,
-        RunPhase.CANCELLED,
-    },
-    RunPhase.REVIEWING: {
-        RunPhase.EXECUTING,
-        RunPhase.VERIFYING,
-        RunPhase.NEEDS_REVIEW,
-        RunPhase.FAILED,
-        RunPhase.CANCELLED,
-    },
-    RunPhase.VERIFYING: {
-        RunPhase.PERSISTING,
-        RunPhase.FAILED,
-        RunPhase.CANCELLED,
-    },
-    RunPhase.PERSISTING: {
+_TERMINAL = frozenset(
+    {
         RunPhase.COMPLETED,
         RunPhase.FAILED,
         RunPhase.CANCELLED,
-    },
-    RunPhase.COMPLETED: {
         RunPhase.PUBLISHED,
-        RunPhase.FAILED,
-    },
-    RunPhase.NEEDS_REVIEW: {
-        RunPhase.CANCELLED,
-        RunPhase.FAILED,
-    },
-    RunPhase.PUBLISHED: set(),
-    RunPhase.FAILED: set(),
-    RunPhase.CANCELLED: set(),
+    }
+)
+
+_ALLOWED: dict[RunPhase, frozenset[RunPhase]] = {
+    RunPhase.CREATED: frozenset({RunPhase.FETCHING, RunPhase.FAILED, RunPhase.CANCELLED}),
+    RunPhase.FETCHING: frozenset(
+        {RunPhase.PLANNING, RunPhase.FAILED, RunPhase.CANCELLED}
+    ),
+    RunPhase.PLANNING: frozenset(
+        {RunPhase.EXECUTING, RunPhase.FAILED, RunPhase.CANCELLED}
+    ),
+    RunPhase.EXECUTING: frozenset(
+        {RunPhase.VERIFYING, RunPhase.FAILED, RunPhase.CANCELLED}
+    ),
+    RunPhase.VERIFYING: frozenset(
+        {RunPhase.PERSISTING, RunPhase.FAILED, RunPhase.CANCELLED}
+    ),
+    RunPhase.PERSISTING: frozenset(
+        {RunPhase.COMPLETED, RunPhase.FAILED, RunPhase.CANCELLED}
+    ),
+    RunPhase.COMPLETED: frozenset({RunPhase.PUBLISHED, RunPhase.COMPLETED}),
+    RunPhase.FAILED: frozenset({RunPhase.FAILED}),
+    RunPhase.CANCELLED: frozenset({RunPhase.CANCELLED}),
+    RunPhase.PUBLISHED: frozenset({RunPhase.PUBLISHED}),
 }
 
-_TERMINAL_STATES = {
-    RunPhase.COMPLETED,
-    RunPhase.FAILED,
-    RunPhase.CANCELLED,
-    RunPhase.PUBLISHED,
-}
+
+class IllegalTransitionError(RuntimeError):
+    """Raised when a phase transition is not allowed."""
+
+    def __init__(self, from_phase: RunPhase, to_phase: RunPhase) -> None:
+        self.from_phase = from_phase
+        self.to_phase = to_phase
+        super().__init__(f"Illegal transition: {from_phase.value} -> {to_phase.value}")
 
 
-class IllegalTransitionError(Exception):
-    """Raised on an invalid state transition."""
-
-    def __init__(
-        self,
-        run_id: str,
-        current: RunPhase,
-        target: RunPhase,
-    ) -> None:
-        self.run_id = run_id
-        self.current = current
-        self.target = target
-        super().__init__(
-            f"Run {run_id}: illegal transition "
-            f"{current.value} -> {target.value}"
-        )
+@dataclass
+class TransitionRecord:
+    ts: str
+    from_phase: str
+    to_phase: str
 
 
+@dataclass
 class RunStateMachine:
-    """Tracks and enforces the lifecycle of a run."""
+    """Finite state machine for a single agent run."""
 
-    def __init__(self, run_id: str) -> None:
-        if not run_id:
-            raise ValueError("run_id must not be empty")
-        self._run_id = run_id
-        self._phase = RunPhase.CREATED
-        self._history: list[tuple[str, RunPhase, RunPhase]] = []
+    run_id: str
+    _phase: RunPhase = field(default=RunPhase.CREATED, init=False, repr=False)
+    _history: list[TransitionRecord] = field(default_factory=list, init=False, repr=False)
+
+    def __post_init__(self) -> None:
+        if not self.run_id:
+            raise ValueError("run_id is required")
 
     @property
     def phase(self) -> RunPhase:
         return self._phase
 
     @property
-    def run_id(self) -> str:
-        return self._run_id
+    def history(self) -> list[TransitionRecord]:
+        return list(self._history)
 
     @property
     def is_terminal(self) -> bool:
-        return self._phase in _TERMINAL_STATES
+        return self._phase in _TERMINAL
 
-    @property
-    def history(self) -> list[tuple[str, RunPhase, RunPhase]]:
-        return list(self._history)
+    def can_transition(self, to: RunPhase) -> bool:
+        return to in _ALLOWED.get(self._phase, frozenset())
 
-    def can_transition(self, target: RunPhase) -> bool:
-        return target in _TRANSITIONS.get(self._phase, set())
-
-    def transition(self, target: RunPhase) -> None:
-        if not self.can_transition(target):
-            raise IllegalTransitionError(self._run_id, self._phase, target)
-        old = self._phase
-        self._phase = target
-        ts = datetime.now(timezone.utc).isoformat()
-        self._history.append((ts, old, target))
-
-    def fail(self, error: str = "") -> None:
-        if self.is_terminal:
+    def transition(self, to: RunPhase) -> None:
+        if not self.can_transition(to):
+            raise IllegalTransitionError(self._phase, to)
+        if to == self._phase:
             return
-        self.transition(RunPhase.FAILED)
+        rec = TransitionRecord(
+            ts=datetime.now(timezone.utc).isoformat(),
+            from_phase=self._phase.value,
+            to_phase=to.value,
+        )
+        self._history.append(rec)
+        self._phase = to
+
+    def fail(self) -> None:
+        if self._phase not in _TERMINAL:
+            self.transition(RunPhase.FAILED)
 
     def cancel(self) -> None:
-        if self.is_terminal:
-            return
-        self.transition(RunPhase.CANCELLED)
+        if self._phase not in _TERMINAL:
+            self.transition(RunPhase.CANCELLED)
 
-    def to_dict(self) -> dict:
+    def to_dict(self) -> dict[str, Any]:
         return {
-            "run_id": self._run_id,
+            "run_id": self.run_id,
             "phase": self._phase.value,
             "is_terminal": self.is_terminal,
             "history": [
-                {"ts": ts, "from": old.value, "to": new.value}
-                for ts, old, new in self._history
+                {"ts": h.ts, "from": h.from_phase, "to": h.to_phase}
+                for h in self._history
             ],
         }
 
     @classmethod
-    def from_dict(cls, d: dict) -> Self:
-        sm = cls(d["run_id"])
-        phase = RunPhase(d["phase"])
-        history = [
-            (
-                e["ts"],
-                RunPhase(e["from"]),
-                RunPhase(e["to"]),
+    def from_dict(cls, d: dict[str, Any]) -> RunStateMachine:
+        run_id = d.get("run_id") or ""
+        phase_s = d.get("phase", "created")
+        history = d.get("history") or []
+        if phase_s != "created" and not history:
+            raise ValueError("non-created phase requires history")
+        sm = cls(run_id=run_id)
+        try:
+            sm._phase = RunPhase(phase_s)
+        except ValueError as exc:
+            raise ValueError(f"unknown phase: {phase_s}") from exc
+        for h in history:
+            sm._history.append(
+                TransitionRecord(
+                    ts=h.get("ts", ""),
+                    from_phase=h.get("from", h.get("from_phase", "")),
+                    to_phase=h.get("to", h.get("to_phase", "")),
+                )
             )
-            for e in d.get("history", [])
-        ]
-        # Reject corrupt serialized state instead of silently restoring
-        # a lifecycle that could permit an unsafe operation.
-        current = RunPhase.CREATED
-        for _, old, new in history:
-            if old != current or new not in _TRANSITIONS.get(current, set()):
-                raise ValueError("Invalid run state history")
-            current = new
-        if history and current != phase:
-            raise ValueError("Run state phase does not match history")
-        if not history and phase != RunPhase.CREATED:
-            raise ValueError("Non-created state requires transition history")
-        sm._phase = phase
-        sm._history = history
         return sm
