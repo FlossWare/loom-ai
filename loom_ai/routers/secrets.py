@@ -67,7 +67,9 @@ def _mount_secrets_routes(app: FastAPI, config: LoomConfig, auth_deps: list) -> 
     )
     async def reveal_secret(
         name: str,
-        x_secret_access_reason: str | None = Header(None),
+        x_secret_access_reason: str | None = Header(  # NOSONAR
+            None
+        ),
     ):
         """Return the plaintext value of a secret.
 

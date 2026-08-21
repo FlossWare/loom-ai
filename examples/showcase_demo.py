@@ -91,7 +91,9 @@ class CouncilLLM:
         ),
     }
 
-    async def chat(self, messages, *, model=None, temperature=0.7, max_tokens=None):
+    async def chat(  # NOSONAR — sync mock of async protocol
+        self, messages, *, model=None, temperature=0.7, max_tokens=None
+    ):
         from loom_ai.models import ChatResponse
 
         _ = messages, temperature, max_tokens
@@ -108,7 +110,7 @@ class CouncilLLM:
         for word in resp.content.split():
             yield word + " "
 
-    async def list_models(self) -> list[str]:
+    async def list_models(self) -> list[str]:  # NOSONAR — sync mock of async protocol
         return sorted(self._VOICES.keys())
 
 
@@ -290,7 +292,7 @@ def act_iii_death() -> None:
     beat(0.5)
 
 
-async def act_iv_rebirth(vault_path: str) -> None:
+async def act_iv_rebirth(vault_path: str) -> None:  # NOSONAR — called from async main
     banner("ACT IV  ·  Cold Start")
     say("Narrator", "New process. Empty context. Only durable knowledge remains.", DIM)
     beat()

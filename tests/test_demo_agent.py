@@ -258,6 +258,69 @@ class TestCommitAndPr:
         assert mock_git.call_count >= 4
 
 
+class TestLintGating:
+    async def test_success_requires_lint_pass(self, tmp_path):
+        _git_init(tmp_path)
+        agent = DemoAgent(llm=_make_llm(), workspace=str(tmp_path))
+        result = AgentResult(issue=1)
+        result.changes = [{"file": "x.py", "result": {"applied": True}}]
+        with (
+            patch(
+                "loom_ai.demo_agent.run_linter",
+                return_value={"exit_code": 1, "count": 2},
+            ),
+            patch(
+                "loom_ai.demo_agent.run_tests",
+                return_value={"exit_code": 0, "passed": 5},
+            ),
+        ):
+            await agent._finalize(result, False, None)
+        assert result.success is False
+
+    async def test_success_when_both_pass(self, tmp_path):
+        _git_init(tmp_path)
+        agent = DemoAgent(llm=_make_llm(), workspace=str(tmp_path))
+        result = AgentResult(issue=1)
+        result.changes = [{"file": "x.py", "result": {"applied": True}}]
+        with (
+            patch(
+                "loom_ai.demo_agent.run_linter",
+                return_value={"exit_code": 0, "count": 0},
+            ),
+            patch(
+                "loom_ai.demo_agent.run_tests",
+                return_value={"exit_code": 0, "passed": 5},
+            ),
+        ):
+            await agent._finalize(result, False, None)
+        assert result.success is True
+
+    async def test_no_pr_when_lint_fails(self, tmp_path):
+        _git_init(tmp_path)
+        agent = DemoAgent(
+            llm=_make_llm(), workspace=str(tmp_path), allow_push=True
+        )
+        result = AgentResult(issue=42)
+        result.changes = [{"file": "x.py", "result": {"applied": True}}]
+        with (
+            patch(
+                "loom_ai.demo_agent.run_linter",
+                return_value={"exit_code": 1, "count": 1},
+            ),
+            patch(
+                "loom_ai.demo_agent.run_tests",
+                return_value={"exit_code": 0, "passed": 3},
+            ),
+            patch(
+                "loom_ai.demo_agent._git", new_callable=AsyncMock
+            ) as mock_git,
+        ):
+            await agent._finalize(result, True, 42)
+        assert result.success is False
+        assert result.pr_url == ""
+        mock_git.assert_not_called()
+
+
 class TestRunAutoPr:
     async def test_accepts_auto_pr_kwarg(self, tmp_path):
         _git_init(tmp_path)

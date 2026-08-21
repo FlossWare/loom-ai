@@ -28,6 +28,7 @@ class MCPProgressReporter:
                     "progressToken": self._token,
                     "progress": progress_pct,
                     "total": 100,
+                    "stage": stage,
                     "message": message,
                 },
             }

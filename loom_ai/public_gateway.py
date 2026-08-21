@@ -131,7 +131,7 @@ def _enforce_rate(request: Any) -> None:
     ip = _client_ip(request)
     ok, retry = _get_limiter().check(ip)
     if not ok:
-        raise HTTPException(
+        raise HTTPException(  # NOSONAR — documented in route responses
             status_code=429,
             detail="Rate limit exceeded",
             headers={"Retry-After": str(int(retry) + 1)},
@@ -147,7 +147,7 @@ def _resolve_model(model: str | None) -> str | None:
     if model is None:
         return next(iter(allow)) if allow else None
     if model not in allow:
-        raise HTTPException(
+        raise HTTPException(  # NOSONAR — documented in route responses
             status_code=400,
             detail=f"Model {model!r} is not available on the free tier",
         )

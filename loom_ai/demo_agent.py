@@ -45,7 +45,7 @@ class _NullProgress:
     """No-op progress callback (default)."""
 
     def report(self, stage: str, message: str, progress_pct: float) -> None:
-        pass
+        pass  # intentional no-op for null progress callback
 
 
 @dataclass
@@ -80,7 +80,7 @@ async def _git(
 async def _read_file(path: Path) -> str:
     """Read a file, returning empty string on error."""
     try:
-        return path.read_text()
+        return await asyncio.to_thread(path.read_text)
     except Exception:
         return ""
 
@@ -520,7 +520,9 @@ class DemoAgent:
         """Run lint, tests, and optionally create a PR."""
         result.lint_result = await run_linter(workspace=self._workspace)
         result.test_result = await run_tests(workspace=self._workspace)
-        result.success = result.test_result.get("exit_code") == 0
+        lint_ok = result.lint_result.get("exit_code", 1) == 0
+        test_ok = result.test_result.get("exit_code", 1) == 0
+        result.success = lint_ok and test_ok
         if not (auto_pr and result.success):
             return
         changed = [

@@ -110,7 +110,9 @@ class InMemoryConversationManager:
         session = self._require_session(session_id)
         return [asdict(msg) for msg in session["messages"]]
 
-    async def archive(self, session_id: str) -> str:
+    async def archive(  # NOSONAR — async for protocol compat
+        self, session_id: str
+    ) -> str:
         """Archive a session and return the session id.
 
         In-memory implementation stores a frozen copy of the transcript

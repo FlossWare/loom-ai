@@ -82,7 +82,7 @@ class SessionManager:
         self._knowledge = knowledge
         self._sessions: dict[str, SessionState] = {}
 
-    async def create_session(
+    async def create_session(  # NOSONAR — async for protocol compat
         self,
         project: str = "",
         *,
@@ -100,7 +100,7 @@ class SessionManager:
         self._sessions[sid] = state
         return sid
 
-    async def record_event(
+    async def record_event(  # NOSONAR — async for protocol compat
         self,
         session_id: str,
         content: str,
@@ -274,7 +274,7 @@ class SessionManager:
             await self._recover_knowledge(ctx, query, project, limit)
         return ctx
 
-    async def get_session(
+    async def get_session(  # NOSONAR — async for protocol compat
         self,
         session_id: str,
     ) -> SessionState | None:

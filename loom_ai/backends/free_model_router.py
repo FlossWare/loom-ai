@@ -220,9 +220,10 @@ async def _async_request(
     body: dict | None = None,
     timeout: int = _CHAT_TIMEOUT,
 ) -> tuple[int, dict]:
-    return await asyncio.to_thread(
-        _http_request, method, url, headers, body, timeout=timeout
-    )
+    async with asyncio.timeout(timeout):
+        return await asyncio.to_thread(
+            _http_request, method, url, headers, body, timeout=timeout
+        )
 
 
 def _openai_chat_body(
@@ -654,7 +655,7 @@ class FreeModelRouter:
         *,
         n_workers: int = 3,
         temperature: float = 0.7,
-        max_tokens: int | None = None,
+        max_tokens: int | None = None,  # NOSONAR — API compat
     ) -> ChatResponse:
         if not self._initialized:
             await self.initialize()

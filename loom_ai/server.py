@@ -79,7 +79,7 @@ from loom_ai.routers import (
     _mount_storage_routes,
     _mount_tools_routes,
 )
-from loom_ai.server_models import *  # noqa: F401, F403
+from loom_ai.server_models import *  # noqa: F401, F403  # NOSONAR — intentional re-export of 68 model classes
 from loom_ai.server_models import HealthResponse, ReadinessResponse
 
 
