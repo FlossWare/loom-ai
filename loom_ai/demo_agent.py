@@ -152,25 +152,77 @@ class DemoAgent:
                 "configure FreeModelRouter."
             )
 
-        session_mgr = cls._build_session_manager()
-        return cls(llm=llm, workspace=ws, session_manager=session_mgr)
+        session_mgr = await cls._build_session_manager()
+        return cls(
+            llm=llm,
+            workspace=ws,
+            session_manager=session_mgr,
+        )
 
-    @staticmethod
-    def _build_session_manager() -> SessionManager:
-        """Build a SessionManager with available backends."""
+    @classmethod
+    async def _build_session_manager(
+        cls,
+    ) -> SessionManager:
+        """Build a SessionManager with available backends.
+
+        Prefers PostgreSQL when LOOM_STORAGE=postgresql,
+        falls back to in-memory backends otherwise.
+        """
+        if os.environ.get("LOOM_STORAGE") == "postgresql":
+            try:
+                from loom_ai.backends.postgresql import (
+                    PostgresqlKnowledgePipeline,
+                    PostgresqlPersistentMemory,
+                    get_shared_pool,
+                )
+
+                pool = await get_shared_pool()
+                memory = (
+                    await PostgresqlPersistentMemory
+                    .from_env(pool=pool)
+                )
+                knowledge = (
+                    await PostgresqlKnowledgePipeline
+                    .from_env(pool=pool)
+                )
+                logger.info(
+                    "SessionManager wired with PG"
+                )
+                return SessionManager(
+                    memory=memory,
+                    knowledge=knowledge,
+                )
+            except Exception as exc:
+                logger.warning(
+                    "PG session backend failed: %s;"
+                    " falling back to in-memory",
+                    exc,
+                )
+
         try:
             from loom_ai.backends.knowledge import (
                 InMemoryKnowledgePipeline,
                 TokenChunker,
             )
-            from loom_ai.backends.memory import InMemoryPersistentMemory
+            from loom_ai.backends.memory import (
+                InMemoryPersistentMemory,
+            )
 
             memory = InMemoryPersistentMemory()
-            knowledge = InMemoryKnowledgePipeline(TokenChunker())
-            logger.info("SessionManager wired with in-memory backends")
-            return SessionManager(memory=memory, knowledge=knowledge)
+            knowledge = InMemoryKnowledgePipeline(
+                TokenChunker(),
+            )
+            logger.info(
+                "SessionManager wired with in-memory"
+            )
+            return SessionManager(
+                memory=memory, knowledge=knowledge,
+            )
         except Exception as exc:
-            logger.warning("Session backend init failed: %s", exc)
+            logger.warning(
+                "Session backend init failed: %s",
+                exc,
+            )
             return SessionManager()
 
     async def _chat(
