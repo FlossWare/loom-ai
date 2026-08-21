@@ -60,6 +60,7 @@ class AgentResult:
     success: bool = False
     error: str = ""
     pr_url: str = ""
+    run_state: dict = field(default_factory=dict)
 
 
 async def _git(
@@ -619,6 +620,13 @@ class DemoAgent:
         auto_pr: bool = False,
     ) -> AgentResult:
         """Execute the full agent loop for an issue."""
+        from loom_ai.run_state import (
+            RunPhase,
+            RunStateMachine,
+        )
+
+        run_id = f"run-{issue_number or 0}"
+        sm = RunStateMachine(run_id)
         result = AgentResult(issue=issue_number or 0)
 
         sid = await self._session.create_session(
@@ -626,32 +634,64 @@ class DemoAgent:
             metadata={"issue": issue_number or 0},
         )
 
-        self._progress.report("fetch", "Fetching issue...", 10)
+        sm.transition(RunPhase.FETCHING)
+        self._progress.report(
+            "fetch", "Fetching issue...", 10
+        )
         if not issue_text and issue_number:
             try:
-                issue_text = await self._fetch_issue(issue_number)
+                issue_text = (
+                    await self._fetch_issue(
+                        issue_number
+                    )
+                )
             except Exception as exc:
-                result.error = f"Failed to fetch issue: {exc}"
+                result.error = (
+                    f"Failed to fetch issue: {exc}"
+                )
+                sm.fail()
+                result.run_state = sm.to_dict()
                 return result
 
         if not issue_text:
             result.error = "No issue text provided"
+            sm.fail()
+            result.run_state = sm.to_dict()
             return result
 
         try:
-            self._progress.report("context", "Gathering repo context...", 20)
-            context = await self._build_context(issue_text, sid)
-            self._progress.report("plan", "Planning implementation...", 35)
+            sm.transition(RunPhase.PLANNING)
+            self._progress.report(
+                "context",
+                "Gathering repo context...",
+                20,
+            )
+            context = await self._build_context(
+                issue_text, sid
+            )
+            self._progress.report(
+                "plan",
+                "Planning implementation...",
+                35,
+            )
             plan = await self._plan(context)
             result.plan = plan
-            logger.info("Generated plan (%d chars)", len(plan))
+            logger.info(
+                "Generated plan (%d chars)",
+                len(plan),
+            )
             await self._session.record_event(
                 sid,
                 f"planned {len(plan)} chars",
                 kind="decision",
             )
 
-            self._progress.report("implement", "Implementing changes...", 55)
+            sm.transition(RunPhase.EXECUTING)
+            self._progress.report(
+                "implement",
+                "Implementing changes...",
+                55,
+            )
             approved = await self._run_review_loop(
                 plan,
                 context,
@@ -660,19 +700,44 @@ class DemoAgent:
             )
 
             if approved:
-                self._progress.report("finalize", "Running lint and tests...", 80)
-                await self._finalize(result, auto_pr, issue_number)
-                self._progress.report("done", "Complete.", 100)
-            elif not result.error:
-                result.error = (
-                    f"Review not approved after {self._MAX_REVIEW_ATTEMPTS} attempts"
+                sm.transition(RunPhase.VERIFYING)
+                self._progress.report(
+                    "finalize",
+                    "Running lint and tests...",
+                    80,
                 )
+                await self._finalize(
+                    result, auto_pr, issue_number
+                )
+
+                sm.transition(RunPhase.PERSISTING)
+                await self._session.persist(sid)
+
+                sm.transition(RunPhase.COMPLETED)
+                if result.pr_url:
+                    sm.transition(RunPhase.PUBLISHED)
+                self._progress.report(
+                    "done", "Complete.", 100
+                )
+            else:
+                sm.fail()
+                if not result.error:
+                    result.error = (
+                        "Review not approved after "
+                        f"{self._MAX_REVIEW_ATTEMPTS}"
+                        " attempts"
+                    )
 
         except Exception as exc:
             result.error = str(exc)
+            sm.fail()
             logger.exception("Agent run failed")
 
-        await self._session.persist(sid)
+        if not sm.is_terminal:
+            await self._session.persist(sid)
+            sm.fail()
+
+        result.run_state = sm.to_dict()
         return result
 
 
