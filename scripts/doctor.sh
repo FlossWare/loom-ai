@@ -20,6 +20,8 @@ value() {
     awk -v k="$key" '$0 ~ "^[[:space:]]*" k "[[:space:]]*=" {sub("^[[:space:]]*" k "[[:space:]]*=", "", $0); print $0; exit}' "$file"
 }
 
+ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
+
 printf 'Loom Doctor\n===========\n'
 [[ -r /etc/os-release ]] && . /etc/os-release
 [[ "${ID:-}" == fedora ]] && ok OS "Fedora ${VERSION_ID:-unknown}" || warn OS "${PRETTY_NAME:-unknown}; Fedora is first-class"
@@ -54,7 +56,7 @@ else
     bad Podman 'not found'
 fi
 
-PYTHON=.venv/bin/python
+PYTHON="$ROOT/.venv/bin/python"
 if [[ ! -x "$PYTHON" ]]; then
     PYTHON=python3
 fi
