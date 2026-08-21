@@ -17,6 +17,7 @@ packages=()
 for cmd in git curl gh podman; do
     command -v "$cmd" >/dev/null 2>&1 || packages+=("$cmd")
 done
+command -v pg_isready >/dev/null 2>&1 || packages+=(postgresql)
 
 if ((${#packages[@]})); then
     sudo dnf install -y "${packages[@]}"
