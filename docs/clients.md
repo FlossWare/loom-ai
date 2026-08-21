@@ -54,9 +54,8 @@ The CLI uses `get_client()` and therefore inherits local/remote auto-detection.
 Adapters under `loom_ai.clients.*` emit config or env vars for Crush, OpenCode,
 Aider, Cursor, Continue.dev, and Claude Code (MCP bridge).
 
-**Known limitation:** adapters that generate OpenAI-compatible base URLs point
-at `/llm`. The loom-ai server exposes `/llm/chat` and `/llm/models`, not
-`/v1/chat/completions`. Tools that always append `/v1/chat/completions` need a
-proxy or custom base-path support until an OpenAI-compatible route is added.
+The main server exposes both `/llm/chat` and `/v1/chat/completions`
+(OpenAI-compatible). Adapters generate base URLs pointing at `/llm`; tools
+that always append `/v1/chat/completions` also work out of the box.
 
 Set `LOOM_URL` (and optionally `LOOM_API_KEY`) before generating adapter config.

@@ -126,11 +126,11 @@ python -m loom_ai.clients.continue_dev
 
 Add the generated config to your Continue settings.
 
-## Known Limitation
+## OpenAI-Compatible Routes
 
-loom-ai exposes `/llm/chat`, not `/v1/chat/completions`. Tools that always
-append the `/v1/` path need a proxy or the OpenAI-compatible route
-([#774](https://github.com/FlossWare/loom-ai/issues/774)).
+The main server exposes both `/llm/chat` and `/v1/chat/completions`
+(OpenAI-compatible). Tools that append `/v1/` work out of the box when
+an LLM backend is configured.
 
 ## Token Savings
 

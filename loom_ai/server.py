@@ -236,6 +236,9 @@ def create_app(config: LoomConfig) -> FastAPI:
     # Mount optional-backend routers
     if config.llm is not None:
         _mount_llm_routes(app, config, auth_deps)
+        from loom_ai.public_gateway import mount_public_v1_routes
+
+        mount_public_v1_routes(app, config)
 
     if config.consensus is not None:
         _mount_consensus_routes(app, config, auth_deps)
