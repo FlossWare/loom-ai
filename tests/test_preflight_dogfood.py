@@ -25,8 +25,13 @@ def test_non_noop_embedding_is_required(monkeypatch) -> None:
     monkeypatch.setenv("LOOM_EMBEDDING", "litellm")
     checker = PreflightChecker()
     results = checker.run_all()
-    embedding = next(
-        r for r in results if r.dependency == Dependency.EMBEDDING_MODEL
-    )
+    embedding = next(r for r in results if r.dependency == Dependency.EMBEDDING_MODEL)
     assert embedding.required
     assert embedding.status == CheckStatus.PASS
+
+
+def test_required_github_cli_policy_is_honored(monkeypatch) -> None:
+    monkeypatch.setenv("LOOM_REQUIRE_GITHUB", "1")
+    result = PreflightChecker.check_gh_cli()
+    assert result.required is True
+    assert result.status in (CheckStatus.PASS, CheckStatus.FAIL)
