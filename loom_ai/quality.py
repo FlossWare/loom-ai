@@ -1,8 +1,4 @@
-"""Quality gate definitions for CI and local use (#817).
-
-Defines the gates that must pass before a build is
-considered release/dogfood-qualified.
-"""
+"""Quality gate definitions for CI and local use (#817)."""
 
 from __future__ import annotations
 
@@ -40,14 +36,12 @@ class QualificationSummary:
     timestamp: str
     commit_sha: str
     python_version: str
-    gates: list[GateResult] = field(
-        default_factory=list,
-    )
+    gates: list[GateResult] = field(default_factory=list)
 
     @property
     def qualified(self) -> bool:
-        """True when every gate passed."""
-        return all(g.passed for g in self.gates)
+        """True only when at least one required gate exists and all pass."""
+        return bool(self.gates) and all(g.passed for g in self.gates)
 
     def to_dict(self) -> dict[str, Any]:
         """Serialize to a plain dict."""
@@ -65,11 +59,9 @@ class QualificationSummary:
         gates = [
             GateResult(
                 gate=QualityGate(g["gate"]),
-                passed=g["passed"],
+                passed=bool(g["passed"]),
                 detail=g.get("detail", ""),
-                duration_ms=g.get(
-                    "duration_ms", 0.0,
-                ),
+                duration_ms=g.get("duration_ms", 0.0),
             )
             for g in d.get("gates", [])
         ]
