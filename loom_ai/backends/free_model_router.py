@@ -635,6 +635,7 @@ class FreeModelRouter:
             ep for ep in self._endpoints if ep.provider not in exclude_providers
         ]
         if not candidates:
+            logger.warning("No arbiter outside worker providers; reusing pool")
             candidates = self._endpoints[:]
         return max(
             candidates,
@@ -652,7 +653,6 @@ class FreeModelRouter:
         messages: list[ChatMessage],
         *,
         n_workers: int = 3,
-        tool_name: str = "design",
         temperature: float = 0.7,
         max_tokens: int | None = None,
     ) -> ChatResponse:
