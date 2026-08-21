@@ -41,7 +41,7 @@ jobs:
           python-version: ${{ matrix.python-version }}
           cache: pip
       - name: Install core dependencies
-        run: pip install -e ".[dev]"
+        run: pip install --only-binary :all: -c requirements-ci.txt -e ".[dev]"
       - name: Run core tests
         run: >-
           python -m pytest tests/ -x -q
@@ -70,7 +70,7 @@ jobs:
           python-version: ${{ matrix.python-version }}
           cache: pip
       - name: Install dependencies
-        run: pip install -e ".[dev,postgresql]"
+        run: pip install --only-binary :all: -c requirements-ci.txt -e ".[dev,postgresql]"
       - name: Run postgresql tests
         run: python -m pytest tests/ -x -q -m postgresql
 
@@ -90,7 +90,7 @@ jobs:
           python-version: ${{ matrix.python-version }}
           cache: pip
       - name: Install dependencies
-        run: pip install -e ".[dev,redis]"
+        run: pip install --only-binary :all: -c requirements-ci.txt -e ".[dev,redis]"
       - name: Run redis tests
         run: python -m pytest tests/ -x -q -m redis
 
@@ -110,7 +110,7 @@ jobs:
           python-version: ${{ matrix.python-version }}
           cache: pip
       - name: Install dependencies
-        run: pip install -e ".[dev,orientdb]"
+        run: pip install --only-binary :all: -c requirements-ci.txt -e ".[dev,orientdb]"
       - name: Run orientdb tests
         run: python -m pytest tests/ -x -q -m orientdb
 
@@ -130,7 +130,7 @@ jobs:
           python-version: ${{ matrix.python-version }}
           cache: pip
       - name: Install dependencies
-        run: pip install -e ".[dev,openai]"
+        run: pip install --only-binary :all: -c requirements-ci.txt -e ".[dev,openai]"
       - name: Run openai tests
         run: python -m pytest tests/ -x -q -m openai
 
@@ -150,7 +150,7 @@ jobs:
           python-version: ${{ matrix.python-version }}
           cache: pip
       - name: Install dependencies
-        run: pip install -e ".[dev,litellm]"
+        run: pip install --only-binary :all: -c requirements-ci.txt -e ".[dev,litellm]"
       - name: Run litellm tests
         run: python -m pytest tests/ -x -q -m litellm
 
@@ -170,6 +170,6 @@ jobs:
           python-version: ${{ matrix.python-version }}
           cache: pip
       - name: Install dependencies
-        run: pip install -e ".[dev,server]"
+        run: pip install --only-binary :all: -c requirements-ci.txt -e ".[dev,server]"
       - name: Run server tests
         run: python -m pytest tests/ -x -q -m server
