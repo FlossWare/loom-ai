@@ -40,7 +40,7 @@ def validate_workspace(workspace_path: str) -> Path:
     if not (resolved / ".git").is_dir():
         raise ValueError(f"Workspace is not a git repository: {workspace_path}")
     if _ALLOWED_WORKSPACES and not any(
-        str(resolved).startswith(a) for a in _ALLOWED_WORKSPACES
+        resolved.is_relative_to(Path(a)) for a in _ALLOWED_WORKSPACES
     ):
         raise ValueError(f"Workspace not in allowlist: {workspace_path}")
     return resolved
