@@ -106,7 +106,8 @@ class LoomConfig:
             LOOM_EMBEDDING      noop | openai | litellm       (default: noop)
             LOOM_SEARCH         memory | postgresql           (default: memory)
             LOOM_GRAPH          disabled | memory | orientdb  (default: disabled)
-            LOOM_LLM_BASE_URL   Base URL for OpenAI-compatible endpoint
+            LOOM_LLM_PROVIDER   free | openai-compatible        (default: openai-compatible)
+            LOOM_LLM_BASE_URL   Base URL (required when provider=openai-compatible)
             LOOM_LLM_API_KEY    Optional bearer token for the LLM endpoint
             LOOM_LLM_MODEL      Default model id for the LLM backend
             LOOM_SECRETS_FILE   Path to .env file (when LOOM_SECRETS=dotenv)
@@ -164,7 +165,7 @@ class LoomConfig:
             )
             built.append(("graph", graph))
 
-            llm = cls._build_llm()
+            llm = await cls._build_llm()
             if llm is not None and (
                 os.environ.get("LOOM_CAPTURE_LLM") == "1"
             ):
@@ -382,7 +383,18 @@ class LoomConfig:
         )
 
     @staticmethod
-    def _build_llm() -> LLMBackend | None:
+    async def _build_llm() -> LLMBackend | None:
+        provider = os.environ.get("LOOM_LLM_PROVIDER", "openai-compatible")
+
+        if provider == "free":
+            from loom_ai.backends.free_model_router import FreeModelRouter
+
+            router = FreeModelRouter(
+                pg_dsn=os.environ.get("LOOM_PG_DSN", ""),
+            )
+            await router.initialize()
+            return router
+
         base_url = os.environ.get("LOOM_LLM_BASE_URL")
         if not base_url:
             return None
@@ -393,7 +405,7 @@ class LoomConfig:
             base_url=base_url,
             api_key=os.environ.get("LOOM_LLM_API_KEY", ""),
             default_model=os.environ.get("LOOM_LLM_MODEL", "gpt-4o-mini"),
-            provider_name=os.environ.get("LOOM_LLM_PROVIDER", "openai-compatible"),
+            provider_name=provider,
         )
 
     @staticmethod
