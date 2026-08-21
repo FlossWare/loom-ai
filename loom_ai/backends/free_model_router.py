@@ -554,7 +554,9 @@ class FreeModelRouter:
                 return [
                     m["name"].removeprefix("models/")
                     for m in body.get("models", [])
-                    if "generateContent" in str(m.get("supportedGenerationMethods", []))
+                    if "generateContent" in str(
+                        m.get("supportedGenerationMethods", [])
+                    )
                 ]
 
         elif provider == "cohere":
@@ -666,32 +668,25 @@ class FreeModelRouter:
         workers = self._select_diverse_workers(
             n=n_workers,
         )
-        worker_providers = {
-            ep.provider for ep in workers
-        }
+        worker_providers = {ep.provider for ep in workers}
         arbiter_ep = self._select_arbiter(
             exclude_providers=worker_providers,
         )
-        degraded = (
-            arbiter_ep.provider in worker_providers
-        )
+        degraded = arbiter_ep.provider in worker_providers
         if degraded:
             logger.warning(
-                "Degraded consensus: arbiter shares"
-                " provider with workers",
+                "Degraded consensus: arbiter shares provider with workers",
             )
 
-        user_prompt = "\n".join(
-            m.content
-            for m in messages
-            if m.role == "user"
-        )
+        user_prompt = "\n".join(m.content for m in messages if m.role == "user")
         worker_msgs_raw = build_worker_messages(
-            "design", user_prompt,
+            "design",
+            user_prompt,
         )
         worker_msgs = [
             ChatMessage(
-                role=m["role"], content=m["content"],
+                role=m["role"],
+                content=m["content"],
             )
             for m in worker_msgs_raw
         ]
@@ -708,12 +703,16 @@ class FreeModelRouter:
                     max_tokens,
                 )
                 self._record(
-                    ep, True, time.monotonic() - t0,
+                    ep,
+                    True,
+                    time.monotonic() - t0,
                 )
                 return resp
             except Exception as exc:
                 self._record(
-                    ep, False, time.monotonic() - t0,
+                    ep,
+                    False,
+                    time.monotonic() - t0,
                 )
                 logger.debug(
                     "Worker %s/%s failed: %s",
@@ -726,9 +725,7 @@ class FreeModelRouter:
         results = await asyncio.gather(
             *[_call_worker(ep) for ep in workers],
         )
-        responses = [
-            r for r in results if r is not None
-        ]
+        responses = [r for r in results if r is not None]
 
         if not responses:
             raise RuntimeError(
@@ -743,11 +740,13 @@ class FreeModelRouter:
             for r in responses
         ]
         arbiter_msgs_raw = build_arbiter_messages(
-            user_prompt, worker_dicts,
+            user_prompt,
+            worker_dicts,
         )
         arbiter_msgs = [
             ChatMessage(
-                role=m["role"], content=m["content"],
+                role=m["role"],
+                content=m["content"],
             )
             for m in arbiter_msgs_raw
         ]
@@ -772,8 +771,7 @@ class FreeModelRouter:
                 time.monotonic() - t0,
             )
             logger.warning(
-                "Arbiter failed (%s); using best"
-                " worker response",
+                "Arbiter failed (%s); using best worker response",
                 exc,
             )
             return responses[0]
