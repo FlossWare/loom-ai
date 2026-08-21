@@ -19,7 +19,7 @@ on:
     - cron: '15 2 * * 1'
 
 concurrency:
-  group: ${{ github.workflow }}-${{ github.ref }}
+  group: ${{ github.workflow }}-${{ github.ref }}-${{ matrix.python-version || 'single' }}
   cancel-in-progress: true
 
 permissions:
@@ -51,22 +51,34 @@ jobs:
       - name: Lint with ruff
         id: ruff
         run: |
+          set +e
           ruff check loom_ai/ tests/ 2>&1 | tee ruff-output.txt
-          echo "exit_code=${PIPESTATUS[0]}" >> $GITHUB_OUTPUT
-          ERRORS=$(grep -c "^loom_ai\|^tests" ruff-output.txt 2>/dev/null || true)
-          echo "error_count=${ERRORS:-0}" >> $GITHUB_OUTPUT
+          status=${PIPESTATUS[0]}
+          set -e
+          echo "exit_code=$status" >> "$GITHUB_OUTPUT"
+          ERRORS=$(grep -Ec '^[^[:space:]]+:[0-9]+:[0-9]+:' ruff-output.txt || true)
+          echo "error_count=${ERRORS:-0}" >> "$GITHUB_OUTPUT"
+          exit "$status"
 
       - name: Format check with ruff
         id: format
         run: |
+          set +e
           ruff format --check loom_ai/ tests/ 2>&1 | tee format-output.txt
-          echo "exit_code=${PIPESTATUS[0]}" >> $GITHUB_OUTPUT
+          status=${PIPESTATUS[0]}
+          set -e
+          echo "exit_code=$status" >> "$GITHUB_OUTPUT"
+          exit "$status"
 
       - name: Run tests with coverage
         id: tests
         run: |
+          set +e
           python -m pytest tests/ -v --tb=short 2>&1 | tee test-output.txt
-          echo "exit_code=${PIPESTATUS[0]}" >> $GITHUB_OUTPUT
+          status=${PIPESTATUS[0]}
+          set -e
+          echo "exit_code=$status" >> "$GITHUB_OUTPUT"
+          exit "$status"
 
       - name: Verify imports
         id: imports
@@ -134,10 +146,10 @@ jobs:
           if [ "${{ steps.ruff.outputs.exit_code }}" != "0" ]; then
             echo "  - ruff check failed"
           fi
-          if [ "${{ steps.format.outputs.exit_code }}" != "0" ]; then
+          if [ "${{ steps.format.outputs.exit_code }}" != '0' ]; then
             echo "  - ruff format --check failed"
           fi
-          if [ "${{ steps.tests.outputs.exit_code }}" != "0" ]; then
+          if [ "${{ steps.tests.outputs.exit_code }}" != '0' ]; then
             echo "  - pytest failed"
           fi
           exit 1
