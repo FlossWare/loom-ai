@@ -1,0 +1,28 @@
+{
+    "$schema": "https://charm.land/crush.json",
+    "providers": {
+        "loom": {
+            "id": "loom",
+            "name": "loom-ai",
+            "type": "openai-compat",
+            "base_url": "http://localhost:8000/v1",
+            "api_key": "loom-ai",
+            "flat_rate": true,
+            "discover_models": true
+        }
+    },
+    "models": {
+        "default": {
+            "model": "auto",
+            "provider": "loom"
+        },
+        "large": {
+            "model": "auto",
+            "provider": "loom"
+        },
+        "small": {
+            "model": "auto",
+            "provider": "loom"
+        }
+    }
+}
