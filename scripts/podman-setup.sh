@@ -35,7 +35,7 @@ podman run -d \
     -e POSTGRES_DB="$PG_DATABASE" \
     -p "${PG_PORT}:5432" \
     -v loom-pgdata:/var/lib/postgresql/data:Z \
-    pgvector/pgvector:pg16
+    docker.io/pgvector/pgvector:pg16
 
 # Wait for PostgreSQL to be ready
 echo "Waiting for PostgreSQL..."
