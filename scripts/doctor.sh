@@ -13,6 +13,52 @@ bad() { printf 'FAIL  %-22s %s\n' "$1" "$2"; FAIL=$((FAIL + 1)); }
 warn() { printf 'WARN  %-22s %s\n' "$1" "$2"; WARN=$((WARN + 1)); }
 have() { command -v "$1" >/dev/null 2>&1; }
 
+# Read only simple KEY=VALUE assignments from .env. Do not source the file:
+# doctor is a diagnostic and must not execute arbitrary shell code from config.
+env_file_value() {
+  local key="$1" file="$2" value
+  [[ -f "$file" ]] || return 1
+  value="$(awk -v key="$key" '
+    $0 ~ "^[[:space:]]*" key "[[:space:]]*=" {
+      sub("^[[:space:]]*" key "[[:space:]]*=", "", $0)
+      print $0
+      exit
+    }
+  ' "$file")"
+  value="${value#"${value%%[![:space:]]*}"}"
+  value="${value%"${value##*[![:space:]]}"}"
+  if [[ "$value" == \"*\" && "$value" == *\" ]]; then
+    value="${value:1:${#value}-2}"
+  elif [[ "$value" == \'*\' && "$value" == *\' ]]; then
+    value="${value:1:${#value}-2}"
+  fi
+  printf '%s\n' "$value"
+}
+
+# Environment variables take precedence. If they are absent, read known values
+# from the repository .env without executing it.
+CONFIG_FILE="${LOOM_ENV_FILE:-.env}"
+config_or_env() {
+  local key="$1" current
+  current="${!key-}"
+  if [[ -n "$current" ]]; then
+    printf '%s\n' "$current"
+  elif [[ -f "$CONFIG_FILE" ]]; then
+    env_file_value "$key" "$CONFIG_FILE" || true
+  fi
+}
+
+LOOM_STORAGE_VALUE="$(config_or_env LOOM_STORAGE)"
+LOOM_QUEUE_VALUE="$(config_or_env LOOM_QUEUE)"
+LOOM_PROVIDER_VALUE="$(config_or_env LOOM_LLM_PROVIDER)"
+LOOM_BASE_URL_VALUE="$(config_or_env LOOM_LLM_BASE_URL)"
+LOOM_EMBED_VALUE="$(config_or_env LOOM_EMBEDDING)"
+LOOM_REQUIRE_GITHUB_VALUE="$(config_or_env LOOM_REQUIRE_GITHUB)"
+LOOM_PG_HOST_VALUE="$(config_or_env LOOM_PG_HOST)"
+LOOM_PG_PORT_VALUE="$(config_or_env LOOM_PG_PORT)"
+LOOM_REDIS_HOST_VALUE="$(config_or_env LOOM_REDIS_HOST)"
+LOOM_REDIS_PORT_VALUE="$(config_or_env LOOM_REDIS_PORT)"
+
 printf 'Loom Doctor\n===========\n\n'
 
 # OS
@@ -49,7 +95,7 @@ for cmd in git curl; do
 done
 
 # GitHub CLI is required only for GitHub-backed publication workflows.
-if [[ "${LOOM_REQUIRE_GITHUB:-0}" == "1" ]]; then
+if [[ "${LOOM_REQUIRE_GITHUB_VALUE:-0}" == "1" ]]; then
   if have gh; then
     if gh auth status >/dev/null 2>&1; then
       ok "GitHub CLI" "installed and authenticated"
@@ -75,10 +121,10 @@ else
 fi
 
 # PostgreSQL: only required when configured as the storage backend.
-STORAGE="${LOOM_STORAGE:-memory}"
+STORAGE="${LOOM_STORAGE_VALUE:-memory}"
 if [[ "$STORAGE" == "postgresql" ]]; then
-  PGHOST="${LOOM_PG_HOST:-localhost}"
-  PGPORT="${LOOM_PG_PORT:-5432}"
+  PGHOST="${LOOM_PG_HOST_VALUE:-localhost}"
+  PGPORT="${LOOM_PG_PORT_VALUE:-5432}"
   if have pg_isready; then
     if pg_isready -h "$PGHOST" -p "$PGPORT" >/dev/null 2>&1; then
       ok "PostgreSQL" "$PGHOST:$PGPORT accepting connections"
@@ -93,10 +139,10 @@ else
 fi
 
 # Redis: only required for the Redis queue backend.
-QUEUE="${LOOM_QUEUE:-memory}"
+QUEUE="${LOOM_QUEUE_VALUE:-memory}"
 if [[ "$QUEUE" == "redis" ]]; then
-  RHOST="${LOOM_REDIS_HOST:-localhost}"
-  RPORT="${LOOM_REDIS_PORT:-6379}"
+  RHOST="${LOOM_REDIS_HOST_VALUE:-localhost}"
+  RPORT="${LOOM_REDIS_PORT_VALUE:-6379}"
   if have redis-cli; then
     if redis-cli -h "$RHOST" -p "$RPORT" ping 2>/dev/null | grep -q '^PONG$'; then
       ok "Redis" "$RHOST:$RPORT responding"
@@ -111,8 +157,8 @@ else
 fi
 
 # LLM configuration. Do not print credentials.
-PROVIDER="${LOOM_LLM_PROVIDER:-openai-compatible}"
-BASE_URL="${LOOM_LLM_BASE_URL:-}"
+PROVIDER="${LOOM_PROVIDER_VALUE:-openai-compatible}"
+BASE_URL="${LOOM_BASE_URL_VALUE:-}"
 if [[ "$PROVIDER" == "free" ]]; then
   ok "LLM provider" "FreeModelRouter configured"
 elif [[ -n "$BASE_URL" ]]; then
@@ -126,7 +172,7 @@ else
 fi
 
 # Embedding backend. Noop is not acceptable for persistent dogfood.
-EMBED="${LOOM_EMBEDDING:-noop}"
+EMBED="${LOOM_EMBED_VALUE:-noop}"
 if [[ "$EMBED" == "noop" ]]; then
   bad "Embeddings" "noop embeddings are not valid for dogfood"
 elif [[ "$EMBED" == "openai" || "$EMBED" == "litellm" ]]; then
@@ -152,13 +198,10 @@ else
   bad "Workspace" "not inside a Git repository"
 fi
 
-# Environment/configuration visibility without exposing secrets.
-if [[ -n "${LOOM_ENV_FILE:-}" && -f "$LOOM_ENV_FILE" ]]; then
-  ok "Configuration" "$LOOM_ENV_FILE present"
-elif [[ -f .env ]]; then
-  ok "Configuration" ".env present"
+if [[ -f "$CONFIG_FILE" ]]; then
+  ok "Configuration" "$CONFIG_FILE present"
 else
-  warn "Configuration" "no .env file; environment variables may still be configured"
+  warn "Configuration" "no $CONFIG_FILE; environment variables may still be configured"
 fi
 
 printf '\nSummary\n-------\nPASS: %d  WARN: %d  FAIL: %d\n' "$PASS" "$WARN" "$FAIL"
