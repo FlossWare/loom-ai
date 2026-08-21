@@ -14,11 +14,13 @@ class TestRunPhase:
             "fetching",
             "planning",
             "executing",
+            "reviewing",
             "verifying",
             "persisting",
             "completed",
             "failed",
             "cancelled",
+            "needs_review",
             "published",
         }
         assert {p.value for p in RunPhase} == expected
