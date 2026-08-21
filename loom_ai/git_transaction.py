@@ -44,29 +44,22 @@ class GitTransaction:
         self._committed = False
         self._pushed = False
         self._pr_url: str = ""
+        self._verified = False
 
     async def begin(self) -> GitSnapshot:
         if self._snapshot is not None:
             raise RuntimeError("Transaction already started")
-
-        branch = await self._git(
-            "rev-parse",
-            "--abbrev-ref",
-            "HEAD",
-        )
+        branch = await self._git("rev-parse", "--abbrev-ref", "HEAD")
         head_sha = await self._git("rev-parse", "HEAD")
         status = await self._git("status", "--porcelain")
         is_dirty = bool(status.strip())
-
         tracked: set[str] = set()
         for line in status.splitlines():
             parts = line.strip().split(maxsplit=1)
             if len(parts) == 2:
                 tracked.add(parts[1])
-
         if is_dirty and not self._policy.allow_dirty:
             raise RuntimeError("Workspace is dirty and policy forbids it")
-
         self._snapshot = GitSnapshot(
             branch=branch,
             head_sha=head_sha,
@@ -81,6 +74,11 @@ class GitTransaction:
         self._branch = name
         return name
 
+    def mark_verified(self) -> None:
+        """Authorize publication after independent verification has passed."""
+        self._require_started()
+        self._verified = True
+
     async def stage_and_commit(
         self,
         files: list[str],
@@ -90,23 +88,15 @@ class GitTransaction:
         author_email: str,
     ) -> str:
         self._require_started()
-
         for f in files:
             await self._git("add", str(f))
-
         diff = await self._git("diff", "--cached", "--name-only")
         if not diff.strip():
-            head = await self._git("rev-parse", "HEAD")
-            return head
-
+            return await self._git("rev-parse", "HEAD")
         await self._git(
-            "-c",
-            f"user.name={author_name}",
-            "-c",
-            f"user.email={author_email}",
-            "commit",
-            "-m",
-            message,
+            "-c", f"user.name={author_name}",
+            "-c", f"user.email={author_email}",
+            "commit", "-m", message,
         )
         self._committed = True
         return await self._git("rev-parse", "HEAD")
@@ -114,20 +104,16 @@ class GitTransaction:
     async def push(self) -> None:
         if not self._committed:
             raise RuntimeError("Nothing to push")
+        if self._policy.require_verification and not self._verified:
+            raise RuntimeError("Verification is required before push")
         if self._pushed:
             return
-
         branch = self._branch or self._snapshot.branch  # type: ignore[union-attr]
-        retries = self._policy.max_push_retries
+        retries = max(1, self._policy.max_push_retries)
         last_err: Exception | None = None
         for _ in range(retries):
             try:
-                await self._git(
-                    "push",
-                    "--set-upstream",
-                    "origin",
-                    branch,
-                )
+                await self._git("push", "--set-upstream", "origin", branch)
                 self._pushed = True
                 return
             except RuntimeError as exc:
@@ -144,24 +130,14 @@ class GitTransaction:
     ) -> str:
         if not self._pushed:
             raise RuntimeError("Cannot create PR before push")
+        if self._policy.require_verification and not self._verified:
+            raise RuntimeError("Verification is required before PR creation")
         if self._pr_url:
             return self._pr_url
-
-        branch = (
-            self._branch or self._snapshot.branch  # type: ignore[union-attr]
-        )
+        branch = self._branch or self._snapshot.branch  # type: ignore[union-attr]
         url = await self._run_cmd(
-            "gh",
-            "pr",
-            "create",
-            "--title",
-            title,
-            "--body",
-            body,
-            "--base",
-            base,
-            "--head",
-            branch,
+            "gh", "pr", "create", "--title", title, "--body", body,
+            "--base", base, "--head", branch,
         )
         self._pr_url = url
         return url
@@ -171,18 +147,11 @@ class GitTransaction:
             raise RuntimeError("Cannot rollback after push")
         self._require_started()
         assert self._snapshot is not None
-
-        await self._git(
-            "checkout",
-            self._snapshot.branch,
-        )
-        await self._git(
-            "reset",
-            "--hard",
-            self._snapshot.head_sha,
-        )
+        await self._git("checkout", self._snapshot.branch)
+        await self._git("reset", "--hard", self._snapshot.head_sha)
         self._committed = False
         self._branch = ""
+        self._verified = False
 
     async def detect_external_changes(self) -> bool:
         self._require_started()
@@ -199,15 +168,13 @@ class GitTransaction:
                     "branch": snap.branch,
                     "head_sha": snap.head_sha,
                     "is_dirty": snap.is_dirty,
-                    "tracked_files": sorted(
-                        snap.tracked_files,
-                    ),
+                    "tracked_files": sorted(snap.tracked_files),
                 }
-                if snap
-                else None
+                if snap else None
             ),
             "branch": self._branch,
             "committed": self._committed,
+            "verified": self._verified,
             "pushed": self._pushed,
             "pr_url": self._pr_url,
         }
@@ -225,12 +192,11 @@ class GitTransaction:
                 branch=snap["branch"],
                 head_sha=snap["head_sha"],
                 is_dirty=snap["is_dirty"],
-                tracked_files=frozenset(
-                    snap["tracked_files"],
-                ),
+                tracked_files=frozenset(snap["tracked_files"]),
             )
         obj._branch = data.get("branch", "")
         obj._committed = data.get("committed", False)
+        obj._verified = data.get("verified", False)
         obj._pushed = data.get("pushed", False)
         obj._pr_url = data.get("pr_url", "")
         return obj
@@ -244,10 +210,8 @@ class GitTransaction:
 
     async def _run_cmd(self, *args: str) -> str:
         proc = await asyncio.create_subprocess_exec(
-            *args,
-            cwd=self._ws,
-            stdout=subprocess.PIPE,
-            stderr=subprocess.PIPE,
+            *args, cwd=self._ws,
+            stdout=subprocess.PIPE, stderr=subprocess.PIPE,
         )
         stdout, stderr = await proc.communicate()
         if proc.returncode != 0:
