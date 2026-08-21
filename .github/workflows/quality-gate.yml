@@ -50,7 +50,6 @@ jobs:
 
       - name: Lint with ruff
         id: ruff
-        continue-on-error: true
         run: |
           ruff check loom_ai/ tests/ 2>&1 | tee ruff-output.txt
           echo "exit_code=${PIPESTATUS[0]}" >> $GITHUB_OUTPUT
@@ -59,14 +58,12 @@ jobs:
 
       - name: Format check with ruff
         id: format
-        continue-on-error: true
         run: |
           ruff format --check loom_ai/ tests/ 2>&1 | tee format-output.txt
           echo "exit_code=${PIPESTATUS[0]}" >> $GITHUB_OUTPUT
 
       - name: Run tests with coverage
         id: tests
-        continue-on-error: true
         run: |
           python -m pytest tests/ -v --tb=short 2>&1 | tee test-output.txt
           echo "exit_code=${PIPESTATUS[0]}" >> $GITHUB_OUTPUT

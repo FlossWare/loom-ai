@@ -58,3 +58,17 @@ line-length = 88
 
 [tool.ruff.lint]
 select = ["E", "F", "I", "W"]
+
+[tool.coverage.run]
+source = ["loom_ai"]
+branch = true
+omit = ["*/tests/*", "*/__main__.py"]
+
+[tool.coverage.report]
+fail_under = 60
+show_missing = true
+exclude_lines = [
+    "pragma: no cover",
+    "if TYPE_CHECKING:",
+    "if __name__",
+]
