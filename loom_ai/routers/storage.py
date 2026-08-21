@@ -50,7 +50,13 @@ def _mount_storage_routes(app: FastAPI, config: LoomConfig, auth_deps: list) -> 
             "offset": offset,
         }
 
-    @router.get("/documents/{document_id}")
+    @router.get(
+        "/documents/{document_id}",
+        responses={
+            400: {"description": "Invalid document ID format"},
+            404: {"description": "Document not found"},
+        },
+    )
     async def get_document(document_id: str):
         from fastapi import HTTPException
 
