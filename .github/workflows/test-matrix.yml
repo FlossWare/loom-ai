@@ -1,3 +1,4 @@
+# Test matrix — binary-only constrained installs (Sonar S8541/S8544)
 name: Test Matrix
 
 on:
