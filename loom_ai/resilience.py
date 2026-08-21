@@ -14,6 +14,8 @@ from dataclasses import dataclass, field
 from enum import Enum
 from typing import Any
 
+_SECURE_RNG = random.SystemRandom()
+
 
 class FailureMode(str, Enum):
     """Categories of failure to inject."""
@@ -45,13 +47,11 @@ class InjectedFailure(Exception):
     """Raised when an injection fires."""
 
     def __init__(
-        self, injection: FailureInjection,
+        self,
+        injection: FailureInjection,
     ) -> None:
         self.injection = injection
-        super().__init__(
-            f"Injected {injection.mode.value}"
-            f" at {injection.target}"
-        )
+        super().__init__(f"Injected {injection.mode.value} at {injection.target}")
 
 
 class FailureInjector:
@@ -62,7 +62,8 @@ class FailureInjector:
         self._triggered: list[dict[str, Any]] = []
 
     def add(
-        self, injection: FailureInjection,
+        self,
+        injection: FailureInjection,
     ) -> None:
         """Register a failure injection."""
         self._injections.append(injection)
@@ -73,19 +74,19 @@ class FailureInjector:
         self._triggered.clear()
 
     def should_fail(
-        self, target: str,
+        self,
+        target: str,
     ) -> FailureInjection | None:
         """Check if *target* should fail now."""
         for inj in self._injections:
-            if (
-                inj.target == target
-                and random.random() < inj.probability
-            ):
-                self._triggered.append({
-                    "mode": inj.mode.value,
-                    "target": inj.target,
-                    "timestamp": time.monotonic(),
-                })
+            if inj.target == target and _SECURE_RNG.random() < inj.probability:
+                self._triggered.append(
+                    {
+                        "mode": inj.mode.value,
+                        "target": inj.target,
+                        "timestamp": time.monotonic(),
+                    }
+                )
                 return inj
         return None
 
@@ -138,9 +139,7 @@ class RecoveryPolicy:
             "retries": retries,
             "idempotent": idempotent,
             "preserves_partial": preserves_partial,
-            "requires_reconciliation": (
-                requires_reconciliation
-            ),
+            "requires_reconciliation": (requires_reconciliation),
         }
 
     def get(self, stage: str) -> dict[str, Any]:
@@ -148,7 +147,9 @@ class RecoveryPolicy:
         return dict(self._policies.get(stage, {}))
 
     def should_retry(
-        self, stage: str, attempt: int,
+        self,
+        stage: str,
+        attempt: int,
     ) -> bool:
         """True if *attempt* is within retry budget."""
         policy = self._policies.get(stage, {})
@@ -164,10 +165,14 @@ def default_recovery_policies() -> RecoveryPolicy:
     """Standard policies for demo-agent stages."""
     rp = RecoveryPolicy()
     rp.register(
-        "fetch", retries=2, idempotent=True,
+        "fetch",
+        retries=2,
+        idempotent=True,
     )
     rp.register(
-        "plan", retries=1, idempotent=True,
+        "plan",
+        retries=1,
+        idempotent=True,
     )
     rp.register(
         "implement",
@@ -175,16 +180,24 @@ def default_recovery_policies() -> RecoveryPolicy:
         preserves_partial=True,
     )
     rp.register(
-        "review", retries=1, idempotent=True,
+        "review",
+        retries=1,
+        idempotent=True,
     )
     rp.register(
-        "lint", retries=1, idempotent=True,
+        "lint",
+        retries=1,
+        idempotent=True,
     )
     rp.register(
-        "test", retries=1, idempotent=True,
+        "test",
+        retries=1,
+        idempotent=True,
     )
     rp.register(
-        "persist", retries=2, idempotent=True,
+        "persist",
+        retries=2,
+        idempotent=True,
     )
     rp.register(
         "git_push",
