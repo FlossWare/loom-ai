@@ -16,7 +16,6 @@ import json
 import logging
 import os
 from dataclasses import dataclass, field
-from pathlib import Path
 from typing import Any, Protocol, runtime_checkable
 
 from loom_ai.backends.code_actions import apply_diff, run_linter, run_tests
@@ -188,7 +187,9 @@ class DemoAgent:
             "file, search, replace. Search must be an exact unique substring of "
             "the current file. Output a JSON array."
         )
-        raw = await self._chat(f"## Plan\n{plan}\n\n## Context\n{context}", system=system)
+        raw = await self._chat(
+            f"## Plan\n{plan}\n\n## Context\n{context}", system=system
+        )
         try:
             start, end = raw.find("["), raw.rfind("]")
             parsed = json.loads(
@@ -488,10 +489,14 @@ class DemoAgent:
 async def _main() -> None:
     import argparse
 
-    parser = argparse.ArgumentParser(description="Loom demo agent — resolve a GitHub issue")
+    parser = argparse.ArgumentParser(
+        description="Loom demo agent — resolve a GitHub issue"
+    )
     parser.add_argument("--issue", type=int, help="GitHub issue number")
     parser.add_argument("--workspace", default=os.getcwd(), help="Repo path")
-    parser.add_argument("--auto-pr", action="store_true", help="Create and publish a PR")
+    parser.add_argument(
+        "--auto-pr", action="store_true", help="Create and publish a PR"
+    )
     args = parser.parse_args()
     agent = await DemoAgent.create(workspace=args.workspace)
     result = await agent.run(issue_number=args.issue, auto_pr=args.auto_pr)
