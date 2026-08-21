@@ -16,8 +16,8 @@ COPY pyproject.toml uv.lock README.md ./
 COPY loom_ai/ loom_ai/
 
 RUN pip install --no-cache-dir --only-binary :all: "uv==0.12.5" \
-    && uv pip install --locked --only-binary :all: \
-       --prefix=/install ".[server,postgresql]"  # NOSONAR — deps locked via uv.lock
+    && uv export --locked --format requirements-txt --extra server --extra postgresql -o /tmp/requirements.txt \
+    && pip install --no-cache-dir --only-binary :all: -r /tmp/requirements.txt --prefix=/install
 
 # ── server (default) ────────────────────────────────────────────────
 FROM python:3.12-slim AS server
@@ -51,7 +51,9 @@ COPY pyproject.toml uv.lock README.md ./
 COPY loom_ai/ loom_ai/
 
 RUN pip install --no-cache-dir --only-binary :all: "uv==0.12.5" \
-    && uv pip install --locked --only-binary :all: "." && rm -rf /build  # NOSONAR — deps locked via uv.lock
+    && uv export --locked --format requirements-txt -o /tmp/requirements.txt \
+    && pip install --no-cache-dir --only-binary :all: -r /tmp/requirements.txt \
+    && rm -rf /build
 
 USER loom
 WORKDIR /home/loom
