@@ -22,6 +22,10 @@ from typing import Any
 from loom_ai.backends.memory_mcp import MemoryToolProvider
 from loom_ai.models import ToolDefinition
 
+_ALLOWED_WORKSPACES = [
+    p for p in os.environ.get("LOOM_ALLOWED_WORKSPACES", "").split(":") if p
+]
+
 
 def validate_workspace(workspace_path: str) -> Path:
     """Validate workspace: exists, is directory, is git repo, not a symlink."""
@@ -35,6 +39,10 @@ def validate_workspace(workspace_path: str) -> Path:
         raise ValueError(f"Workspace is not a directory: {workspace_path}")
     if not (resolved / ".git").is_dir():
         raise ValueError(f"Workspace is not a git repository: {workspace_path}")
+    if _ALLOWED_WORKSPACES and not any(
+        str(resolved).startswith(a) for a in _ALLOWED_WORKSPACES
+    ):
+        raise ValueError(f"Workspace not in allowlist: {workspace_path}")
     return resolved
 
 

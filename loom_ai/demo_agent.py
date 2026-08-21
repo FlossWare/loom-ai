@@ -101,10 +101,12 @@ class DemoAgent:
         git_name: str | None = None,
         git_email: str | None = None,
         on_progress: ProgressCallback | None = None,
+        allow_push: bool = False,
     ) -> None:
         self._llm = llm
         self._workspace = workspace
         self._session = session_manager or SessionManager()
+        self._allow_push = allow_push
         self._git_name = git_name or os.environ.get("LOOM_GIT_NAME", "loom-ai")
         self._git_email = git_email or os.environ.get(
             "LOOM_GIT_EMAIL", "loom-ai@users.noreply.github.com"
@@ -269,6 +271,8 @@ class DemoAgent:
         changed_files: list[str],
     ) -> dict:
         """Create a branch, commit changes, push, and open a PR."""
+        if not self._allow_push:
+            raise RuntimeError("Push/PR disabled; set allow_push=True to enable")
         branch = f"fix/issue-{issue_number}"
         existing = await _git("branch", "--list", branch, cwd=self._workspace)
         if existing.strip():

@@ -2,6 +2,10 @@
 
 The first Loom demo is complete when all of the following are true.
 
+> **Policy:** Checkboxes are updated ONLY after operator-verified runs,
+> not aspirational completion.  An item is checked when a human has
+> witnessed it working end-to-end and recorded the evidence.
+
 ## Agent
 
 - [ ] A user can give Loom a concrete repository task.

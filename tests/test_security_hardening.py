@@ -126,7 +126,7 @@ class TestBranchCollision:
     async def test_uses_suffix_on_collision(self, tmp_path):
         _git_init(tmp_path)
         llm = MagicMock()
-        agent = DemoAgent(llm=llm, workspace=str(tmp_path))
+        agent = DemoAgent(llm=llm, workspace=str(tmp_path), allow_push=True)
 
         git_calls = []
 
@@ -151,3 +151,11 @@ class TestBranchCollision:
 
         checkout_calls = [c for c in git_calls if c[0] == "checkout"]
         assert any("fix/issue-42-2" in c for c in checkout_calls)
+
+    async def test_push_blocked_without_allow_push(self, tmp_path):
+        _git_init(tmp_path)
+        llm = MagicMock()
+        agent = DemoAgent(llm=llm, workspace=str(tmp_path))
+
+        with pytest.raises(RuntimeError, match="Push/PR disabled"):
+            await agent._commit_and_pr(42, ["test.py"])

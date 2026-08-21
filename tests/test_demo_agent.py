@@ -235,7 +235,7 @@ class TestAgentResult:
 
 class TestCommitAndPr:
     async def test_creates_branch_and_returns_pr_url(self, tmp_path):
-        agent = DemoAgent(llm=_make_llm(), workspace=str(tmp_path))
+        agent = DemoAgent(llm=_make_llm(), workspace=str(tmp_path), allow_push=True)
 
         with patch("loom_ai.demo_agent._git", new_callable=AsyncMock) as mock_git:
             mock_git.return_value = ""

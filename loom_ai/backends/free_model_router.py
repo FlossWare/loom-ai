@@ -30,8 +30,8 @@ import urllib.request
 from dataclasses import dataclass
 from typing import Any, AsyncIterator
 
+from loom_ai.consensus import ConsensusEngine
 from loom_ai.models import ChatMessage, ChatResponse
-from loom_ai.prompts import build_arbiter_messages
 
 logger = logging.getLogger(__name__)
 
@@ -659,58 +659,26 @@ class FreeModelRouter:
         if not self._initialized:
             await self.initialize()
         workers = self._select_diverse_workers(n=n_workers)
-
-        async def _run_worker(
-            ep: _ModelEndpoint,
-        ) -> tuple[_ModelEndpoint, ChatResponse | None]:
-            t0 = time.monotonic()
-            try:
-                resp = await self._call(ep, messages, temperature, max_tokens)
-                self._record(ep, True, time.monotonic() - t0)
-                return ep, resp
-            except Exception as exc:
-                self._record(ep, False, time.monotonic() - t0)
-                logger.debug("Worker %s/%s failed: %s", ep.provider, ep.model_id, exc)
-                return ep, None
-
-        results = await asyncio.gather(*(_run_worker(ep) for ep in workers))
-
-        worker_dicts: list[dict[str, str]] = []
-        successful: list[ChatResponse] = []
-        for ep, resp in results:
-            if resp is not None and resp.content:
-                successful.append(resp)
-                worker_dicts.append(
-                    {"model": f"{ep.provider}/{ep.model_id}", "response": resp.content}
-                )
-
-        if not successful:
-            raise RuntimeError("All worker endpoints failed in consensus")
-
-        user_prompt = "\n".join(m.content for m in messages if m.role == "user")
-        arbiter_msg_dicts = build_arbiter_messages(user_prompt, worker_dicts)
-        arbiter_msgs = [
-            ChatMessage(role=d["role"], content=d["content"]) for d in arbiter_msg_dicts
-        ]
-
-        worker_providers = {ep.provider for ep, _ in results}
+        worker_model_ids = [ep.model_id for ep in workers]
+        worker_providers = {ep.provider for ep in workers}
         arbiter_ep = self._select_arbiter(exclude_providers=worker_providers)
-        t0 = time.monotonic()
-        try:
-            arbiter_resp = await self._call(
-                arbiter_ep, arbiter_msgs, temperature, max_tokens
-            )
-            self._record(arbiter_ep, True, time.monotonic() - t0)
-            return arbiter_resp
-        except Exception as exc:
-            self._record(arbiter_ep, False, time.monotonic() - t0)
+
+        engine = ConsensusEngine(backend=self)
+        user_prompt = "\n".join(m.content for m in messages if m.role == "user")
+
+        result = await engine.synthesize(
+            prompt=user_prompt,
+            models=worker_model_ids,
+            arbiter_model=arbiter_ep.model_id,
+            temperature=temperature,
+        )
+        if result.arbiter_error and result.worker_responses:
             logger.warning(
-                "Arbiter %s/%s failed: %s",
-                arbiter_ep.provider,
-                arbiter_ep.model_id,
-                exc,
+                "Arbiter failed (%s); using best worker response",
+                result.arbiter_error,
             )
-            return successful[0]
+            return result.worker_responses[0]
+        return result.synthesis
 
     async def chat(
         self,
