@@ -29,7 +29,18 @@ def _git_init(path, *, add_all=False):
     if add_all:
         subprocess.run(["git", "add", ".", "-A"], cwd=path, check=True)
     subprocess.run(
-        ["git", "-c", "user.name=t", "-c", "user.email=t@t", "commit", "--allow-empty", "-m", "init", "-q"],
+        [
+            "git",
+            "-c",
+            "user.name=t",
+            "-c",
+            "user.email=t@t",
+            "commit",
+            "--allow-empty",
+            "-m",
+            "init",
+            "-q",
+        ],
         cwd=path,
         check=True,
     )
@@ -45,7 +56,9 @@ class TestReview:
         assert issues
 
     async def test_majority(self, tmp_path):
-        agent = DemoAgent(_make_llm(["APPROVE", "REJECT: bug", "APPROVE"]), str(tmp_path))
+        agent = DemoAgent(
+            _make_llm(["APPROVE", "REJECT: bug", "APPROVE"]), str(tmp_path)
+        )
         result = await agent._review_changes("diff", "context")
         assert result["approved"]
         assert result["votes"] == 2
@@ -87,17 +100,16 @@ class TestRun:
         _git_init(tmp_path, add_all=True)
         changes = '[{"file":"sample.py","search":"x = 1","replace":"x = 2"}]'
         # plan + 3x (implement + 3 review rounds) so re-attempts after reset still get diffs
-        llm = _make_llm(
-            ["plan"]
-            + [changes, "REJECT: bug", "REJECT", "REJECT"] * 3
-        )
+        llm = _make_llm(["plan"] + [changes, "REJECT: bug", "REJECT", "REJECT"] * 3)
         result = await DemoAgent(llm, str(tmp_path)).run(issue_text="change x")
         assert not result.success
         assert "Review not approved" in result.error
 
 
 class TestPublicationTransaction:
-    async def test_auto_pr_requires_clean_workspace_and_uses_transaction(self, tmp_path):
+    async def test_auto_pr_requires_clean_workspace_and_uses_transaction(
+        self, tmp_path
+    ):
         _git_init(tmp_path)
         agent = DemoAgent(_make_llm(), str(tmp_path), allow_push=True)
         tx = MagicMock()
@@ -115,9 +127,13 @@ class TestPublicationTransaction:
         tx = MagicMock()
         tx.stage_and_commit = AsyncMock()
         tx.push = AsyncMock()
-        tx.create_pr = AsyncMock(return_value="https://github.com/FlossWare/loom-ai/pull/1")
+        tx.create_pr = AsyncMock(
+            return_value="https://github.com/FlossWare/loom-ai/pull/1"
+        )
         agent._transaction = tx
-        result = AgentResult(issue=42, changes=[{"file": "x.py", "result": {"applied": True}}])
+        result = AgentResult(
+            issue=42, changes=[{"file": "x.py", "result": {"applied": True}}]
+        )
         with (
             patch("loom_ai.demo_agent.run_linter", return_value={"exit_code": 0}),
             patch("loom_ai.demo_agent.run_tests", return_value={"exit_code": 0}),
@@ -136,7 +152,9 @@ class TestPublicationTransaction:
         tx.stage_and_commit = AsyncMock()
         tx.push = AsyncMock()
         agent._transaction = tx
-        result = AgentResult(issue=42, changes=[{"file": "x.py", "result": {"applied": True}}])
+        result = AgentResult(
+            issue=42, changes=[{"file": "x.py", "result": {"applied": True}}]
+        )
         with (
             patch("loom_ai.demo_agent.run_linter", return_value={"exit_code": 1}),
             patch("loom_ai.demo_agent.run_tests", return_value={"exit_code": 0}),
