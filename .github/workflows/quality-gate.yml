@@ -49,11 +49,10 @@ jobs:
 
       - name: Lint with ruff
         id: ruff
+        continue-on-error: true
         run: |
-          set +e
           ruff check loom_ai/ tests/ 2>&1 | tee ruff-output.txt
           status=${PIPESTATUS[0]}
-          set -e
           echo "exit_code=$status" >> "$GITHUB_OUTPUT"
           ERRORS=$(grep -Ec '^[^[:space:]]+:[0-9]+:[0-9]+:' ruff-output.txt || true)
           echo "error_count=${ERRORS:-0}" >> "$GITHUB_OUTPUT"
@@ -61,26 +60,23 @@ jobs:
 
       - name: Format check with ruff
         id: format
+        continue-on-error: true
         run: |
-          set +e
           ruff format --check loom_ai/ tests/ 2>&1 | tee format-output.txt
           status=${PIPESTATUS[0]}
-          set -e
           echo "exit_code=$status" >> "$GITHUB_OUTPUT"
           exit "$status"
 
       - name: Run tests with coverage
         id: tests
+        continue-on-error: true
         run: |
-          set +e
           python -m pytest tests/ -v --tb=short 2>&1 | tee test-output.txt
           status=${PIPESTATUS[0]}
-          set -e
           echo "exit_code=$status" >> "$GITHUB_OUTPUT"
           exit "$status"
 
       - name: Verify imports
-        id: imports
         run: |
           python -c "
           import asyncio
@@ -136,19 +132,29 @@ jobs:
             });
 
       - name: Fail if quality gates not met
-        if: |
-          steps.ruff.outputs.exit_code != '0' ||
-          steps.format.outputs.exit_code != '0' ||
-          steps.tests.outputs.exit_code != '0'
+        if: always()
         run: |
-          echo "Quality gates failed!"
+          echo "Quality gate results:"
           if [ "${{ steps.ruff.outputs.exit_code }}" != '0' ]; then
             echo "  - ruff check failed"
+          else
+            echo "  - ruff check passed"
           fi
           if [ "${{ steps.format.outputs.exit_code }}" != '0' ]; then
             echo "  - ruff format --check failed"
+          else
+            echo "  - ruff format --check passed"
           fi
           if [ "${{ steps.tests.outputs.exit_code }}" != '0' ]; then
             echo "  - pytest failed"
+          else
+            echo "  - pytest passed"
           fi
-          exit 1
+
+          if [ "${{ steps.ruff.outputs.exit_code }}" != '0' ] || \
+             [ "${{ steps.format.outputs.exit_code }}" != '0' ] || \
+             [ "${{ steps.tests.outputs.exit_code }}" != '0' ]; then
+            echo "Quality gates failed!"
+            exit 1
+          fi
+          echo "All quality gates passed!"
