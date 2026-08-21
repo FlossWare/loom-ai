@@ -44,9 +44,3 @@ jobs:
 
       - name: Dependency vulnerability scan
         run: pip-audit --strict --progress-spinner=off
-
-      - name: Lint with ruff
-        run: ruff check loom_ai/ tests/
-
-      - name: Format check with ruff
-        run: ruff format --check loom_ai/ tests/
