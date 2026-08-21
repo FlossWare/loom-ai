@@ -58,6 +58,80 @@ Terminate the Loom process/session completely (Ctrl-C or SIGTERM).
 
 Do not provide Session 2 with the Session 1 transcript.
 
+## Cold-Start Recovery
+
+When the Loom process dies (crash, Ctrl-C, OOM kill), Session 2 must recover
+state from persistence rather than in-memory data structures.
+
+### Persistence backend selection
+
+| Backend | Survives process death? | Notes |
+|---------|------------------------|-------|
+| **InMemoryPersistentMemory** | No -- ephemeral | Data lost on crash; only for quick demos |
+| **PostgreSQL** (`LOOM_STORAGE=postgresql`) | Yes | Recommended for any multi-session demo |
+
+### How SessionManager discovers prior sessions
+
+`SessionManager` queries the configured `StorageBackend` for documents
+matching the session namespace. On construction it loads all prior session
+metadata. When `LOOM_STORAGE=postgresql`, this survives process restarts
+because the rows live in the `sessions` table.
+
+### Verify session state after process death
+
+After killing the Session 1 process, verify that persistence survived
+before starting Session 2:
+
+```python
+python -c "
+import asyncio
+from loom_ai.config import LoomConfig
+from loom_ai.session_persistence import SessionManager
+
+async def check():
+    cfg = await LoomConfig.from_env()
+    sm = SessionManager(storage=cfg.storage)
+    sessions = await sm.list_sessions()
+    print(f'Recovered sessions: {len(sessions)}')
+    for s in sessions:
+        knowledge = await sm.get_knowledge(s)
+        print(f'  {s}: {len(knowledge)} knowledge items')
+        for k in knowledge:
+            print(f'    - {k.get(\"title\", \"untitled\")} (provenance: {k.get(\"provenance\", \"unknown\")})')
+
+asyncio.run(check())
+"
+```
+
+If `Recovered sessions: 0` with PostgreSQL, check `LOOM_PG_*` environment
+variables and database connectivity.
+
+### Verify knowledge has provenance
+
+Knowledge items should include provenance metadata indicating their origin
+(e.g. which session, which issue, which model generated the insight):
+
+```python
+python -c "
+import asyncio
+from loom_ai.config import LoomConfig
+from loom_ai.session_persistence import SessionManager
+
+async def verify_provenance():
+    cfg = await LoomConfig.from_env()
+    sm = SessionManager(storage=cfg.storage)
+    sessions = await sm.list_sessions()
+    for s in sessions:
+        knowledge = await sm.get_knowledge(s)
+        for k in knowledge:
+            has_provenance = 'provenance' in k or 'source' in k or 'session_id' in k
+            status = 'OK' if has_provenance else 'MISSING'
+            print(f'[{status}] {k.get(\"title\", \"untitled\")}')
+
+asyncio.run(verify_provenance())
+"
+```
+
 ## Session 2 -- Recover Knowledge and Continue
 
 Start a fresh Loom process/session for the same project:

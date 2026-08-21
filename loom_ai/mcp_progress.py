@@ -4,21 +4,22 @@ from __future__ import annotations
 
 import json
 import sys
-import threading
 
 
 class MCPProgressReporter:
     """Writes MCP ``notifications/progress`` JSON-RPC messages to stdout.
 
     Uses Content-Length framing matching the MCP stdio transport.
-    Thread-safe: multiple calls from background threads are serialized.
+    Thread-safe: shares ``_MCP_STDOUT_LOCK`` with the MCP server to
+    prevent interleaved JSON-RPC writes on stdout.
     """
 
     def __init__(self, token: str = "loom-resolve") -> None:
         self._token = token
-        self._lock = threading.Lock()
 
     def report(self, stage: str, message: str, progress_pct: float) -> None:
+        from loom_ai.mcp_server import _MCP_STDOUT_LOCK
+
         body = json.dumps(
             {
                 "jsonrpc": "2.0",
@@ -32,6 +33,6 @@ class MCPProgressReporter:
             }
         )
         encoded = body.encode("utf-8")
-        with self._lock:
+        with _MCP_STDOUT_LOCK:
             sys.stdout.write(f"Content-Length: {len(encoded)}\r\n\r\n{body}")
             sys.stdout.flush()

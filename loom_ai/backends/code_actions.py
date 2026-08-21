@@ -23,12 +23,34 @@ from loom_ai.backends.memory_mcp import MemoryToolProvider
 from loom_ai.models import ToolDefinition
 
 
+def validate_workspace(workspace_path: str) -> Path:
+    """Validate workspace: exists, is directory, is git repo, not a symlink."""
+    raw_path = Path(workspace_path)
+    if raw_path.is_symlink():
+        raise ValueError(f"Workspace must not be a symlink: {workspace_path}")
+    resolved = raw_path.resolve()
+    if not resolved.exists():
+        raise ValueError(f"Workspace does not exist: {workspace_path}")
+    if not resolved.is_dir():
+        raise ValueError(f"Workspace is not a directory: {workspace_path}")
+    if not (resolved / ".git").is_dir():
+        raise ValueError(f"Workspace is not a git repository: {workspace_path}")
+    return resolved
+
+
 def _resolve_safe(workspace: Path, relpath: str) -> Path:
-    """Resolve *relpath* under *workspace*, rejecting escapes."""
+    """Resolve *relpath* under *workspace*, rejecting escapes and symlink tricks."""
     resolved_ws = workspace.resolve()
     target = (resolved_ws / relpath).resolve()
     if not target.is_relative_to(resolved_ws):
         raise ValueError(f"Path escapes workspace: {relpath}")
+    current = resolved_ws
+    for part in Path(relpath).parts:
+        current = current / part
+        if current.is_symlink():
+            link_target = current.resolve()
+            if not link_target.is_relative_to(resolved_ws):
+                raise ValueError(f"Symlink component escapes workspace: {relpath}")
     return target
 
 

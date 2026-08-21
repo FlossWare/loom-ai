@@ -110,7 +110,7 @@ def _api_request(method: str, path: str, body: dict | None = None) -> dict:
         headers["Authorization"] = f"Bearer {_LOOM_KEY}"
     req = urllib.request.Request(url, data=data, headers=headers, method=method)
     try:
-        with urllib.request.urlopen(req, timeout=30) as resp:
+        with urllib.request.urlopen(req, timeout=30) as resp:  # noqa: S310  # NOSONAR — URL from LOOM_BASE_URL env var, not user input
             return json.loads(resp.read())
     except urllib.error.HTTPError as exc:
         body_text = exc.read(4096).decode(errors="replace")

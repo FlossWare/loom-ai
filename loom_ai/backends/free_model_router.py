@@ -196,7 +196,7 @@ def _http_request(
     last_status, last_body = 0, {"error": "no attempts"}
     for attempt in range(1 + retries):
         try:
-            with urllib.request.urlopen(req, timeout=timeout) as resp:
+            with urllib.request.urlopen(req, timeout=timeout) as resp:  # noqa: S310  # NOSONAR — URL from provider config, not user input
                 return resp.status, json.loads(resp.read())
         except urllib.error.HTTPError as exc:
             try:
@@ -437,7 +437,7 @@ class FreeModelRouter:
             import subprocess
 
             result = await asyncio.to_thread(
-                subprocess.run,
+                subprocess.run,  # NOSONAR — hardcoded psql command, no user input
                 [
                     "psql",
                     self._pg_dsn,

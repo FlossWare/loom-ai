@@ -7,6 +7,7 @@ from io import StringIO
 from unittest.mock import patch
 
 from loom_ai.mcp_server import (
+    _DISPATCH_TABLE,
     _TOOLS,
     _dispatch,
     _handle,
@@ -162,7 +163,6 @@ class TestAsyncResolve:
             _dispatch_resolve_issue_status,
         )
 
-        # Patch _dispatch_resolve_issue to avoid running the real agent
         with patch(
             "loom_ai.mcp_server._dispatch_resolve_issue",
             return_value={"success": True, "error": "", "plan": "", "pr_url": ""},
@@ -171,12 +171,10 @@ class TestAsyncResolve:
         assert "task_id" in result
         assert result["status"] == "queued"
 
-        # Verify status lookup works
         status = _dispatch_resolve_issue_status({"task_id": result["task_id"]})
         assert status["task_id"] == result["task_id"]
         assert status["status"] in ("queued", "running", "complete")
 
-        # Clean up
         import time
 
         time.sleep(0.5)
@@ -188,6 +186,114 @@ class TestAsyncResolve:
 
         result = _dispatch_resolve_issue_status({"task_id": "nonexistent"})
         assert "error" in result
+
+    def test_cancel_running_task(self):
+        from loom_ai.mcp_server import (
+            _ASYNC_LOCK,
+            _ASYNC_TASKS,
+            _AsyncTask,
+            _dispatch_resolve_issue_cancel,
+        )
+
+        task = _AsyncTask(
+            task_id="test-cancel",
+            status="running",
+            progress="Working...",
+            created_at=1000.0,
+        )
+        with _ASYNC_LOCK:
+            _ASYNC_TASKS["test-cancel"] = task
+        result = _dispatch_resolve_issue_cancel({"task_id": "test-cancel"})
+        assert result["status"] == "cancelled"
+        with _ASYNC_LOCK:
+            _ASYNC_TASKS.pop("test-cancel", None)
+
+    def test_cancel_unknown_task(self):
+        from loom_ai.mcp_server import _dispatch_resolve_issue_cancel
+
+        result = _dispatch_resolve_issue_cancel({"task_id": "no-such-task"})
+        assert "error" in result
+
+    def test_cancel_already_complete(self):
+        from loom_ai.mcp_server import (
+            _ASYNC_LOCK,
+            _ASYNC_TASKS,
+            _AsyncTask,
+            _dispatch_resolve_issue_cancel,
+        )
+
+        task = _AsyncTask(
+            task_id="test-done",
+            status="complete",
+            progress="Done.",
+            created_at=1000.0,
+        )
+        with _ASYNC_LOCK:
+            _ASYNC_TASKS["test-done"] = task
+        result = _dispatch_resolve_issue_cancel({"task_id": "test-done"})
+        assert result["message"] == "Task already finished"
+        with _ASYNC_LOCK:
+            _ASYNC_TASKS.pop("test-done", None)
+
+    def test_cleanup_removes_expired(self):
+        import time
+
+        from loom_ai.mcp_server import (
+            _ASYNC_LOCK,
+            _ASYNC_TASKS,
+            _TASK_TTL_SECONDS,
+            _AsyncTask,
+            _cleanup_tasks,
+        )
+
+        task = _AsyncTask(
+            task_id="old-task",
+            status="complete",
+            progress="Done.",
+            created_at=time.time() - _TASK_TTL_SECONDS - 10,
+        )
+        with _ASYNC_LOCK:
+            _ASYNC_TASKS["old-task"] = task
+        _cleanup_tasks()
+        with _ASYNC_LOCK:
+            assert "old-task" not in _ASYNC_TASKS
+
+    def test_async_stores_timeout_and_token(self):
+        from loom_ai.mcp_server import (
+            _ASYNC_LOCK,
+            _ASYNC_TASKS,
+            _dispatch_resolve_issue_async,
+        )
+
+        with patch(
+            "loom_ai.mcp_server._dispatch_resolve_issue",
+            return_value={"success": True, "error": "", "plan": "", "pr_url": ""},
+        ):
+            result = _dispatch_resolve_issue_async(
+                {
+                    "issue_number": 99,
+                    "timeout": 60,
+                    "progress_token": "tok-123",
+                }
+            )
+        tid = result["task_id"]
+        import time
+
+        time.sleep(0.1)
+        with _ASYNC_LOCK:
+            task = _ASYNC_TASKS.get(tid)
+            assert task is not None
+            assert task.timeout == 60.0
+            assert task.progress_token == "tok-123"
+            assert task.created_at > 0
+            _ASYNC_TASKS.pop(tid, None)
+
+    def test_cancel_tool_definition_exists(self):
+        names = [t["name"] for t in _TOOLS]
+        assert "loom_resolve_issue_cancel" in names
+
+    def test_cancel_dispatch_table_entry(self):
+        assert "loom_resolve_issue_cancel" in _DISPATCH_TABLE
 
 
 class TestMessageFraming:

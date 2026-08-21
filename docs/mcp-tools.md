@@ -32,12 +32,15 @@ python -m loom_ai.mcp_server
 | `loom_queue_status`  | Queue status                                    | `queue_name`          | -                             |
 | `loom_secret_list`   | List secret names                               | -                     | -                             |
 | `loom_secret_get`    | Get secret                                      | `name`, `reason`      | -                             |
-| `loom_graph_add_node`| Add graph node                                  | `label`               | `properties`                  |
-| `loom_graph_neighbors` | Get neighbors                                  | `node_id`             | `edge_label`                  |
+| `loom_graph_add_entity`| Add entity to knowledge graph                  | `label`, `entity_type` | `properties`                  |
+| `loom_graph_relationships` | Get entity relationships                    | `entity_id`           | `relation_type`               |
 | `loom_router_select` | Select model via Thompson Sampling              | `task_type`           | -                             |
 | `loom_router_stats`  | Router stats                                    | -                     | -                             |
 | `loom_health`        | Health check                                    | -                     | -                             |
 | `loom_resolve_issue` | Resolve GitHub issue end-to-end                 | `issue_number`        | `workspace`, `issue_text`     |
+| `loom_resolve_issue_async` | Start async issue resolution, returns task_id | `issue_number`   | `workspace`, `issue_text`, `timeout`, `progress_token` |
+| `loom_resolve_issue_status` | Poll status of async issue resolution       | `task_id`             | -                             |
+| `loom_resolve_issue_cancel` | Cancel a running async resolution task       | `task_id`             | -                             |
 
 ## loom_resolve_issue Detailed
 

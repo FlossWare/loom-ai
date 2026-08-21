@@ -108,7 +108,7 @@ class LoomClient:
 
         def _do() -> dict[str, Any]:
             try:
-                with urllib.request.urlopen(req, timeout=self._config.timeout) as resp:
+                with urllib.request.urlopen(req, timeout=self._config.timeout) as resp:  # noqa: S310  # NOSONAR — URL from constructor config, not user input
                     raw = resp.read()
                     if not raw:
                         return {}
@@ -202,7 +202,7 @@ class LoomClient:
 
         def _stream() -> None:
             try:
-                with urllib.request.urlopen(req, timeout=self._config.timeout) as resp:
+                with urllib.request.urlopen(req, timeout=self._config.timeout) as resp:  # noqa: S310  # NOSONAR — URL from constructor config, not user input
                     for raw_line in resp:
                         line = raw_line.decode(errors="replace").strip()
                         if line.startswith("data: "):

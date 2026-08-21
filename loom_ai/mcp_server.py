@@ -23,6 +23,7 @@ import logging
 import os
 import sys
 import threading
+import time
 import urllib.error
 import urllib.parse
 import urllib.request
@@ -40,10 +41,17 @@ class _AsyncTask:
     progress: str
     result: dict[str, Any] | None = None
     error: str = ""
+    created_at: float = 0.0
+    cancelled: bool = False
+    timeout: float = 300.0
+    progress_token: str = ""
 
 
 _ASYNC_TASKS: dict[str, _AsyncTask] = {}
 _ASYNC_LOCK = threading.Lock()
+_MAX_ASYNC_TASKS = 100
+_TASK_TTL_SECONDS = 3600
+_MCP_STDOUT_LOCK = threading.Lock()
 
 _SUPPORTED_VERSIONS = ["2024-11-05", "2025-03-26"]
 _LATEST_VERSION = _SUPPORTED_VERSIONS[-1]
@@ -274,6 +282,8 @@ _TOOLS: list[dict] = [
                 "issue_number": _int_prop("GitHub issue number"),
                 "workspace": _str_prop("Repo workspace path"),
                 "issue_text": _str_prop("Issue description text"),
+                "timeout": _int_prop("Max execution time in seconds", 300),
+                "progress_token": _str_prop("MCP progress token for notifications"),
             },
             "required": ["issue_number"],
         },
@@ -285,6 +295,17 @@ _TOOLS: list[dict] = [
             "type": "object",
             "properties": {
                 "task_id": _str_prop("Task ID from loom_resolve_issue_async"),
+            },
+            "required": ["task_id"],
+        },
+    },
+    {
+        "name": "loom_resolve_issue_cancel",
+        "description": "Cancel a running async issue resolution task",
+        "inputSchema": {
+            "type": "object",
+            "properties": {
+                "task_id": _str_prop("Task ID to cancel"),
             },
             "required": ["task_id"],
         },
@@ -312,7 +333,7 @@ def _api(method: str, path: str, body: dict | None = None) -> dict:
         method=method,
     )
     try:
-        with urllib.request.urlopen(req, timeout=60) as resp:
+        with urllib.request.urlopen(req, timeout=60) as resp:  # noqa: S310  # NOSONAR — URL from LOOM_BASE_URL env var, not user input
             return json.loads(resp.read())
     except urllib.error.HTTPError as exc:
         text = exc.read(4096).decode(errors="replace")
@@ -352,7 +373,7 @@ def _dispatch_secret_get(args: dict) -> dict:
         method="POST",
     )
     try:
-        with urllib.request.urlopen(req, timeout=30) as resp:
+        with urllib.request.urlopen(req, timeout=30) as resp:  # noqa: S310  # NOSONAR — URL from LOOM_BASE_URL env var, not user input
             return json.loads(resp.read())
     except urllib.error.HTTPError as exc:
         text = exc.read(4096).decode(errors="replace")
@@ -362,15 +383,17 @@ def _dispatch_secret_get(args: dict) -> dict:
 def _dispatch_resolve_issue(args: dict) -> dict:
     import asyncio as _asyncio
 
+    from loom_ai.backends.code_actions import validate_workspace
     from loom_ai.demo_agent import DemoAgent
 
     async def _run() -> dict:
-        workspace = args.get("workspace", os.getcwd())
-        agent = await DemoAgent.create(workspace=workspace)
+        workspace_path = args.get("workspace", os.getcwd())
+        workspace = validate_workspace(workspace_path)
+        agent = await DemoAgent.create(workspace=str(workspace))
         result = await agent.run(
             issue_number=args.get("issue_number"),
             issue_text=args.get("issue_text", ""),
-            auto_pr=True,
+            auto_pr=args.get("auto_pr", False),
         )
         return {
             "success": result.success,
@@ -390,30 +413,79 @@ def _dispatch_resolve_issue(args: dict) -> dict:
         }
 
 
+def _cleanup_tasks() -> None:
+    """Remove expired and excess completed tasks."""
+    now = time.time()
+    with _ASYNC_LOCK:
+        expired = [
+            k
+            for k, v in _ASYNC_TASKS.items()
+            if v.created_at > 0 and now - v.created_at > _TASK_TTL_SECONDS
+        ]
+        for k in expired:
+            del _ASYNC_TASKS[k]
+        if len(_ASYNC_TASKS) > _MAX_ASYNC_TASKS:
+            done = sorted(
+                [
+                    (k, v)
+                    for k, v in _ASYNC_TASKS.items()
+                    if v.status in ("complete", "failed", "cancelled", "timed_out")
+                ],
+                key=lambda x: x[1].created_at,
+            )
+            while len(_ASYNC_TASKS) > _MAX_ASYNC_TASKS and done:
+                del _ASYNC_TASKS[done.pop(0)[0]]
+
+
 def _run_resolve_thread(task_id: str, args: dict) -> None:
     """Background thread: run DemoAgent and update task status."""
     with _ASYNC_LOCK:
-        _ASYNC_TASKS[task_id].status = "running"
-        _ASYNC_TASKS[task_id].progress = "Initializing DemoAgent..."
+        task = _ASYNC_TASKS.get(task_id)
+        if task is None or task.cancelled:
+            return
+        task.status = "running"
+        task.progress = "Initializing DemoAgent..."
+    start = time.time()
     try:
         result = _dispatch_resolve_issue(args)
+        elapsed = time.time() - start
         with _ASYNC_LOCK:
-            task = _ASYNC_TASKS[task_id]
+            task = _ASYNC_TASKS.get(task_id)
+            if task is None:
+                return
+            if task.cancelled:
+                task.status = "cancelled"
+                task.progress = "Task was cancelled."
+                return
+            if elapsed > task.timeout:
+                task.status = "timed_out"
+                task.progress = f"Task exceeded {task.timeout}s timeout."
+                task.result = result
+                return
             task.status = "complete"
             task.progress = "Resolution complete."
             task.result = result
     except Exception as exc:
         logger.exception("Async resolve task %s failed", task_id)
         with _ASYNC_LOCK:
-            task = _ASYNC_TASKS[task_id]
-            task.status = "failed"
-            task.progress = "Task failed."
-            task.error = str(exc)
+            task = _ASYNC_TASKS.get(task_id)
+            if task is not None:
+                task.status = "failed"
+                task.progress = "Task failed."
+                task.error = str(exc)
 
 
 def _dispatch_resolve_issue_async(args: dict) -> dict:
+    _cleanup_tasks()
     task_id = uuid.uuid4().hex
-    task = _AsyncTask(task_id=task_id, status="queued", progress="Task queued.")
+    task = _AsyncTask(
+        task_id=task_id,
+        status="queued",
+        progress="Task queued.",
+        created_at=time.time(),
+        timeout=float(args.get("timeout", 300)),
+        progress_token=args.get("progress_token", ""),
+    )
     with _ASYNC_LOCK:
         _ASYNC_TASKS[task_id] = task
     thread = threading.Thread(
@@ -438,6 +510,24 @@ def _dispatch_resolve_issue_status(args: dict) -> dict:
             "result": task.result,
             "error": task.error,
         }
+
+
+def _dispatch_resolve_issue_cancel(args: dict) -> dict:
+    task_id = args["task_id"]
+    with _ASYNC_LOCK:
+        task = _ASYNC_TASKS.get(task_id)
+        if task is None:
+            return {"error": f"Task {task_id} not found"}
+        if task.status in ("complete", "failed", "cancelled", "timed_out"):
+            return {
+                "task_id": task_id,
+                "status": task.status,
+                "message": "Task already finished",
+            }
+        task.cancelled = True
+        task.status = "cancelled"
+        task.progress = "Task cancelled by user."
+        return {"task_id": task_id, "status": "cancelled"}
 
 
 def _dispatch_search(args: dict) -> dict:
@@ -525,6 +615,7 @@ _DISPATCH_TABLE = {
     "loom_resolve_issue": _dispatch_resolve_issue,
     "loom_resolve_issue_async": _dispatch_resolve_issue_async,
     "loom_resolve_issue_status": _dispatch_resolve_issue_status,
+    "loom_resolve_issue_cancel": _dispatch_resolve_issue_cancel,
 }
 
 
@@ -555,8 +646,9 @@ def _read_message() -> dict | None:
 def _write_message(msg: dict) -> None:
     """Write a JSON-RPC message with Content-Length framing."""
     body = json.dumps(msg)
-    sys.stdout.write(f"Content-Length: {len(body)}\r\n\r\n{body}")
-    sys.stdout.flush()
+    with _MCP_STDOUT_LOCK:
+        sys.stdout.write(f"Content-Length: {len(body)}\r\n\r\n{body}")
+        sys.stdout.flush()
 
 
 def _respond(req_id: int | str | None, result: dict) -> None:

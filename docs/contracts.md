@@ -16,7 +16,7 @@ namespace. This is the **recommended and stable** import path.
 
 ## Versioning and compatibility
 
-- **Phase modules are implementation artifacts.** The files
+- **Domain modules are implementation artifacts.** The files
   `contracts_core.py` through `contracts_context.py`, `contracts_api.py`,
   and `protocols.py` may be reorganized, merged, or renamed in future
   releases. They are not an API commitment.
@@ -45,11 +45,15 @@ tool, resource, and task execution contracts.
 | `SecretsBackend` | `protocols` | Async secret/API-key storage | stable | `EnvSecretsBackend`, `PostgresqlSecretsBackend`, `RotatingSecretsBackend` |
 | `EmbeddingBackend` | `protocols` | Provider-agnostic vector-embedding generation | stable | `NoopEmbeddingBackend`, `OpenAIEmbeddingBackend`, `LiteLLMEmbeddingBackend` |
 | `SearchBackend` | `protocols` | Full-text, semantic, and hybrid search | stable | `MemorySearchBackend`, `PostgresqlSearchBackend` |
-| `GraphBackend` | `protocols` | Knowledge-graph node and edge storage | stable | `MemoryGraphBackend`, `DisabledGraphBackend`, `OrientDBGraphBackend` |
 | `LLMBackend` | `protocols` | Provider-agnostic chat completion interface | stable | `HttpLLMBackend` |
+| `ModelSelectionStrategy` | `protocols` | Pluggable model selection strategy for routing | stable | `ThompsonSamplingSelector` |
 | `ToolProvider` | `protocols` | MCP-shaped tool listing and invocation | stable | `MemoryToolProvider` |
 | `ResourceProvider` | `protocols` | MCP-shaped resource listing and reading | stable | `MemoryResourceProvider` |
 | `TaskRunner` | `protocols` | Strategy for executing a single task | stable | `LLMTaskRunner`, `NoopTaskRunner` |
+
+> **Deprecation note:** `GraphBackend` in `protocols.py` is a deprecated alias
+> for `KnowledgeGraph` (defined in `contracts_graph.py`). New code should use
+> `KnowledgeGraph` directly. The alias remains for backward compatibility.
 
 ## Orchestration (7 protocols)
 

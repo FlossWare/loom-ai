@@ -262,6 +262,10 @@ async def main():
 asyncio.run(main())
 ```
 
+> **Note:** Consensus requires `LOOM_LLM_BASE_URL` to be set. Without it,
+> `cfg.consensus` is `None` and calls to `synthesize()` or `gather()` will
+> raise.
+
 ## Client SDK
 
 Loom ships a dual-mode client SDK with auto-detection:
@@ -344,7 +348,7 @@ No inheritance, no registration, no framework imports required.
 | Vault, AWS Secrets Manager | `SecretsBackend` | 4 |
 | Cohere, Voyage AI, local ONNX | `EmbeddingBackend` | 4 |
 | Elasticsearch, Meilisearch | `SearchBackend` | 5 |
-| Neo4j, ArangoDB, TigerGraph | `GraphBackend` | 7 |
+| Neo4j, ArangoDB, TigerGraph | `KnowledgeGraph` | 10 |
 | Ollama, vLLM, custom server | `LLMBackend` | 3 |
 
 ```python
@@ -363,7 +367,7 @@ See [docs/architecture.md](docs/architecture.md#extension-model) for the full ex
 
 ## Protocol Contracts
 
-Loom defines **94 `@runtime_checkable` Protocol contracts** across 12 modules, all using structural subtyping (no ABC inheritance required). The recommended import path is `from loom_ai.contracts import ...` which re-exports every contract through a single stable facade. See [docs/contracts.md](docs/contracts.md) for the full inventory.
+Loom defines **81 `@runtime_checkable` Protocol contracts** across 12 modules, all using structural subtyping (no ABC inheritance required). The recommended import path is `from loom_ai.contracts import ...` which re-exports every contract through a single stable facade. See [docs/contracts.md](docs/contracts.md) for the full inventory.
 
 ### Core Protocols (`protocols.py`)
 
@@ -374,18 +378,18 @@ Loom defines **94 `@runtime_checkable` Protocol contracts** across 12 modules, a
 | `SecretsBackend` | API keys and config | `os.environ` |
 | `EmbeddingBackend` | Text to vectors | Zero vectors |
 | `SearchBackend` | Full-text + semantic | Substring + cosine |
-| `GraphBackend` | Knowledge graph | In-memory adjacency |
+| `KnowledgeGraph` | Knowledge graph | In-memory adjacency |
 | `LLMBackend` | Chat completions | HTTP (OpenAI-compatible) |
 | `ToolProvider` | MCP-shaped tool contract | In-memory callables |
 | `ResourceProvider` | MCP-shaped resource contract | In-memory static |
 | `TaskRunner` | Task execution strategy | Noop (pass-through) |
 | `IdempotentStore` | Upsert semantics marker | All storage backends |
 
-### Phase 1–3: Orchestration Contracts (21 contracts)
+### Core, Workflow, Session: Orchestration Contracts (21 contracts)
 
 Structured output, conversation, memory, model routing, consensus patterns, knowledge/RAG, streaming, workflow, learning, strategy selection, budget tracking, transcripts, resilience (circuit breaker), observability, session management, worker registry, caching, evaluation, feedback loops, and human-in-the-loop.
 
-### Phase 4–9: Advanced Contracts (43 contracts)
+### Graph through Context: Advanced Contracts (43 contracts)
 
 Knowledge graphs, temporal stores, belief management, evaluation suites, telemetry, inference routing, agent lifecycle, agent memory, output validation, security gates, program optimization, agent loops, recipe execution, ACP interoperability, context assembly, trajectory stores, agent environments, provider/capability/policy registries, catalog synchronization, tournament runners, consensus strategies, model evaluation, context compression, prompt cache optimization, pluggable runtimes, health checks, and request validation.
 
@@ -399,7 +403,7 @@ Request lifecycle, error handling, and middleware protocols.
 
 ## Backend Implementations
 
-58 pluggable backend modules in `loom_ai/backends/`:
+63 pluggable backend modules in `loom_ai/backends/`:
 
 | Backend | Purpose |
 |---------|---------|

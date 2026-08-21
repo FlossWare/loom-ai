@@ -40,13 +40,13 @@ synthesis), `ExecutionEngine` (DAG-based task scheduling), and higher-level
 coordination such as adaptive routing and fleet management.  These components
 depend on the contract layer but never on a specific backend.
 
-**Contract layer** -- 94 `@runtime_checkable` Protocol classes across
+**Contract layer** -- 81 `@runtime_checkable` Protocol classes across
 `protocols.py` and `contracts_core.py` through `contracts_context.py` plus
 `contracts_api.py` and `contracts_execution.py`.  Nearly all methods are `async` (exceptions include
 `IdempotentStore.is_idempotent`).  The only imports are from the
 standard library (`typing`, `dataclasses`).
 
-**Backend layer** -- 58 pluggable modules in `loom_ai/backends/` that satisfy
+**Backend layer** -- 63 pluggable modules in `loom_ai/backends/` that satisfy
 contracts via structural subtyping.  Each module can depend on an external
 library (asyncpg, redis, etc.) but the dependency is optional and loaded
 lazily.
@@ -60,9 +60,9 @@ direction only.
 
 ```text
 loom_ai/protocols.py          <-- 11 core Protocol classes
-loom_ai/contracts_core.py   <-- 7 orchestration contracts (phase 1)
-loom_ai/contracts_workflow.py   <-- 8 orchestration contracts (phase 2)
-...                           <-- phases 3-9, contracts_api.py
+loom_ai/contracts_core.py   <-- 7 orchestration contracts
+loom_ai/contracts_workflow.py   <-- 8 workflow contracts
+...                           <-- session, graph, inference, agent, provider, capability, context, api
 loom_ai/models.py             <-- plain dataclasses (Document, ChatMessage, ...)
 loom_ai/models_core.py      <-- phase-specific data models
 ...
@@ -70,7 +70,7 @@ loom_ai/backends/memory.py    <-- in-memory implementations
 loom_ai/backends/postgresql.py
 loom_ai/backends/redis_queue.py
 loom_ai/backends/http_llm.py
-...                           <-- 58 backend modules total
+...                           <-- 63 backend modules total
 ```
 
 Contracts use `typing.Protocol` with `@runtime_checkable`:
@@ -267,7 +267,7 @@ framework coupling.
 | `SecretsBackend` | 4 | Swap env vars for Vault, AWS Secrets Manager, or 1Password |
 | `EmbeddingBackend` | 4 | Swap OpenAI embeddings for Cohere, Voyage AI, or local ONNX |
 | `SearchBackend` | 5 | Swap in-memory for Elasticsearch, Meilisearch, or Typesense |
-| `GraphBackend` | 7 | Swap in-memory for Neo4j, ArangoDB, or TigerGraph |
+| `KnowledgeGraph` (deprecated alias: `GraphBackend`) | 10 | Swap in-memory for Neo4j, ArangoDB, or TigerGraph |
 | `LLMBackend` | 3 | Swap HTTP for Ollama, vLLM, or a custom inference server |
 | `ToolProvider` | 2 | Wrap any tool registry (MCP, LangChain, custom) |
 | `ResourceProvider` | 2 | Expose files, databases, or APIs as resources |
@@ -284,7 +284,7 @@ Identify the contract you want to implement.  The core contracts live in
 - `SecretsBackend` -- API key storage
 - `EmbeddingBackend` -- text-to-vector generation
 - `SearchBackend` -- full-text + semantic search
-- `GraphBackend` -- knowledge graph
+- `KnowledgeGraph` -- knowledge graph (deprecated alias: `GraphBackend`)
 - `LLMBackend` -- chat completions
 - `ToolProvider` -- MCP-shaped tool dispatch
 - `ResourceProvider` -- MCP-shaped resource access
@@ -381,19 +381,22 @@ class RabbitMQQueue:
     async def list_queues(self) -> list[str]: ...
 ```
 
-**Custom GraphBackend (e.g. Neo4j):**
+**Custom KnowledgeGraph (e.g. Neo4j):**
 
 ```python
 class Neo4jGraph:
-    """Satisfies GraphBackend -- 7 methods."""
+    """Satisfies KnowledgeGraph -- 10 methods."""
 
-    async def add_node(self, node) -> str: ...
-    async def get_node(self, node_id: str): ...
-    async def add_edge(self, edge) -> str: ...
-    async def get_neighbors(self, node_id: str, *, edge_label=None) -> list: ...
-    async def traverse(self, start_id: str, *, edge_label=None, depth=1) -> list: ...
-    async def delete_node(self, node_id: str) -> bool: ...
-    async def delete_edge(self, edge_id: str) -> bool: ...
+    async def add_entity(self, entity) -> str: ...
+    async def get_entity(self, entity_id: str): ...
+    async def update_entity(self, entity_id: str, *, properties=None, metadata=None) -> None: ...
+    async def delete_entity(self, entity_id: str) -> bool: ...
+    async def add_relationship(self, relationship) -> str: ...
+    async def get_relationships(self, entity_id: str, *, relation_type=None, direction="outgoing") -> list: ...
+    async def delete_relationship(self, relationship_id: str) -> bool: ...
+    async def add_claim(self, claim) -> str: ...
+    async def get_claims(self, entity_id: str, *, predicate=None) -> list: ...
+    async def search_entities(self, query: str, *, entity_type=None, limit=10) -> list: ...
 ```
 
 **Custom SecretsBackend (e.g. HashiCorp Vault):**
@@ -513,26 +516,25 @@ intentionally does not -- `enqueue` appends duplicates by design.
 
 ## Contract Phases
 
-The 94 protocol contracts are organized into phases reflecting the order they
-were designed:
+The 81 protocol contracts are organized into domain modules:
 
-| Phase | File | Count | Focus |
-|-------|------|-------|-------|
-| Core | `protocols.py` | 13 | Storage, queue, secrets, LLM, tools, graph |
-| API | `contracts_api.py` | 4 | Request lifecycle, error handling, middleware |
-| 1 | `contracts_core.py` | 8 | Structured output, conversation, memory, router, RAG |
-| 2 | `contracts_workflow.py` | 9 | Workflow, learning, strategy, budget, resilience |
-| 3 | `contracts_session.py` | 7 | Session, worker registry, cache, evaluation |
-| 4 | `contracts_graph.py` | 6 | Knowledge graphs, temporal stores, beliefs |
-| 5 | `contracts_inference.py` | 9 | Eval suites, telemetry, agent lifecycle, security |
-| 6 | `contracts_agent.py` | 8 | Agent loops, recipes, ACP, context, trajectories |
-| 7 | `contracts_provider.py` | 5 | Provider/capability/policy registries, catalog sync |
-| 8 | `contracts_capability.py` | 10 | Tournaments, consensus strategies, evaluation |
-| 9 | `contracts_context.py` | 11 | Context compression, prompt cache, runtimes, health |
-| Execution | `contracts_execution.py` | 4 | Execution steps, pipelines, observers |
+| Domain | File | Count | Focus |
+|--------|------|-------|-------|
+| Core | `protocols.py` | 11 | Storage, queue, secrets, LLM, tools, graph |
+| Orchestration | `contracts_core.py` | 7 | Structured output, conversation, memory, router, RAG |
+| Workflow | `contracts_workflow.py` | 8 | Workflow, learning, strategy, budget, resilience |
+| Session | `contracts_session.py` | 6 | Session, worker registry, cache, evaluation |
+| Graph | `contracts_graph.py` | 5 | Knowledge graphs, temporal stores, beliefs |
+| Inference | `contracts_inference.py` | 8 | Eval suites, telemetry, agent lifecycle, security |
+| Agent | `contracts_agent.py` | 7 | Agent loops, recipes, ACP, context, trajectories |
+| Provider | `contracts_provider.py` | 4 | Provider/capability/policy registries, catalog sync |
+| Capability | `contracts_capability.py` | 9 | Tournaments, consensus strategies, evaluation |
+| Context | `contracts_context.py` | 10 | Context compression, prompt cache, runtimes, health |
+| Execution | `contracts_execution.py` | 3 | Execution steps, pipelines, observers |
+| API | `contracts_api.py` | 3 | Request lifecycle, error handling, middleware |
 
-Domains are additive -- later domains never modify earlier contracts.  Each
-domain has a corresponding `models_<domain>.py` with its data models.
+Domains are additive -- later domains never modify earlier contracts. Each
+domain has a corresponding `models_<name>.py` with its data models.
 
 ---
 

@@ -10,6 +10,22 @@ The goal is deliberately smaller than the long-term Loom vision. We need a worki
 
 The second session must recover useful context from persistent Loom state rather than relying on the original conversation transcript.
 
+## Status (as of 2026-08-20)
+
+**Working:**
+
+- DemoAgent can resolve issues end-to-end
+- MCP server with 19 tools (including async issue resolution and cancellation)
+- REST API with domain routers
+- Knowledge graph with entity/relationship API
+- Async issue resolution with progress streaming
+
+**Not yet verified:**
+
+- Full session-2 cold-start recovery after process death
+- Persistent knowledge retrieval with provenance
+- Self-dogfooding loop (Loom improving Loom)
+
 ## Success criteria
 
 - [ ] Start Loom locally.

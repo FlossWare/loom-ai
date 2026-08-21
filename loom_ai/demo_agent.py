@@ -270,6 +270,14 @@ class DemoAgent:
     ) -> dict:
         """Create a branch, commit changes, push, and open a PR."""
         branch = f"fix/issue-{issue_number}"
+        existing = await _git("branch", "--list", branch, cwd=self._workspace)
+        if existing.strip():
+            for suffix in range(2, 11):
+                candidate = f"{branch}-{suffix}"
+                check = await _git("branch", "--list", candidate, cwd=self._workspace)
+                if not check.strip():
+                    branch = candidate
+                    break
         await _git("checkout", "-b", branch, cwd=self._workspace)
         for f in changed_files:
             await _git("add", f, cwd=self._workspace)
