@@ -166,7 +166,7 @@ class TestAsyncResolve:
         with patch(
             "loom_ai.mcp_server._dispatch_resolve_issue",
             return_value={"success": True, "error": "", "plan": "", "pr_url": ""},
-        ):
+        ), patch("loom_ai.mcp_server._persist_task"):
             result = _dispatch_resolve_issue_async({"issue_number": 1})
         assert "task_id" in result
         assert result["status"] == "queued"
@@ -203,7 +203,8 @@ class TestAsyncResolve:
         )
         with _ASYNC_LOCK:
             _ASYNC_TASKS["test-cancel"] = task
-        result = _dispatch_resolve_issue_cancel({"task_id": "test-cancel"})
+        with patch("loom_ai.mcp_server._persist_task"):
+            result = _dispatch_resolve_issue_cancel({"task_id": "test-cancel"})
         assert result["status"] == "cancelled"
         with _ASYNC_LOCK:
             _ASYNC_TASKS.pop("test-cancel", None)
@@ -268,7 +269,7 @@ class TestAsyncResolve:
         with patch(
             "loom_ai.mcp_server._dispatch_resolve_issue",
             return_value={"success": True, "error": "", "plan": "", "pr_url": ""},
-        ):
+        ), patch("loom_ai.mcp_server._persist_task"):
             result = _dispatch_resolve_issue_async(
                 {
                     "issue_number": 99,
@@ -294,6 +295,242 @@ class TestAsyncResolve:
 
     def test_cancel_dispatch_table_entry(self):
         assert "loom_resolve_issue_cancel" in _DISPATCH_TABLE
+
+
+class TestTaskPersistence:
+    def test_task_to_dict_roundtrip(self):
+        from loom_ai.mcp_server import (
+            _AsyncTask,
+            _dict_to_task,
+            _task_to_dict,
+        )
+
+        original = _AsyncTask(
+            task_id="abc123",
+            status="running",
+            progress="Working...",
+            result={"key": "val"},
+            error="",
+            created_at=1000.0,
+            cancelled=False,
+            timeout=300.0,
+            progress_token="tok-1",
+        )
+        d = _task_to_dict(original)
+        restored = _dict_to_task(d)
+        assert restored.task_id == original.task_id
+        assert restored.status == original.status
+        assert restored.result == original.result
+        assert restored.timeout == original.timeout
+        assert restored.progress_token == "tok-1"
+
+    def test_persist_task_calls_api(self):
+        from loom_ai.mcp_server import (
+            _AsyncTask,
+            _persist_task,
+        )
+
+        task = _AsyncTask(
+            task_id="persist-test",
+            status="queued",
+            progress="Queued.",
+            created_at=1000.0,
+        )
+        with patch(
+            "loom_ai.mcp_server._api"
+        ) as mock_api:
+            _persist_task(task)
+        mock_api.assert_called_once()
+        call_args = mock_api.call_args
+        assert call_args[0][0] == "POST"
+        assert "/knowledge/documents" in call_args[0][1]
+        body = call_args[0][2]
+        assert body["id"] == "mcp-task-persist-test"
+        assert body["category"] == "mcp_task"
+
+    def test_persist_task_best_effort(self):
+        from loom_ai.mcp_server import (
+            _AsyncTask,
+            _persist_task,
+        )
+
+        task = _AsyncTask(
+            task_id="fail-test",
+            status="running",
+            progress="x",
+            created_at=1000.0,
+        )
+        with patch(
+            "loom_ai.mcp_server._api",
+            side_effect=Exception("down"),
+        ):
+            _persist_task(task)
+
+    def test_load_task_returns_task(self):
+        from loom_ai.mcp_server import _load_task
+
+        stored = json.dumps(
+            {
+                "task_id": "load-test",
+                "status": "complete",
+                "progress": "Done.",
+                "result": {"ok": True},
+                "error": "",
+                "created_at": 1000.0,
+                "cancelled": False,
+                "timeout": 300.0,
+                "progress_token": "",
+            }
+        )
+        with patch(
+            "loom_ai.mcp_server._api",
+            return_value={
+                "id": "mcp-task-load-test",
+                "content": stored,
+            },
+        ):
+            task = _load_task("load-test")
+        assert task is not None
+        assert task.task_id == "load-test"
+        assert task.status == "complete"
+
+    def test_load_task_returns_none_on_404(self):
+        from loom_ai.mcp_server import _load_task
+
+        with patch(
+            "loom_ai.mcp_server._api",
+            side_effect=Exception("404"),
+        ):
+            assert _load_task("missing") is None
+
+    def test_load_task_handles_corrupt_json(self):
+        from loom_ai.mcp_server import _load_task
+
+        with patch(
+            "loom_ai.mcp_server._api",
+            return_value={"content": "not-json!!!"},
+        ):
+            assert _load_task("corrupt") is None
+
+    def test_status_falls_back_to_storage(self):
+        from loom_ai.mcp_server import (
+            _ASYNC_LOCK,
+            _ASYNC_TASKS,
+            _dispatch_resolve_issue_status,
+        )
+
+        with _ASYNC_LOCK:
+            _ASYNC_TASKS.pop("fb-test", None)
+        stored = json.dumps(
+            {
+                "task_id": "fb-test",
+                "status": "complete",
+                "progress": "Done.",
+                "result": None,
+                "error": "",
+                "created_at": 1000.0,
+                "cancelled": False,
+                "timeout": 300.0,
+                "progress_token": "",
+            }
+        )
+        with patch(
+            "loom_ai.mcp_server._api",
+            return_value={
+                "id": "mcp-task-fb-test",
+                "content": stored,
+            },
+        ):
+            result = _dispatch_resolve_issue_status(
+                {"task_id": "fb-test"}
+            )
+        assert result["task_id"] == "fb-test"
+        assert result["status"] == "complete"
+        with _ASYNC_LOCK:
+            _ASYNC_TASKS.pop("fb-test", None)
+
+    def test_recover_tasks_marks_running_as_failed(
+        self,
+    ):
+        import time
+
+        from loom_ai.mcp_server import (
+            _ASYNC_LOCK,
+            _ASYNC_TASKS,
+            _recover_tasks,
+        )
+
+        docs = [
+            {
+                "category": "mcp_task",
+                "content": json.dumps(
+                    {
+                        "task_id": "recover-1",
+                        "status": "running",
+                        "progress": "x",
+                        "created_at": time.time(),
+                        "timeout": 300.0,
+                    }
+                ),
+            },
+            {
+                "category": "mcp_task",
+                "content": json.dumps(
+                    {
+                        "task_id": "recover-2",
+                        "status": "complete",
+                        "progress": "Done",
+                        "created_at": time.time(),
+                        "timeout": 300.0,
+                    }
+                ),
+            },
+        ]
+        with patch(
+            "loom_ai.mcp_server._api",
+            return_value={"documents": docs},
+        ):
+            _recover_tasks()
+        with _ASYNC_LOCK:
+            t1 = _ASYNC_TASKS.get("recover-1")
+            t2 = _ASYNC_TASKS.get("recover-2")
+            assert t1 is not None
+            assert t1.status == "failed"
+            assert "restart" in t1.error
+            assert t2 is not None
+            assert t2.status == "complete"
+            _ASYNC_TASKS.pop("recover-1", None)
+            _ASYNC_TASKS.pop("recover-2", None)
+
+    def test_recover_skips_expired(self):
+        from loom_ai.mcp_server import (
+            _ASYNC_LOCK,
+            _ASYNC_TASKS,
+            _TASK_TTL_SECONDS,
+            _recover_tasks,
+        )
+
+        docs = [
+            {
+                "category": "mcp_task",
+                "content": json.dumps(
+                    {
+                        "task_id": "old-1",
+                        "status": "complete",
+                        "progress": "Done",
+                        "created_at": 1.0,
+                        "timeout": 300.0,
+                    }
+                ),
+            },
+        ]
+        with patch(
+            "loom_ai.mcp_server._api",
+            return_value={"documents": docs},
+        ):
+            _recover_tasks()
+        with _ASYNC_LOCK:
+            assert "old-1" not in _ASYNC_TASKS
 
 
 class TestMessageFraming:

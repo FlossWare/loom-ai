@@ -57,6 +57,7 @@ _SUPPORTED_VERSIONS = ["2024-11-05", "2025-03-26"]
 _LATEST_VERSION = _SUPPORTED_VERSIONS[-1]
 _LOOM_URL = os.environ.get("LOOM_URL", "http://127.0.0.1:5000").rstrip("/")
 _LOOM_KEY = os.environ.get("LOOM_API_KEY", "")
+_MCP_TASK_CATEGORY = "mcp_task"
 _MAX_MESSAGE_SIZE = 10 * 1024 * 1024
 
 
@@ -344,6 +345,138 @@ def _api(method: str, path: str, body: dict | None = None) -> dict:
         raise _ToolError(str(exc)) from exc
 
 
+def _task_to_dict(task: _AsyncTask) -> dict:
+    """Serialize task to a plain dict."""
+    return {
+        "task_id": task.task_id,
+        "status": task.status,
+        "progress": task.progress,
+        "result": task.result,
+        "error": task.error,
+        "created_at": task.created_at,
+        "cancelled": task.cancelled,
+        "timeout": task.timeout,
+        "progress_token": task.progress_token,
+    }
+
+
+def _dict_to_task(d: dict) -> _AsyncTask:
+    """Deserialize dict to _AsyncTask."""
+    return _AsyncTask(
+        task_id=d["task_id"],
+        status=d.get("status", "unknown"),
+        progress=d.get("progress", ""),
+        result=d.get("result"),
+        error=d.get("error", ""),
+        created_at=d.get("created_at", 0.0),
+        cancelled=d.get("cancelled", False),
+        timeout=d.get("timeout", 300.0),
+        progress_token=d.get(
+            "progress_token", ""
+        ),
+    )
+
+
+def _persist_task(task: _AsyncTask) -> None:
+    """Best-effort persist task to storage."""
+    with _ASYNC_LOCK:
+        snapshot = _task_to_dict(task)
+    doc_id = f"mcp-task-{task.task_id}"
+    try:
+        _api(
+            "POST",
+            "/knowledge/documents",
+            {
+                "id": doc_id,
+                "title": (
+                    f"MCP Task {task.task_id}"
+                ),
+                "content": json.dumps(snapshot),
+                "category": _MCP_TASK_CATEGORY,
+            },
+        )
+    except Exception:
+        logger.debug(
+            "Failed to persist task %s",
+            task.task_id,
+        )
+
+
+def _load_task(
+    task_id: str,
+) -> _AsyncTask | None:
+    """Load a single task from storage."""
+    doc_id = f"mcp-task-{task_id}"
+    try:
+        resp = _api(
+            "GET",
+            f"/knowledge/documents/{doc_id}",
+        )
+        raw = resp.get("content", "{}")
+        data = json.loads(raw)
+        return _dict_to_task(data)
+    except json.JSONDecodeError:
+        logger.warning(
+            "Corrupt task data for %s",
+            task_id,
+        )
+        return None
+    except Exception:
+        return None
+
+
+def _recover_tasks() -> None:
+    """Reload persisted tasks on startup."""
+    try:
+        resp = _api(
+            "GET",
+            "/knowledge/documents?limit=200",
+        )
+        docs = resp.get("documents", [])
+    except Exception:
+        logger.debug("Task recovery skipped")
+        return
+    now = time.time()
+    recovered = 0
+    with _ASYNC_LOCK:
+        for doc in docs:
+            cat = doc.get("category", "")
+            if cat != _MCP_TASK_CATEGORY:
+                continue
+            raw = doc.get("content", "{}")
+            try:
+                data = json.loads(raw)
+                task = _dict_to_task(data)
+            except (
+                json.JSONDecodeError,
+                KeyError,
+            ):
+                logger.warning(
+                    "Skipping corrupt task doc"
+                )
+                continue
+            if task.task_id in _ASYNC_TASKS:
+                continue
+            age = now - task.created_at
+            if age > _TASK_TTL_SECONDS:
+                continue
+            if task.status in (
+                "running",
+                "queued",
+            ):
+                task.status = "failed"
+                task.error = (
+                    "Interrupted by server restart"
+                )
+            _ASYNC_TASKS[task.task_id] = task
+            recovered += 1
+    if recovered:
+        logger.info(
+            "Recovered %d tasks from storage",
+            recovered,
+        )
+
+
 def _handle(name: str, args: dict) -> dict:
     """Execute a tool call and return MCP result."""
     try:
@@ -445,6 +578,7 @@ def _run_resolve_thread(task_id: str, args: dict) -> None:
             return
         task.status = "running"
         task.progress = "Initializing DemoAgent..."
+    _persist_task(task)
     start = time.time()
     try:
         result = _dispatch_resolve_issue(args)
@@ -456,23 +590,33 @@ def _run_resolve_thread(task_id: str, args: dict) -> None:
             if task.cancelled:
                 task.status = "cancelled"
                 task.progress = "Task was cancelled."
+                _persist_task(task)
                 return
             if elapsed > task.timeout:
                 task.status = "timed_out"
-                task.progress = f"Task exceeded {task.timeout}s timeout."
+                task.progress = (
+                    f"Exceeded {task.timeout}s"
+                )
                 task.result = result
+                _persist_task(task)
                 return
             task.status = "complete"
             task.progress = "Resolution complete."
             task.result = result
+        _persist_task(task)
     except Exception as exc:
-        logger.exception("Async resolve task %s failed", task_id)
+        logger.exception(
+            "Async resolve task %s failed",
+            task_id,
+        )
         with _ASYNC_LOCK:
             task = _ASYNC_TASKS.get(task_id)
             if task is not None:
                 task.status = "failed"
                 task.progress = "Task failed."
                 task.error = str(exc)
+        if task is not None:
+            _persist_task(task)
 
 
 def _dispatch_resolve_issue_async(args: dict) -> dict:
@@ -488,6 +632,7 @@ def _dispatch_resolve_issue_async(args: dict) -> dict:
     )
     with _ASYNC_LOCK:
         _ASYNC_TASKS[task_id] = task
+    _persist_task(task)
     thread = threading.Thread(
         target=_run_resolve_thread,
         args=(task_id, args),
@@ -501,15 +646,22 @@ def _dispatch_resolve_issue_status(args: dict) -> dict:
     task_id = args["task_id"]
     with _ASYNC_LOCK:
         task = _ASYNC_TASKS.get(task_id)
-        if task is None:
-            return {"error": f"Task {task_id} not found"}
+    if task is None:
+        task = _load_task(task_id)
+        if task is not None:
+            with _ASYNC_LOCK:
+                _ASYNC_TASKS[task_id] = task
+    if task is None:
         return {
-            "task_id": task.task_id,
-            "status": task.status,
-            "progress": task.progress,
-            "result": task.result,
-            "error": task.error,
+            "error": f"Task {task_id} not found"
         }
+    return {
+        "task_id": task.task_id,
+        "status": task.status,
+        "progress": task.progress,
+        "result": task.result,
+        "error": task.error,
+    }
 
 
 def _dispatch_resolve_issue_cancel(args: dict) -> dict:
@@ -517,8 +669,17 @@ def _dispatch_resolve_issue_cancel(args: dict) -> dict:
     with _ASYNC_LOCK:
         task = _ASYNC_TASKS.get(task_id)
         if task is None:
-            return {"error": f"Task {task_id} not found"}
-        if task.status in ("complete", "failed", "cancelled", "timed_out"):
+            return {
+                "error": (
+                    f"Task {task_id} not found"
+                )
+            }
+        if task.status in (
+            "complete",
+            "failed",
+            "cancelled",
+            "timed_out",
+        ):
             return {
                 "task_id": task_id,
                 "status": task.status,
@@ -527,7 +688,11 @@ def _dispatch_resolve_issue_cancel(args: dict) -> dict:
         task.cancelled = True
         task.status = "cancelled"
         task.progress = "Task cancelled by user."
-        return {"task_id": task_id, "status": "cancelled"}
+    _persist_task(task)
+    return {
+        "task_id": task_id,
+        "status": "cancelled",
+    }
 
 
 def _dispatch_search(args: dict) -> dict:
@@ -669,6 +834,7 @@ def main() -> None:
         level=logging.WARNING,
         stream=sys.stderr,
     )
+    _recover_tasks()
     while True:
         msg = _read_message()
         if msg is None:
