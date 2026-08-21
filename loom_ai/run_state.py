@@ -106,8 +106,7 @@ class IllegalTransitionError(Exception):
         self.current = current
         self.target = target
         super().__init__(
-            f"Run {run_id}: illegal transition "
-            f"{current.value} -> {target.value}"
+            f"Run {run_id}: illegal transition {current.value} -> {target.value}"
         )
 
 
