@@ -10,36 +10,34 @@ The goal is deliberately smaller than the long-term Loom vision. We need a worki
 
 The second session must recover useful context from persistent Loom state rather than relying on the original conversation transcript.
 
-## Status (as of 2026-08-20)
+## Qualification status
 
-**Working:**
+**Current status: NOT YET DOGFOOD-QUALIFIED.**
 
-- DemoAgent can resolve issues end-to-end
-- MCP server with 19 tools (including async issue resolution and cancellation)
-- REST API with domain routers
-- Knowledge graph with entity/relationship API
-- Async issue resolution with progress streaming
+The repository contains the implementation pieces for the demo, but the complete A+ acceptance path has not yet been proven against the real production-oriented integration stack across a process boundary. In particular, cold-start recovery, durable provenance, failure recovery, and bounded autonomous execution remain qualification requirements.
 
-**Not yet verified:**
-
-- Full session-2 cold-start recovery after process death
-- Persistent knowledge retrieval with provenance
-- Self-dogfooding loop (Loom improving Loom)
+Do not interpret the presence of working DemoAgent/MCP/API components as proof that the complete dogfood contract has passed. The authoritative qualification path is the acceptance harness and the A+ exit criteria tracked by issues #681 and #812.
 
 ## Success criteria
 
 - [ ] Start Loom locally.
+- [ ] Pass the production-stack preflight checks.
 - [ ] Connect to a model through the existing provider abstraction.
 - [ ] Give Loom a concrete repository task.
 - [ ] Inspect repository files.
 - [ ] Use tools to modify code.
-- [ ] Run relevant tests.
+- [ ] Run relevant tests and lint/verification gates.
 - [ ] Persist the session.
 - [ ] Persist useful observations and decisions.
-- [ ] End the process/session.
-- [ ] Start a fresh session.
-- [ ] Retrieve prior project/session knowledge.
-- [ ] Explain the previous work and reasoning.
+- [ ] Persist durable provenance/evidence.
+- [ ] End the process/session completely.
+- [ ] Start a fresh process with no prior transcript in memory.
+- [ ] Retrieve prior project/session knowledge from persistent storage.
+- [ ] Explain the previous work with provenance.
+- [ ] Use recovered knowledge for a follow-up change.
+- [ ] Survive the defined failure-injection/recovery cases.
+- [ ] Operate within the bounded canary/security policy.
+- [ ] Produce machine-readable qualification evidence.
 - [ ] Use Loom itself to make at least one follow-up change to Loom.
 
 ## What is intentionally out of scope
@@ -60,7 +58,7 @@ These remain valuable roadmap work. The demo exists to create a working feedback
 
 ## Dogfood principle
 
-Once the demo works, Loom should be used to develop Loom.
+Once the demo passes its qualification criteria, Loom should be used to develop Loom.
 
 Every limitation encountered while dogfooding should become evidence for the next implementation issue rather than another speculative feature.
 
