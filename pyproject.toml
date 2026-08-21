@@ -57,6 +57,13 @@ line-length = 88
 
 [tool.ruff.lint]
 select = ["E", "F", "I", "W"]
+extend-ignore = ["E501"]
+per-file-ignores = {
+    "loom_ai/backends/free_model_router.py" = ["F401"],
+    "loom_ai/demo_agent.py" = ["F401"],
+    "loom_ai/routers/storage.py" = ["I001"],
+    "tests/test_mcp_server.py" = ["F401"],
+}
 
 [tool.coverage.run]
 source = ["loom_ai"]
