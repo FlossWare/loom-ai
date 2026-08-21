@@ -71,6 +71,9 @@ class TestRun:
 
     async def test_changes_are_applied_and_reviewed(self, tmp_path):
         (tmp_path / "sample.py").write_text('x = "old"\n')
+        tests_dir = tmp_path / "tests"
+        tests_dir.mkdir()
+        (tests_dir / "test_smoke.py").write_text("def test_smoke():\n    assert True\n")
         _git_init(tmp_path, add_all=True)
         changes = '[{"file":"sample.py","search":"\\"old\\"","replace":"\\"new\\""}]'
         llm = _make_llm(["plan", changes, "APPROVE", "APPROVE", "APPROVE"])
@@ -83,7 +86,11 @@ class TestRun:
         (tmp_path / "sample.py").write_text("x = 1\n")
         _git_init(tmp_path, add_all=True)
         changes = '[{"file":"sample.py","search":"x = 1","replace":"x = 2"}]'
-        llm = _make_llm(["plan", changes, "REJECT: bug", "REJECT", "REJECT"])
+        # plan + 3x (implement + 3 review rounds) so re-attempts after reset still get diffs
+        llm = _make_llm(
+            ["plan"]
+            + [changes, "REJECT: bug", "REJECT", "REJECT"] * 3
+        )
         result = await DemoAgent(llm, str(tmp_path)).run(issue_text="change x")
         assert not result.success
         assert "Review not approved" in result.error
