@@ -114,3 +114,5 @@ if (( FAIL == 0 )); then
 fi
 echo 'RESULT: NOT READY'
 exit 1
+
+# CI re-trigger after test-matrix install hardening
