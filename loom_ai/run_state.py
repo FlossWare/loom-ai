@@ -74,15 +74,17 @@ _TRANSITIONS: dict[RunPhase, set[RunPhase]] = {
     },
     RunPhase.COMPLETED: {
         RunPhase.PUBLISHED,
+        RunPhase.COMPLETED,
         RunPhase.FAILED,
     },
     RunPhase.NEEDS_REVIEW: {
         RunPhase.CANCELLED,
         RunPhase.FAILED,
     },
-    RunPhase.PUBLISHED: set(),
-    RunPhase.FAILED: set(),
-    RunPhase.CANCELLED: set(),
+    # Terminal phases accept only self-transitions (idempotent no-ops).
+    RunPhase.PUBLISHED: {RunPhase.PUBLISHED},
+    RunPhase.FAILED: {RunPhase.FAILED},
+    RunPhase.CANCELLED: {RunPhase.CANCELLED},
 }
 
 _TERMINAL_STATES = {
