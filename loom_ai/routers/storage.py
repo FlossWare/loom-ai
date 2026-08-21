@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import hashlib
+import re
 import uuid
 from typing import TYPE_CHECKING
 
@@ -25,6 +26,9 @@ from loom_ai.server_models import (
 )
 
 
+_DOCUMENT_ID_RE = re.compile(r"^[a-zA-Z0-9_-]+$")
+
+
 def _mount_storage_routes(app: FastAPI, config: LoomConfig, auth_deps: list) -> None:
     from fastapi import APIRouter
 
@@ -44,6 +48,33 @@ def _mount_storage_routes(app: FastAPI, config: LoomConfig, auth_deps: list) -> 
             "documents": [d.__dict__ for d in docs],
             "limit": limit,
             "offset": offset,
+        }
+
+    @router.get("/documents/{document_id}")
+    async def get_document(document_id: str):
+        from fastapi import HTTPException
+
+        if not _DOCUMENT_ID_RE.match(document_id):
+            raise HTTPException(
+                status_code=400,
+                detail="Invalid document ID format",
+            )
+        doc = await config.storage.get_document(
+            document_id
+        )
+        if doc is None:
+            raise HTTPException(
+                status_code=404,
+                detail="Document not found",
+            )
+        return {
+            "id": doc.id,
+            "stored": True,
+            "title": getattr(doc, "title", ""),
+            "content": getattr(doc, "content", ""),
+            "category": getattr(
+                doc, "category", ""
+            ),
         }
 
     @router.post("/documents", response_model=StoreDocumentResponse)
