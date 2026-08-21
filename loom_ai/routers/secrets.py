@@ -99,5 +99,3 @@ def _mount_secrets_routes(app: FastAPI, config: LoomConfig, auth_deps: list) -> 
         return {"name": name, "value": value}
 
     app.include_router(router)
-
-

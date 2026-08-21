@@ -44,5 +44,3 @@ def _mount_search_routes(app: FastAPI, config: LoomConfig, auth_deps: list) -> N
         return {"results": [r.__dict__ for r in results]}
 
     app.include_router(router)
-
-

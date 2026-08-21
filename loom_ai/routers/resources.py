@@ -56,5 +56,3 @@ def _mount_resources_routes(app: FastAPI, config: LoomConfig, auth_deps: list) -
         }
 
     app.include_router(router)
-
-

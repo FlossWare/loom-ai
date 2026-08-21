@@ -67,5 +67,3 @@ def _mount_queue_routes(app: FastAPI, config: LoomConfig, auth_deps: list) -> No
         return {"requeued": count}
 
     app.include_router(router)
-
-

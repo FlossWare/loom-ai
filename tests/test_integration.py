@@ -160,18 +160,25 @@ async def test_graph_with_storage_workflow(config):
     from loom_ai.models_graph import KnowledgeEntity, KnowledgeRelationship
 
     doc_entity = KnowledgeEntity(
-        id="gn-doc", label="Document", entity_type="Document",
+        id="gn-doc",
+        label="Document",
+        entity_type="Document",
         properties={"title": doc.title},
     )
     topic_entity = KnowledgeEntity(
-        id="gn-arch", label="Topic", entity_type="Topic",
+        id="gn-arch",
+        label="Topic",
+        entity_type="Topic",
         properties={"name": "Architecture"},
     )
     await config.graph.add_entity(doc_entity)
     await config.graph.add_entity(topic_entity)
 
     rel = KnowledgeRelationship(
-        id="ge-1", source_id="gn-doc", target_id="gn-arch", relation_type="covers",
+        id="ge-1",
+        source_id="gn-doc",
+        target_id="gn-arch",
+        relation_type="covers",
     )
     await config.graph.add_relationship(rel)
 
@@ -192,7 +199,10 @@ async def test_graph_add_relationship_cleans_stale_adjacency(config):
         await config.graph.add_entity(e)
 
     rel = KnowledgeRelationship(
-        id="e1", source_id="a", target_id="b", relation_type="link",
+        id="e1",
+        source_id="a",
+        target_id="b",
+        relation_type="link",
     )
     await config.graph.add_relationship(rel)
     rels_a = await config.graph.get_relationships("a")
@@ -200,7 +210,10 @@ async def test_graph_add_relationship_cleans_stale_adjacency(config):
     assert rels_a[0].target_id == "b"
 
     updated = KnowledgeRelationship(
-        id="e1", source_id="a", target_id="c", relation_type="link",
+        id="e1",
+        source_id="a",
+        target_id="c",
+        relation_type="link",
     )
     await config.graph.add_relationship(updated)
 

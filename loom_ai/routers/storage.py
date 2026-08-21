@@ -106,5 +106,3 @@ def _mount_storage_routes(app: FastAPI, config: LoomConfig, auth_deps: list) -> 
         return {"stored": stored, "total": len(embeddings)}
 
     app.include_router(router)
-
-

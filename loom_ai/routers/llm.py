@@ -40,5 +40,3 @@ def _mount_llm_routes(app: FastAPI, config: LoomConfig, auth_deps: list) -> None
         return resp.__dict__
 
     app.include_router(router)
-
-

@@ -59,7 +59,9 @@ def _mount_graph_routes(app: FastAPI, config: LoomConfig, auth_deps: list) -> No
         direction: str = "outgoing",
     ):
         rels = await config.graph.get_relationships(
-            entity_id, relation_type=relation_type, direction=direction,
+            entity_id,
+            relation_type=relation_type,
+            direction=direction,
         )
         return {"relationships": [r.__dict__ for r in rels]}
 

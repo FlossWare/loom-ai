@@ -32,5 +32,3 @@ def _mount_tools_routes(app: FastAPI, config: LoomConfig, auth_deps: list) -> No
         return result.__dict__
 
     app.include_router(router)
-
-

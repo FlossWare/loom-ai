@@ -19,19 +19,19 @@ class MCPProgressReporter:
         self._lock = threading.Lock()
 
     def report(self, stage: str, message: str, progress_pct: float) -> None:
-        body = json.dumps({
-            "jsonrpc": "2.0",
-            "method": "notifications/progress",
-            "params": {
-                "progressToken": self._token,
-                "progress": progress_pct,
-                "total": 100,
-                "message": message,
-            },
-        })
+        body = json.dumps(
+            {
+                "jsonrpc": "2.0",
+                "method": "notifications/progress",
+                "params": {
+                    "progressToken": self._token,
+                    "progress": progress_pct,
+                    "total": 100,
+                    "message": message,
+                },
+            }
+        )
         encoded = body.encode("utf-8")
         with self._lock:
-            sys.stdout.write(
-                f"Content-Length: {len(encoded)}\r\n\r\n{body}"
-            )
+            sys.stdout.write(f"Content-Length: {len(encoded)}\r\n\r\n{body}")
             sys.stdout.flush()

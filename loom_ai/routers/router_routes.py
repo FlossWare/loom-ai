@@ -106,5 +106,3 @@ def _mount_router_routes(app: FastAPI, config: LoomConfig, auth_deps: list) -> N
         return {"model": body.model, "capabilities": body.capabilities}
 
     app.include_router(router_api)
-
-
