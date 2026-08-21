@@ -42,55 +42,81 @@ class TestFreeModelRouterConsensus:
     @pytest.mark.asyncio
     async def test_consensus_chat_returns_synthesis(self):
         messages = [ChatMessage("user", "test")]
-        synth = ChatResponse("synthesized answer", "gemini-pro", "google")
+        call_count = 0
 
-        async def mock_chat(msgs, *, model=None, temperature=0.7, **kw):
-            return ChatResponse("worker output", model or "m", "p")
-
-        with patch.object(self.router, "chat", side_effect=mock_chat):
-            from loom_ai.consensus import ConsensusEngine, ConsensusResult
-
-            fake_result = ConsensusResult(
-                synthesis=synth,
-                worker_responses=[ChatResponse("w", "m", "p")],
-                failed_models=[],
-                arbiter_attempted=True,
-            )
-            with patch.object(
-                ConsensusEngine, "synthesize", new_callable=AsyncMock
-            ) as mock_synth:
-                mock_synth.return_value = fake_result
-                result = await self.router.consensus_chat(
-                    messages, n_workers=3, temperature=0.7
+        async def mock_call(ep, msgs, temp, max_tokens):
+            nonlocal call_count
+            call_count += 1
+            if call_count <= 3:
+                return ChatResponse(
+                    "worker output", ep.model_id, ep.provider,
                 )
+            return ChatResponse(
+                "synthesized answer", ep.model_id, ep.provider,
+            )
+
+        with patch.object(
+            self.router, "_call", side_effect=mock_call,
+        ):
+            result = await self.router.consensus_chat(
+                messages, n_workers=3, temperature=0.7,
+            )
 
         assert result.content == "synthesized answer"
 
     @pytest.mark.asyncio
     async def test_consensus_chat_fallback_on_arbiter_failure(self):
         messages = [ChatMessage("user", "test")]
-        worker_resp = ChatResponse("worker fallback", "gpt-4", "openai")
+        call_count = 0
 
-        from loom_ai.consensus import ConsensusEngine, ConsensusResult
+        async def mock_call(ep, msgs, temp, max_tokens):
+            nonlocal call_count
+            call_count += 1
+            if call_count <= 2:
+                return ChatResponse(
+                    "worker fallback", ep.model_id, ep.provider,
+                )
+            raise RuntimeError("Arbiter failed")
 
-        fake_result = ConsensusResult(
-            synthesis=ChatResponse(
-                "Arbiter synthesis failed; worker responses are available."
-            ),
-            worker_responses=[worker_resp],
-            failed_models=[],
-            arbiter_attempted=True,
-            arbiter_error="Arbiter call failed after retries",
-        )
         with patch.object(
-            ConsensusEngine, "synthesize", new_callable=AsyncMock
-        ) as mock_synth:
-            mock_synth.return_value = fake_result
+            self.router, "_call", side_effect=mock_call,
+        ):
             result = await self.router.consensus_chat(
-                messages, n_workers=2, temperature=0.7
+                messages, n_workers=2, temperature=0.7,
             )
 
         assert result.content == "worker fallback"
+
+    @pytest.mark.asyncio
+    async def test_consensus_chat_degraded_logged(self):
+        router = FreeModelRouter(consensus=True, n_workers=2)
+        router._initialized = True
+        router._endpoints = [
+            _ModelEndpoint(
+                "openai", "gpt-4", "k1", "a1",
+            ),
+            _ModelEndpoint(
+                "openai", "gpt-3.5", "k2", "a2",
+            ),
+            _ModelEndpoint(
+                "openai", "gpt-4o", "k3", "a3",
+            ),
+        ]
+
+        async def mock_call(ep, msgs, temp, max_tokens):
+            return ChatResponse(
+                "output", ep.model_id, ep.provider,
+            )
+
+        with patch.object(
+            router, "_call", side_effect=mock_call,
+        ):
+            result = await router.consensus_chat(
+                [ChatMessage("user", "test")],
+                n_workers=2,
+            )
+
+        assert result.content == "output"
 
     @pytest.mark.asyncio
     async def test_chat_uses_consensus_when_enabled(self):

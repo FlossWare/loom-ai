@@ -32,6 +32,10 @@ from typing import Any, AsyncIterator
 
 from loom_ai.consensus import ConsensusEngine
 from loom_ai.models import ChatMessage, ChatResponse
+from loom_ai.prompts import (
+    build_arbiter_messages,
+    build_worker_messages,
+)
 
 logger = logging.getLogger(__name__)
 
@@ -659,27 +663,122 @@ class FreeModelRouter:
     ) -> ChatResponse:
         if not self._initialized:
             await self.initialize()
-        workers = self._select_diverse_workers(n=n_workers)
-        worker_model_ids = [ep.model_id for ep in workers]
-        worker_providers = {ep.provider for ep in workers}
-        arbiter_ep = self._select_arbiter(exclude_providers=worker_providers)
-
-        engine = ConsensusEngine(backend=self)
-        user_prompt = "\n".join(m.content for m in messages if m.role == "user")
-
-        result = await engine.synthesize(
-            prompt=user_prompt,
-            models=worker_model_ids,
-            arbiter_model=arbiter_ep.model_id,
-            temperature=temperature,
+        workers = self._select_diverse_workers(
+            n=n_workers,
         )
-        if result.arbiter_error and result.worker_responses:
+        worker_providers = {
+            ep.provider for ep in workers
+        }
+        arbiter_ep = self._select_arbiter(
+            exclude_providers=worker_providers,
+        )
+        degraded = (
+            arbiter_ep.provider in worker_providers
+        )
+        if degraded:
             logger.warning(
-                "Arbiter failed (%s); using best worker response",
-                result.arbiter_error,
+                "Degraded consensus: arbiter shares"
+                " provider with workers",
             )
-            return result.worker_responses[0]
-        return result.synthesis
+
+        user_prompt = "\n".join(
+            m.content
+            for m in messages
+            if m.role == "user"
+        )
+        worker_msgs_raw = build_worker_messages(
+            "design", user_prompt,
+        )
+        worker_msgs = [
+            ChatMessage(
+                role=m["role"], content=m["content"],
+            )
+            for m in worker_msgs_raw
+        ]
+
+        async def _call_worker(
+            ep: _ModelEndpoint,
+        ) -> ChatResponse | None:
+            t0 = time.monotonic()
+            try:
+                resp = await self._call(
+                    ep,
+                    worker_msgs,
+                    temperature,
+                    max_tokens,
+                )
+                self._record(
+                    ep, True, time.monotonic() - t0,
+                )
+                return resp
+            except Exception as exc:
+                self._record(
+                    ep, False, time.monotonic() - t0,
+                )
+                logger.debug(
+                    "Worker %s/%s failed: %s",
+                    ep.provider,
+                    ep.model_id,
+                    exc,
+                )
+                return None
+
+        results = await asyncio.gather(
+            *[_call_worker(ep) for ep in workers],
+        )
+        responses = [
+            r for r in results if r is not None
+        ]
+
+        if not responses:
+            raise RuntimeError(
+                "All consensus workers failed",
+            )
+
+        worker_dicts = [
+            {
+                "model": r.model or "unknown",
+                "response": r.content,
+            }
+            for r in responses
+        ]
+        arbiter_msgs_raw = build_arbiter_messages(
+            user_prompt, worker_dicts,
+        )
+        arbiter_msgs = [
+            ChatMessage(
+                role=m["role"], content=m["content"],
+            )
+            for m in arbiter_msgs_raw
+        ]
+
+        try:
+            t0 = time.monotonic()
+            synthesis = await self._call(
+                arbiter_ep,
+                arbiter_msgs,
+                0.3,
+                max_tokens,
+            )
+            self._record(
+                arbiter_ep,
+                True,
+                time.monotonic() - t0,
+            )
+        except Exception as exc:
+            self._record(
+                arbiter_ep,
+                False,
+                time.monotonic() - t0,
+            )
+            logger.warning(
+                "Arbiter failed (%s); using best"
+                " worker response",
+                exc,
+            )
+            return responses[0]
+
+        return synthesis
 
     async def chat(
         self,
