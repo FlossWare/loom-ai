@@ -31,6 +31,7 @@ from dataclasses import dataclass
 from typing import Any, AsyncIterator
 
 from loom_ai.models import ChatMessage, ChatResponse
+from loom_ai.prompts import build_arbiter_messages
 
 logger = logging.getLogger(__name__)
 
@@ -319,12 +320,16 @@ class FreeModelRouter:
         | LatencyWeightedStrategy
         | CascadeStrategy
         | None = None,
+        consensus: bool = True,
+        n_workers: int = 3,
     ) -> None:
         self._pg_dsn = pg_dsn or os.environ.get("LOOM_PG_DSN", "")
         self._env_fallback = env_fallback
         self._strategy = strategy or ThompsonSamplingStrategy()
         self._endpoints: list[_ModelEndpoint] = []
         self._initialized = False
+        self._consensus = consensus
+        self._n_workers = n_workers
 
     def set_strategy(
         self,
@@ -595,6 +600,118 @@ class FreeModelRouter:
             latency_s=latency_s,
         )
 
+    def _select_diverse_workers(self, n: int = 3) -> list[_ModelEndpoint]:
+        by_provider: dict[str, list[tuple[float, _ModelEndpoint]]] = {}
+        for ep in self._endpoints:
+            key = f"{ep.provider}/{ep.model_id}/{ep.account_name}"
+            score = self._strategy.score(
+                successes=ep.successes,
+                failures=ep.failures,
+                model_id=ep.model_id,
+                provider=ep.provider,
+                endpoint_key=key,
+            )
+            by_provider.setdefault(ep.provider, []).append((score, ep))
+        for group in by_provider.values():
+            group.sort(key=lambda t: t[0], reverse=True)
+        selected: list[_ModelEndpoint] = []
+        providers = list(by_provider.keys())
+        idx = 0
+        while len(selected) < n and providers:
+            provider = providers[idx % len(providers)]
+            group = by_provider[provider]
+            if group:
+                selected.append(group.pop(0)[1])
+            if not group:
+                providers.remove(provider)
+                if providers:
+                    idx = idx % len(providers)
+                continue
+            idx += 1
+        return selected
+
+    def _select_arbiter(self, exclude_providers: set[str]) -> _ModelEndpoint:
+        candidates = [
+            ep for ep in self._endpoints if ep.provider not in exclude_providers
+        ]
+        if not candidates:
+            candidates = self._endpoints[:]
+        return max(
+            candidates,
+            key=lambda ep: self._strategy.score(
+                successes=ep.successes,
+                failures=ep.failures,
+                model_id=ep.model_id,
+                provider=ep.provider,
+                endpoint_key=f"{ep.provider}/{ep.model_id}/{ep.account_name}",
+            ),
+        )
+
+    async def consensus_chat(
+        self,
+        messages: list[ChatMessage],
+        *,
+        n_workers: int = 3,
+        tool_name: str = "design",
+        temperature: float = 0.7,
+        max_tokens: int | None = None,
+    ) -> ChatResponse:
+        if not self._initialized:
+            await self.initialize()
+        workers = self._select_diverse_workers(n=n_workers)
+
+        async def _run_worker(
+            ep: _ModelEndpoint,
+        ) -> tuple[_ModelEndpoint, ChatResponse | None]:
+            t0 = time.monotonic()
+            try:
+                resp = await self._call(ep, messages, temperature, max_tokens)
+                self._record(ep, True, time.monotonic() - t0)
+                return ep, resp
+            except Exception as exc:
+                self._record(ep, False, time.monotonic() - t0)
+                logger.debug("Worker %s/%s failed: %s", ep.provider, ep.model_id, exc)
+                return ep, None
+
+        results = await asyncio.gather(*(_run_worker(ep) for ep in workers))
+
+        worker_dicts: list[dict[str, str]] = []
+        successful: list[ChatResponse] = []
+        for ep, resp in results:
+            if resp is not None and resp.content:
+                successful.append(resp)
+                worker_dicts.append(
+                    {"model": f"{ep.provider}/{ep.model_id}", "response": resp.content}
+                )
+
+        if not successful:
+            raise RuntimeError("All worker endpoints failed in consensus")
+
+        user_prompt = "\n".join(m.content for m in messages if m.role == "user")
+        arbiter_msg_dicts = build_arbiter_messages(user_prompt, worker_dicts)
+        arbiter_msgs = [
+            ChatMessage(role=d["role"], content=d["content"]) for d in arbiter_msg_dicts
+        ]
+
+        worker_providers = {ep.provider for ep, _ in results}
+        arbiter_ep = self._select_arbiter(exclude_providers=worker_providers)
+        t0 = time.monotonic()
+        try:
+            arbiter_resp = await self._call(
+                arbiter_ep, arbiter_msgs, temperature, max_tokens
+            )
+            self._record(arbiter_ep, True, time.monotonic() - t0)
+            return arbiter_resp
+        except Exception as exc:
+            self._record(arbiter_ep, False, time.monotonic() - t0)
+            logger.warning(
+                "Arbiter %s/%s failed: %s",
+                arbiter_ep.provider,
+                arbiter_ep.model_id,
+                exc,
+            )
+            return successful[0]
+
     async def chat(
         self,
         messages: list[ChatMessage],
@@ -605,6 +722,18 @@ class FreeModelRouter:
     ) -> ChatResponse:
         if not self._initialized:
             await self.initialize()
+
+        if (
+            self._consensus
+            and model is None
+            and len(self._endpoints) >= self._n_workers + 1
+        ):
+            return await self.consensus_chat(
+                messages,
+                n_workers=self._n_workers,
+                temperature=temperature,
+                max_tokens=max_tokens,
+            )
 
         candidates = self._select_endpoint(model)
         if not candidates:
