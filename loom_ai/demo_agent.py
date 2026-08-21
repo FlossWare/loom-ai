@@ -1,16 +1,8 @@
 """End-to-end Loom agent that resolves a real issue.
 
-Demonstrates the full Loom pipeline: read repo context, plan a fix via
-LLM, apply changes via code actions, run tests, and report results.
-
-Usage::
-
-    python -m loom_ai.demo_agent --issue 123 --workspace /path/to/repo
-
-    # Or programmatically:
-    from loom_ai.demo_agent import DemoAgent
-    agent = await DemoAgent.create(workspace="/path/to/repo")
-    result = await agent.run(issue_number=123)
+The demo agent is intentionally conservative when publication is enabled:
+workspace state is captured before mutation, changes are reviewed and
+verified, and Git/PR mutation is performed only through ``GitTransaction``.
 """
 
 from __future__ import annotations
@@ -23,11 +15,8 @@ from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Any, Protocol, runtime_checkable
 
-from loom_ai.backends.code_actions import (
-    apply_diff,
-    run_linter,
-    run_tests,
-)
+from loom_ai.backends.code_actions import apply_diff, run_linter, run_tests
+from loom_ai.git_transaction import GitTransaction, TransactionPolicy
 from loom_ai.models import ChatMessage, ChatResponse
 from loom_ai.session_persistence import SessionManager
 
@@ -36,22 +25,16 @@ logger = logging.getLogger(__name__)
 
 @runtime_checkable
 class ProgressCallback(Protocol):
-    """Callback for streaming progress updates from DemoAgent."""
-
     def report(self, stage: str, message: str, progress_pct: float) -> None: ...
 
 
 class _NullProgress:
-    """No-op progress callback (default)."""
-
     def report(self, stage: str, message: str, progress_pct: float) -> None:
-        pass  # intentional no-op for null progress callback
+        pass
 
 
 @dataclass
 class AgentResult:
-    """Outcome of a single agent run."""
-
     issue: int
     plan: str = ""
     changes: list[dict] = field(default_factory=list)
@@ -63,23 +46,19 @@ class AgentResult:
     run_state: dict = field(default_factory=dict)
 
 
-async def _git(
-    *args: str,
-    cwd: str,
-) -> str:
+async def _git(*args: str, cwd: str) -> str:
     proc = await asyncio.create_subprocess_exec(
-        "git",
-        *args,
-        cwd=cwd,
+        "git", *args, cwd=cwd,
         stdout=asyncio.subprocess.PIPE,
         stderr=asyncio.subprocess.PIPE,
     )
-    stdout, _ = await proc.communicate()
+    stdout, stderr = await proc.communicate()
+    if proc.returncode != 0:
+        raise RuntimeError(f"git {' '.join(args)} failed: {stderr.decode(errors='replace').strip()}")
     return stdout.decode(errors="replace").strip()
 
 
 async def _read_file(path: Path) -> str:
-    """Read a file, returning empty string on error."""
     try:
         return await asyncio.to_thread(path.read_text)
     except Exception:
@@ -87,11 +66,7 @@ async def _read_file(path: Path) -> str:
 
 
 class DemoAgent:
-    """Loom agent that resolves issues end-to-end.
-
-    Uses any :class:`~loom_ai.protocols.LLMBackend` (including
-    ``FreeModelRouter``) for planning and code generation.
-    """
+    """Loom agent that resolves issues end-to-end."""
 
     def __init__(
         self,
@@ -113,125 +88,57 @@ class DemoAgent:
             "LOOM_GIT_EMAIL", "loom-ai@users.noreply.github.com"
         )
         self._progress: ProgressCallback = on_progress or _NullProgress()
+        self._transaction: GitTransaction | None = None
 
     @classmethod
-    async def create(
-        cls,
-        workspace: str | None = None,
-    ) -> DemoAgent:
-        """Create agent from environment, auto-detecting LLM backend."""
+    async def create(cls, workspace: str | None = None) -> "DemoAgent":
         ws = workspace or os.getcwd()
-
         llm = None
         base_url = os.environ.get("LOOM_LLM_BASE_URL")
         if base_url:
             from loom_ai.backends.http_llm import HttpLLMBackend
-
             llm = HttpLLMBackend(
                 base_url=base_url,
                 api_key=os.environ.get("LOOM_LLM_API_KEY", ""),
-                default_model=os.environ.get(
-                    "LOOM_LLM_MODEL",
-                    "gpt-4o-mini",
-                ),
+                default_model=os.environ.get("LOOM_LLM_MODEL", "gpt-4o-mini"),
             )
-
         if llm is None:
             try:
-                from loom_ai.backends.free_model_router import (
-                    FreeModelRouter,
-                )
-
+                from loom_ai.backends.free_model_router import FreeModelRouter
                 llm = FreeModelRouter()
                 await llm.initialize()
             except Exception as exc:
                 logger.warning("FreeModelRouter unavailable: %s", exc)
-
         if llm is None:
             raise RuntimeError(
-                "No LLM backend available. Set LOOM_LLM_BASE_URL or "
-                "configure FreeModelRouter."
+                "No LLM backend available. Set LOOM_LLM_BASE_URL or configure FreeModelRouter."
             )
-
-        session_mgr = await cls._build_session_manager()
-        return cls(
-            llm=llm,
-            workspace=ws,
-            session_manager=session_mgr,
-        )
+        return cls(llm=llm, workspace=ws, session_manager=await cls._build_session_manager())
 
     @classmethod
-    async def _build_session_manager(
-        cls,
-    ) -> SessionManager:
-        """Build a SessionManager with available backends.
+    async def _build_session_manager(cls) -> SessionManager:
+        storage = os.environ.get("LOOM_STORAGE", "memory")
+        if storage == "postgresql":
+            from loom_ai.backends.postgresql import (
+                PostgresqlKnowledgePipeline,
+                PostgresqlPersistentMemory,
+                get_shared_pool,
+            )
+            pool = await get_shared_pool()
+            memory = await PostgresqlPersistentMemory.from_env(pool=pool)
+            knowledge = await PostgresqlKnowledgePipeline.from_env(pool=pool)
+            logger.info("SessionManager wired with PostgreSQL")
+            return SessionManager(memory=memory, knowledge=knowledge)
+        if storage not in {"", "memory"}:
+            raise RuntimeError(f"Unsupported LOOM_STORAGE backend: {storage}")
+        from loom_ai.backends.knowledge import InMemoryKnowledgePipeline, TokenChunker
+        from loom_ai.backends.memory import InMemoryPersistentMemory
+        return SessionManager(
+            memory=InMemoryPersistentMemory(),
+            knowledge=InMemoryKnowledgePipeline(TokenChunker()),
+        )
 
-        Prefers PostgreSQL when LOOM_STORAGE=postgresql,
-        falls back to in-memory backends otherwise.
-        """
-        if os.environ.get("LOOM_STORAGE") == "postgresql":
-            try:
-                from loom_ai.backends.postgresql import (
-                    PostgresqlKnowledgePipeline,
-                    PostgresqlPersistentMemory,
-                    get_shared_pool,
-                )
-
-                pool = await get_shared_pool()
-                memory = (
-                    await PostgresqlPersistentMemory
-                    .from_env(pool=pool)
-                )
-                knowledge = (
-                    await PostgresqlKnowledgePipeline
-                    .from_env(pool=pool)
-                )
-                logger.info(
-                    "SessionManager wired with PG"
-                )
-                return SessionManager(
-                    memory=memory,
-                    knowledge=knowledge,
-                )
-            except Exception as exc:
-                logger.warning(
-                    "PG session backend failed: %s;"
-                    " falling back to in-memory",
-                    exc,
-                )
-
-        try:
-            from loom_ai.backends.knowledge import (
-                InMemoryKnowledgePipeline,
-                TokenChunker,
-            )
-            from loom_ai.backends.memory import (
-                InMemoryPersistentMemory,
-            )
-
-            memory = InMemoryPersistentMemory()
-            knowledge = InMemoryKnowledgePipeline(
-                TokenChunker(),
-            )
-            logger.info(
-                "SessionManager wired with in-memory"
-            )
-            return SessionManager(
-                memory=memory, knowledge=knowledge,
-            )
-        except Exception as exc:
-            logger.warning(
-                "Session backend init failed: %s",
-                exc,
-            )
-            return SessionManager()
-
-    async def _chat(
-        self,
-        prompt: str,
-        *,
-        system: str = "",
-    ) -> str:
+    async def _chat(self, prompt: str, *, system: str = "") -> str:
         msgs: list[ChatMessage] = []
         if system:
             msgs.append(ChatMessage(role="system", content=system))
@@ -239,77 +146,42 @@ class DemoAgent:
         resp: ChatResponse = await self._llm.chat(msgs)
         return resp.content
 
-    async def _gather_context(
-        self,
-        issue_text: str,
-    ) -> str:
-        """Gather repo context relevant to the issue."""
-        ws = self._workspace
-        recent_log = await _git(
-            "log",
-            "--oneline",
-            "-20",
-            cwd=ws,
-        )
-        tree = await _git(
-            "ls-tree",
-            "-r",
-            "--name-only",
-            "HEAD",
-            cwd=ws,
-        )
-        file_list = tree[:3000]
-
+    async def _gather_context(self, issue_text: str) -> str:
+        recent_log = await _git("log", "--oneline", "-20", cwd=self._workspace)
+        tree = await _git("ls-tree", "-r", "--name-only", "HEAD", cwd=self._workspace)
         return (
             f"## Issue\n{issue_text}\n\n"
             f"## Recent commits\n{recent_log}\n\n"
-            f"## File tree (truncated)\n{file_list}"
+            f"## File tree (truncated)\n{tree[:3000]}"
         )
 
-    async def _plan(
-        self,
-        context: str,
-    ) -> str:
-        """Ask the LLM to produce an implementation plan."""
+    async def _plan(self, context: str) -> str:
         system = (
-            "You are a senior software engineer working on the loom-ai "
-            "project. Produce a concise implementation plan for the "
-            "given issue. List specific files to modify, what to change "
-            "in each, and a test strategy. Output JSON with keys: "
-            '"files" (list of {path, changes}), "test_strategy".'
+            "You are a senior software engineer working on loom-ai. "
+            "Produce a concise implementation plan. List specific files, changes, "
+            "and a test strategy. Output JSON with keys files and test_strategy."
         )
         return await self._chat(context, system=system)
 
-    async def _implement(
-        self,
-        plan: str,
-        context: str,
-    ) -> list[dict]:
-        """Ask the LLM to generate diffs, then apply them."""
+    async def _implement(self, plan: str, context: str) -> list[dict]:
         system = (
-            "You are implementing a plan. For each change, output JSON "
-            "with keys: file, search, replace. The search text must be "
-            "an exact unique substring of the current file content. "
-            "Output a JSON array of changes."
+            "You are implementing a plan. For each change output JSON with keys "
+            "file, search, replace. Search must be an exact unique substring of "
+            "the current file. Output a JSON array."
         )
-        prompt = f"## Plan\n{plan}\n\n## Context\n{context}"
-        raw = await self._chat(prompt, system=system)
-
-        changes: list[dict] = []
+        raw = await self._chat(f"## Plan\n{plan}\n\n## Context\n{context}", system=system)
         try:
-            parsed = json.loads(raw[raw.find("[") : raw.rfind("]") + 1] or "[]")
-        except ValueError:
+            start, end = raw.find("["), raw.rfind("]")
+            parsed = json.loads(raw[start:end + 1] if start >= 0 and end >= start else "[]")
+        except (ValueError, TypeError):
             logger.warning("Failed to parse LLM diff output")
-            return changes
-
+            return []
+        changes: list[dict] = []
         for change in parsed:
-            if not all(k in change for k in ("file", "search", "replace")):
+            if not isinstance(change, dict) or not all(k in change for k in ("file", "search", "replace")):
                 continue
             result = await apply_diff(
-                change["file"],
-                change["search"],
-                change["replace"],
-                workspace=self._workspace,
+                change["file"], change["search"], change["replace"], workspace=self._workspace
             )
             changes.append({**change, "result": result})
         return changes
@@ -318,259 +190,120 @@ class DemoAgent:
     _REVIEW_VOTES_NEEDED = 2
     _REVIEW_ROUNDS = 3
 
-    async def _commit_and_pr(
-        self,
-        issue_number: int,
-        changed_files: list[str],
-    ) -> dict:
-        """Create a branch, commit changes, push, and open a PR."""
-        if not self._allow_push:
-            raise RuntimeError("Push/PR disabled; set allow_push=True to enable")
-        branch = f"fix/issue-{issue_number}"
-        existing = await _git("branch", "--list", branch, cwd=self._workspace)
-        if existing.strip():
-            for suffix in range(2, 11):
-                candidate = f"{branch}-{suffix}"
-                check = await _git("branch", "--list", candidate, cwd=self._workspace)
-                if not check.strip():
-                    branch = candidate
-                    break
-        await _git("checkout", "-b", branch, cwd=self._workspace)
-        for f in changed_files:
-            await _git("add", f, cwd=self._workspace)
-        await _git(
-            "-c",
-            f"user.name={self._git_name}",
-            "-c",
-            f"user.email={self._git_email}",
-            "commit",
-            "-m",
-            f"fix: resolve issue #{issue_number}",
-            cwd=self._workspace,
-        )
-        await _git(
-            "push",
-            "--set-upstream",
-            "origin",
-            branch,
-            cwd=self._workspace,
-        )
-        proc = await asyncio.create_subprocess_exec(
-            "gh",
-            "pr",
-            "create",
-            "--head",
-            branch,
-            "--base",
-            "main",
-            "--title",
-            f"fix: resolve issue #{issue_number}",
-            "--body",
-            f"Fixes #{issue_number}",
-            stdout=asyncio.subprocess.PIPE,
-            stderr=asyncio.subprocess.PIPE,
-            cwd=self._workspace,
-        )
-        stdout, stderr = await proc.communicate()
-        if proc.returncode != 0:
-            raise RuntimeError(
-                f"gh pr create failed: {stderr.decode(errors='replace')}"
-            )
-        pr_url = stdout.decode(errors="replace").strip()
-        return {"branch": branch, "pr_url": pr_url}
-
-    async def _get_diff(self) -> str:
-        """Return git diff of uncommitted changes in the workspace."""
-        return await _git("diff", cwd=self._workspace)
-
     @staticmethod
-    def _parse_review_response(
-        response: str,
-    ) -> tuple[bool, list[str]]:
-        """Parse a single review response into (approved, issues)."""
-        if "APPROVE" in response.upper():
+    def _parse_review_response(response: str) -> tuple[bool, list[str]]:
+        upper = response.upper()
+        # Only accept an explicit approval token, not prose containing the word.
+        if any(line.strip().upper() == "APPROVE" for line in response.splitlines()):
             return True, []
         issues: list[str] = []
         for line in response.splitlines():
             stripped = line.strip()
-            if not stripped:
+            if not stripped or stripped.upper() == "REJECT":
                 continue
-            upper = stripped.upper()
-            if upper == "REJECT":
-                continue
-            if upper.startswith("REJECT"):
+            if stripped.upper().startswith("REJECT"):
                 stripped = stripped.split(":", 1)[-1].strip()
             if stripped:
                 issues.append(stripped)
         return False, issues
 
-    async def _review_changes(
-        self,
-        diff: str,
-        context: str,
-    ) -> dict:
-        """Send diff to the LLM multiple times for diverse review.
-
-        Returns ``{"approved": bool, "issues": list[str], "votes": int}``.
-        Approval requires at least ``_REVIEW_VOTES_NEEDED`` of
-        ``_REVIEW_ROUNDS`` votes.
-        """
+    async def _review_changes(self, diff: str, context: str) -> dict:
         system = (
-            "You are a strict code reviewer for the loom-ai project. "
-            "Review the git diff below against the issue context. "
-            "Check for correctness, security, and style. "
-            "Respond with APPROVE if the changes are correct, or "
-            "REJECT followed by a numbered list of specific issues."
+            "You are a strict code reviewer for loom-ai. Review the diff for correctness, "
+            "security and style. Respond on its own line with exactly APPROVE when correct, "
+            "otherwise REJECT followed by specific issues."
         )
         prompt = f"## Context\n{context[:2000]}\n\n## Diff\n{diff[:4000]}"
-
         votes = 0
         all_issues: list[str] = []
-
         for _ in range(self._REVIEW_ROUNDS):
             try:
-                response = await self._chat(prompt, system=system)
-                ok, issues = self._parse_review_response(response)
-                if ok:
-                    votes += 1
-                else:
-                    all_issues.extend(issues)
+                ok, issues = self._parse_review_response(
+                    await self._chat(prompt, system=system)
+                )
+                votes += int(ok)
+                all_issues.extend(issues)
             except Exception as exc:
                 logger.warning("Review call failed: %s", exc)
-
         return {
             "approved": votes >= self._REVIEW_VOTES_NEEDED,
             "issues": all_issues,
             "votes": votes,
         }
 
-    async def _fetch_issue(
-        self,
-        issue_number: int,
-    ) -> str:
-        """Fetch issue text from GitHub CLI."""
+    async def _fetch_issue(self, issue_number: int) -> str:
         proc = await asyncio.create_subprocess_exec(
-            "gh",
-            "issue",
-            "view",
-            str(issue_number),
-            "--repo",
-            "FlossWare/loom-ai",
-            cwd=self._workspace,
-            stdout=asyncio.subprocess.PIPE,
-            stderr=asyncio.subprocess.PIPE,
+            "gh", "issue", "view", str(issue_number), "--repo", "FlossWare/loom-ai",
+            cwd=self._workspace, stdout=asyncio.subprocess.PIPE, stderr=asyncio.subprocess.PIPE,
         )
-        stdout, _ = await proc.communicate()
+        stdout, stderr = await proc.communicate()
+        if proc.returncode != 0:
+            raise RuntimeError(f"gh issue view failed: {stderr.decode(errors='replace').strip()}")
         return stdout.decode(errors="replace")
 
-    async def _build_context(
-        self,
-        issue_text: str,
-        sid: str,
-    ) -> str:
-        """Gather repo context and append prior knowledge."""
+    async def _build_context(self, issue_text: str, sid: str) -> str:
         context = await self._gather_context(issue_text)
-        logger.info("Gathered repo context (%d chars)", len(context))
-
-        prior = await self._session.recover_context(
-            project="loom-ai",
-            query=issue_text[:200],
-        )
+        prior = await self._session.recover_context(project="loom-ai", query=issue_text[:200])
         if prior.knowledge:
             context += "\n\n## Prior knowledge\n" + "\n".join(
                 k["content"][:500] for k in prior.knowledge[:3]
             )
             await self._session.record_event(
-                sid,
-                f"recovered {len(prior.knowledge)} prior findings",
-                kind="observation",
+                sid, f"recovered {len(prior.knowledge)} prior findings", kind="observation"
             )
         return context
 
     async def _try_attempt(
-        self,
-        plan: str,
-        context: str,
-        attempt: int,
-        result: AgentResult,
-        sid: str,
+        self, plan: str, context: str, attempt: int, result: AgentResult, sid: str
     ) -> tuple[bool | None, str]:
-        """Run one implement-review attempt.
-
-        Returns ``(approved_or_none, updated_context)``.
-        ``None`` means no changes were applied (caller should stop).
-        """
         changes = await self._implement(plan, context)
         result.changes = changes
         applied = [c for c in changes if c.get("result", {}).get("applied")]
-        logger.info(
-            "Applied %d/%d changes (attempt %d)",
-            len(applied),
-            len(changes),
-            attempt + 1,
-        )
-
         for c in applied:
             await self._session.record_event(
-                sid,
-                f"applied diff to {c.get('file', '?')}",
-                kind="fix",
+                sid, f"applied diff to {c.get('file', '?')}", kind="fix"
             )
-
         if not applied:
             result.error = "No changes applied"
             return None, context
-
-        diff = await self._get_diff()
+        diff = await _git("diff", cwd=self._workspace)
         if not diff:
-            logger.info("No diff detected, skipping review")
-            return True, context
-
+            result.error = "No git diff detected after applying changes"
+            return None, context
         review = await self._review_changes(diff, context)
-        logger.info(
-            "Review attempt %d: %d/%d votes, approved=%s",
-            attempt + 1,
-            review["votes"],
-            self._REVIEW_ROUNDS,
-            review["approved"],
-        )
         await self._session.record_event(
             sid,
-            f"review attempt {attempt + 1}: "
-            f"{review['votes']}/{self._REVIEW_ROUNDS} approved",
+            f"review attempt {attempt + 1}: {review['votes']}/{self._REVIEW_ROUNDS} approved",
             kind="observation",
         )
-
         if review["approved"]:
             return True, context
-
         if review["issues"]:
-            feedback = "\n".join(review["issues"][:5])
-            context += f"\n\n## Review feedback (attempt {attempt + 1})\n{feedback}"
-            logger.warning(
-                "Review rejected (attempt %d), retrying: %s",
-                attempt + 1,
-                feedback[:200],
-            )
+            context += "\n\n## Review feedback\n" + "\n".join(review["issues"][:5])
         return False, context
 
-    async def _resolve_issue_text(
-        self,
-        issue_number: int | None,
-        issue_text: str,
-    ) -> str:
-        """Return issue text, fetching from GitHub if needed."""
-        if not issue_text and issue_number:
-            issue_text = await self._fetch_issue(issue_number)
-        return issue_text
+    async def _begin_publication(self, issue_number: int) -> None:
+        if not self._allow_push:
+            raise RuntimeError("Push/PR disabled; set allow_push=True to enable")
+        tx = GitTransaction(
+            self._workspace,
+            TransactionPolicy(allow_dirty=False, require_verification=True),
+        )
+        await tx.begin()
+        base = f"fix/issue-{issue_number}"
+        branch = base
+        for suffix in range(0, 10):
+            candidate = base if suffix == 0 else f"{base}-{suffix + 1}"
+            existing = await _git("branch", "--list", candidate, cwd=self._workspace)
+            if not existing.strip():
+                branch = candidate
+                break
+        await tx.create_branch(branch)
+        self._transaction = tx
 
     async def _finalize(
-        self,
-        result: AgentResult,
-        auto_pr: bool,
-        issue_number: int | None,
+        self, result: AgentResult, auto_pr: bool, issue_number: int | None
     ) -> None:
-        """Run lint, tests, and optionally create a PR."""
         result.lint_result = await run_linter(workspace=self._workspace)
         result.test_result = await run_tests(workspace=self._workspace)
         lint_ok = result.lint_result.get("exit_code", 1) == 0
@@ -578,34 +311,33 @@ class DemoAgent:
         result.success = lint_ok and test_ok
         if not (auto_pr and result.success):
             return
-        changed = [
+        if self._transaction is None:
+            raise RuntimeError("Publication transaction was not initialized")
+        changed = list(dict.fromkeys(
             c["file"] for c in result.changes if c.get("result", {}).get("applied")
-        ]
-        if changed:
-            pr_info = await self._commit_and_pr(issue_number or 0, changed)
-            result.pr_url = pr_info["pr_url"]
+        ))
+        if not changed:
+            raise RuntimeError("No changed files available for publication")
+        self._transaction.mark_verified()
+        await self._transaction.stage_and_commit(
+            changed,
+            f"fix: resolve issue #{issue_number or 0}",
+            author_name=self._git_name,
+            author_email=self._git_email,
+        )
+        await self._transaction.push()
+        result.pr_url = await self._transaction.create_pr(
+            title=f"fix: resolve issue #{issue_number or 0}",
+            body=f"Fixes #{issue_number or 0}\n\nVerification: lint and tests passed.",
+        )
 
-    async def _run_review_loop(
-        self,
-        plan: str,
-        context: str,
-        result: AgentResult,
-        sid: str,
-    ) -> bool:
-        """Run implement-review attempts, returning whether approved."""
+    async def _run_review_loop(self, plan: str, context: str, result: AgentResult, sid: str) -> bool:
         for attempt in range(self._MAX_REVIEW_ATTEMPTS):
             self._progress.report(
-                "review",
-                f"Review round {attempt + 1}/{self._MAX_REVIEW_ATTEMPTS}",
+                "review", f"Review round {attempt + 1}/{self._MAX_REVIEW_ATTEMPTS}",
                 55 + (attempt + 1) * 5,
             )
-            status, context = await self._try_attempt(
-                plan,
-                context,
-                attempt,
-                result,
-                sid,
-            )
+            status, context = await self._try_attempt(plan, context, attempt, result, sid)
             if status is None:
                 return False
             if status:
@@ -613,184 +345,83 @@ class DemoAgent:
         return False
 
     async def run(
-        self,
-        issue_number: int | None = None,
-        issue_text: str = "",
-        *,
-        auto_pr: bool = False,
+        self, issue_number: int | None = None, issue_text: str = "", *, auto_pr: bool = False
     ) -> AgentResult:
-        """Execute the full agent loop for an issue."""
-        from loom_ai.run_state import (
-            RunPhase,
-            RunStateMachine,
-        )
-
+        from loom_ai.run_state import RunPhase, RunStateMachine
         run_id = f"run-{issue_number or 0}"
         sm = RunStateMachine(run_id)
         result = AgentResult(issue=issue_number or 0)
-
-        sid = await self._session.create_session(
-            project="loom-ai",
-            metadata={"issue": issue_number or 0},
-        )
-
-        sm.transition(RunPhase.FETCHING)
-        self._progress.report(
-            "fetch", "Fetching issue...", 10
-        )
-        if not issue_text and issue_number:
-            try:
-                issue_text = (
-                    await self._fetch_issue(
-                        issue_number
-                    )
-                )
-            except Exception as exc:
-                result.error = (
-                    f"Failed to fetch issue: {exc}"
-                )
-                sm.fail()
-                result.run_state = sm.to_dict()
-                return result
-
-        if not issue_text:
-            result.error = "No issue text provided"
-            sm.fail()
-            result.run_state = sm.to_dict()
-            return result
-
+        sid = await self._session.create_session(project="loom-ai", metadata={"issue": issue_number or 0})
         try:
+            sm.transition(RunPhase.FETCHING)
+            self._progress.report("fetch", "Fetching issue...", 10)
+            issue_text = await self._resolve_issue_text(issue_number, issue_text)
+            if not issue_text:
+                raise RuntimeError("No issue text provided")
+
             sm.transition(RunPhase.PLANNING)
-            self._progress.report(
-                "context",
-                "Gathering repo context...",
-                20,
-            )
-            context = await self._build_context(
-                issue_text, sid
-            )
-            self._progress.report(
-                "plan",
-                "Planning implementation...",
-                35,
-            )
+            context = await self._build_context(issue_text, sid)
+            self._progress.report("plan", "Planning implementation...", 35)
             plan = await self._plan(context)
             result.plan = plan
-            logger.info(
-                "Generated plan (%d chars)",
-                len(plan),
-            )
-            await self._session.record_event(
-                sid,
-                f"planned {len(plan)} chars",
-                kind="decision",
-            )
+            await self._session.record_event(sid, f"planned {len(plan)} chars", kind="decision")
+
+            if auto_pr:
+                await self._begin_publication(issue_number or 0)
 
             sm.transition(RunPhase.EXECUTING)
-            self._progress.report(
-                "implement",
-                "Implementing changes...",
-                55,
-            )
-            approved = await self._run_review_loop(
-                plan,
-                context,
-                result,
-                sid,
-            )
-
-            if approved:
+            self._progress.report("implement", "Implementing changes...", 55)
+            approved = await self._run_review_loop(plan, context, result, sid)
+            if not approved:
+                result.error = result.error or (
+                    f"Review not approved after {self._MAX_REVIEW_ATTEMPTS} attempts"
+                )
+                sm.fail()
+                if self._transaction:
+                    await self._transaction.rollback()
+            else:
                 sm.transition(RunPhase.VERIFYING)
-                self._progress.report(
-                    "finalize",
-                    "Running lint and tests...",
-                    80,
-                )
-                await self._finalize(
-                    result, auto_pr, issue_number
-                )
-
+                self._progress.report("finalize", "Running lint and tests...", 80)
+                await self._finalize(result, auto_pr, issue_number)
                 sm.transition(RunPhase.PERSISTING)
                 await self._session.persist(sid)
-
                 sm.transition(RunPhase.COMPLETED)
                 if result.pr_url:
                     sm.transition(RunPhase.PUBLISHED)
-                self._progress.report(
-                    "done", "Complete.", 100
-                )
-            else:
-                sm.fail()
-                if not result.error:
-                    result.error = (
-                        "Review not approved after "
-                        f"{self._MAX_REVIEW_ATTEMPTS}"
-                        " attempts"
-                    )
-
+                self._progress.report("done", "Complete.", 100)
         except Exception as exc:
             result.error = str(exc)
             sm.fail()
+            if self._transaction:
+                try:
+                    await self._transaction.rollback()
+                except Exception as rollback_exc:
+                    logger.error("Rollback failed: %s", rollback_exc)
             logger.exception("Agent run failed")
-
-        if not sm.is_terminal:
-            await self._session.persist(sid)
-            sm.fail()
-
+            try:
+                await self._session.persist(sid)
+            except Exception:
+                logger.exception("Failed to persist failed session")
         result.run_state = sm.to_dict()
         return result
+
+    async def _resolve_issue_text(self, issue_number: int | None, issue_text: str) -> str:
+        if not issue_text and issue_number:
+            issue_text = await self._fetch_issue(issue_number)
+        return issue_text
 
 
 async def _main() -> None:
     import argparse
-
-    parser = argparse.ArgumentParser(
-        description="Loom demo agent — resolve a GitHub issue",
-    )
-    parser.add_argument(
-        "--issue",
-        type=int,
-        help="GitHub issue number",
-    )
-    parser.add_argument(
-        "--workspace",
-        default=os.getcwd(),
-        help="Repo path",
-    )
-    parser.add_argument(
-        "--issue-text",
-        default="",
-        help="Issue text (instead of fetching)",
-    )
+    parser = argparse.ArgumentParser(description="Loom demo agent — resolve a GitHub issue")
+    parser.add_argument("--issue", type=int, help="GitHub issue number")
+    parser.add_argument("--workspace", default=os.getcwd(), help="Repo path")
+    parser.add_argument("--auto-pr", action="store_true", help="Create and publish a PR")
     args = parser.parse_args()
-
-    logging.basicConfig(level=logging.INFO)
     agent = await DemoAgent.create(workspace=args.workspace)
-    result = await agent.run(
-        issue_number=args.issue,
-        issue_text=args.issue_text,
-    )
-
-    print(
-        json.dumps(
-            {
-                "issue": result.issue,
-                "success": result.success,
-                "changes_applied": len(
-                    [c for c in result.changes if c.get("result", {}).get("applied")]
-                ),
-                "test_passed": result.test_result.get("passed", 0),
-                "test_failed": result.test_result.get("failed", 0),
-                "error": result.error,
-            },
-            indent=2,
-        )
-    )
-
-
-def main() -> None:
-    asyncio.run(_main())
+    result = await agent.run(issue_number=args.issue, auto_pr=args.auto_pr)
+    print(json.dumps(result.__dict__, indent=2, default=str))
 
 
 if __name__ == "__main__":
-    main()
+    asyncio.run(_main())
