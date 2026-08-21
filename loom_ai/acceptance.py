@@ -11,11 +11,7 @@ from uuid import uuid4
 
 from loom_ai.preflight import PreflightChecker
 from loom_ai.provenance import EventKind, EvidenceLedger
-from loom_ai.quality import (
-    GateResult,
-    QualificationSummary,
-    QualityGate,
-)
+from loom_ai.quality import GateResult, QualificationSummary, QualityGate
 
 
 class AcceptanceStep(str, Enum):
@@ -34,14 +30,14 @@ class AcceptanceStep(str, Enum):
 class StepResult:
     step: AcceptanceStep
     passed: bool
-    evidence: dict[str, Any] = field(
-        default_factory=dict,
-    )
+    evidence: dict[str, Any] = field(default_factory=dict)
     error: str = ""
     duration_ms: float = 0.0
 
 
 class AcceptanceHarness:
+    """Run deterministic dogfood acceptance checks and preserve evidence."""
+
     def __init__(
         self,
         workspace: str,
@@ -49,9 +45,7 @@ class AcceptanceHarness:
         ledger: EvidenceLedger | None = None,
     ) -> None:
         self._workspace = workspace
-        self._ledger = ledger or EvidenceLedger(
-            run_id=f"acceptance-{uuid4()}",
-        )
+        self._ledger = ledger or EvidenceLedger(run_id=f"acceptance-{uuid4()}")
         self._results: list[StepResult] = []
 
     def run_step(
@@ -62,8 +56,19 @@ class AcceptanceHarness:
         start = time.perf_counter()
         try:
             evidence = check_fn()
-            passed = True
-            error = ""
+            # A check may return structured evidence containing its own
+            # verdict. Never turn {"passed": false} or {"ready": false}
+            # into a successful acceptance step merely because no
+            # exception was raised.
+            if "passed" in evidence:
+                passed = bool(evidence["passed"])
+            elif "ready" in evidence:
+                passed = bool(evidence["ready"])
+            elif "success" in evidence:
+                passed = bool(evidence["success"])
+            else:
+                passed = True
+            error = "" if passed else str(evidence.get("error", "check failed"))
         except Exception as exc:
             evidence = {}
             passed = False
@@ -82,6 +87,7 @@ class AcceptanceHarness:
             payload={
                 "step": step.value,
                 "passed": passed,
+                "error": error,
                 **evidence,
             },
         )
@@ -99,20 +105,22 @@ class AcceptanceHarness:
                     for c in summary["checks"]
                     if c["status"] != "pass" and c["required"]
                 ]
-                raise RuntimeError(f"Preflight failed: {', '.join(failing)}")
-            return summary
+                return {
+                    **summary,
+                    "passed": False,
+                    "error": f"Preflight failed: {', '.join(failing)}",
+                }
+            return {**summary, "passed": True}
 
-        return self.run_step(
-            AcceptanceStep.PREFLIGHT,
-            _check,
-        )
+        return self.run_step(AcceptanceStep.PREFLIGHT, _check)
 
     @property
     def results(self) -> list[StepResult]:
         return list(self._results)
 
     def all_passed(self) -> bool:
-        return all(r.passed for r in self._results)
+        """Return true only when at least one step ran and every step passed."""
+        return bool(self._results) and all(r.passed for r in self._results)
 
     def report(self) -> dict[str, Any]:
         return {
@@ -145,9 +153,7 @@ class AcceptanceHarness:
             for r in self._results
         ]
         return QualificationSummary(
-            timestamp=datetime.now(
-                timezone.utc,
-            ).isoformat(),
+            timestamp=datetime.now(timezone.utc).isoformat(),
             commit_sha=commit_sha,
             python_version=python_version,
             gates=gates,

@@ -1,7 +1,7 @@
 """Agent run lifecycle state machine (#821).
 
 Defines a single authoritative state machine for engineering
-runs.  All surfaces (DemoAgent, MCP, CLI, API) must report
+runs. All surfaces (DemoAgent, MCP, CLI, API) must report
 the same semantic phase.
 """
 
@@ -46,7 +46,12 @@ _TRANSITIONS: dict[RunPhase, set[RunPhase]] = {
         RunPhase.CANCELLED,
     },
     RunPhase.EXECUTING: {
+        # DemoAgent currently performs the review loop inside its
+        # execution phase. Keep the explicit REVIEWING state for
+        # callers that expose review as a separate phase, while also
+        # allowing the embedded-review execution path to proceed.
         RunPhase.REVIEWING,
+        RunPhase.VERIFYING,
         RunPhase.FAILED,
         RunPhase.CANCELLED,
     },
@@ -96,7 +101,7 @@ class IllegalTransitionError(Exception):
         run_id: str,
         current: RunPhase,
         target: RunPhase,
-    ):
+    ) -> None:
         self.run_id = run_id
         self.current = current
         self.target = target
@@ -110,11 +115,11 @@ class RunStateMachine:
     """Tracks and enforces the lifecycle of a run."""
 
     def __init__(self, run_id: str) -> None:
+        if not run_id:
+            raise ValueError("run_id must not be empty")
         self._run_id = run_id
         self._phase = RunPhase.CREATED
-        self._history: list[
-            tuple[str, RunPhase, RunPhase]
-        ] = []
+        self._history: list[tuple[str, RunPhase, RunPhase]] = []
 
     @property
     def phase(self) -> RunPhase:
@@ -129,30 +134,18 @@ class RunStateMachine:
         return self._phase in _TERMINAL_STATES
 
     @property
-    def history(
-        self,
-    ) -> list[tuple[str, RunPhase, RunPhase]]:
+    def history(self) -> list[tuple[str, RunPhase, RunPhase]]:
         return list(self._history)
 
-    def can_transition(
-        self, target: RunPhase
-    ) -> bool:
-        return target in _TRANSITIONS.get(
-            self._phase, set()
-        )
+    def can_transition(self, target: RunPhase) -> bool:
+        return target in _TRANSITIONS.get(self._phase, set())
 
     def transition(self, target: RunPhase) -> None:
         if not self.can_transition(target):
-            raise IllegalTransitionError(
-                self._run_id,
-                self._phase,
-                target,
-            )
+            raise IllegalTransitionError(self._run_id, self._phase, target)
         old = self._phase
         self._phase = target
-        ts = datetime.now(
-            timezone.utc
-        ).isoformat()
+        ts = datetime.now(timezone.utc).isoformat()
         self._history.append((ts, old, target))
 
     def fail(self, error: str = "") -> None:
@@ -171,20 +164,16 @@ class RunStateMachine:
             "phase": self._phase.value,
             "is_terminal": self.is_terminal,
             "history": [
-                {
-                    "ts": ts,
-                    "from": f.value,
-                    "to": t.value,
-                }
-                for ts, f, t in self._history
+                {"ts": ts, "from": old.value, "to": new.value}
+                for ts, old, new in self._history
             ],
         }
 
     @classmethod
     def from_dict(cls, d: dict) -> Self:
         sm = cls(d["run_id"])
-        sm._phase = RunPhase(d["phase"])
-        sm._history = [
+        phase = RunPhase(d["phase"])
+        history = [
             (
                 e["ts"],
                 RunPhase(e["from"]),
@@ -192,4 +181,17 @@ class RunStateMachine:
             )
             for e in d.get("history", [])
         ]
+        # Reject corrupt serialized state instead of silently restoring
+        # a lifecycle that could permit an unsafe operation.
+        current = RunPhase.CREATED
+        for _, old, new in history:
+            if old != current or new not in _TRANSITIONS.get(current, set()):
+                raise ValueError("Invalid run state history")
+            current = new
+        if history and current != phase:
+            raise ValueError("Run state phase does not match history")
+        if not history and phase != RunPhase.CREATED:
+            raise ValueError("Non-created state requires transition history")
+        sm._phase = phase
+        sm._history = history
         return sm
