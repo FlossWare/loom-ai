@@ -11,7 +11,6 @@ WARN=0
 ok() { printf 'PASS  %-22s %s\n' "$1" "$2"; PASS=$((PASS + 1)); }
 bad() { printf 'FAIL  %-22s %s\n' "$1" "$2"; FAIL=$((FAIL + 1)); }
 warn() { printf 'WARN  %-22s %s\n' "$1" "$2"; WARN=$((WARN + 1)); }
-
 have() { command -v "$1" >/dev/null 2>&1; }
 
 printf 'Loom Doctor\n===========\n\n'
@@ -49,15 +48,23 @@ for cmd in git curl; do
   fi
 done
 
-# GitHub CLI is required for the GitHub dogfood workflow.
-if have gh; then
-  if gh auth status >/dev/null 2>&1; then
-    ok "GitHub CLI" "installed and authenticated"
+# GitHub CLI is required only for GitHub-backed publication workflows.
+if [[ "${LOOM_REQUIRE_GITHUB:-0}" == "1" ]]; then
+  if have gh; then
+    if gh auth status >/dev/null 2>&1; then
+      ok "GitHub CLI" "installed and authenticated"
+    else
+      bad "GitHub CLI" "installed but not authenticated"
+    fi
   else
-    bad "GitHub CLI" "installed but not authenticated"
+    bad "GitHub CLI" "gh not found"
   fi
 else
-  bad "GitHub CLI" "gh not found"
+  if have gh; then
+    ok "GitHub CLI" "installed; not required by current configuration"
+  else
+    warn "GitHub CLI" "not installed; set LOOM_REQUIRE_GITHUB=1 for GitHub-backed dogfood"
+  fi
 fi
 
 # Loom import/environment
