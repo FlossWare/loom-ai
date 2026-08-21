@@ -61,7 +61,7 @@ class HttpLLMBackend:
         self._default_model = default_model
         self._timeout = timeout
         self._provider_name = provider_name
-        self._ssl_ctx = ssl.create_default_context()
+        self._ssl_ctx = ssl.create_default_context()  # NOSONAR — TLS 1.2 enforced below
         self._ssl_ctx.minimum_version = ssl.TLSVersion.TLSv1_2
         self._rng = random.Random()  # noqa: S311
 
