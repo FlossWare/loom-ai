@@ -21,7 +21,7 @@ import logging
 import os
 from dataclasses import dataclass, field
 from pathlib import Path
-from typing import Any
+from typing import Any, Protocol, runtime_checkable
 
 from loom_ai.backends.code_actions import (
     apply_diff,
@@ -32,6 +32,20 @@ from loom_ai.models import ChatMessage, ChatResponse
 from loom_ai.session_persistence import SessionManager
 
 logger = logging.getLogger(__name__)
+
+
+@runtime_checkable
+class ProgressCallback(Protocol):
+    """Callback for streaming progress updates from DemoAgent."""
+
+    def report(self, stage: str, message: str, progress_pct: float) -> None: ...
+
+
+class _NullProgress:
+    """No-op progress callback (default)."""
+
+    def report(self, stage: str, message: str, progress_pct: float) -> None:
+        pass
 
 
 @dataclass
@@ -86,6 +100,7 @@ class DemoAgent:
         session_manager: SessionManager | None = None,
         git_name: str | None = None,
         git_email: str | None = None,
+        on_progress: ProgressCallback | None = None,
     ) -> None:
         self._llm = llm
         self._workspace = workspace
@@ -94,6 +109,7 @@ class DemoAgent:
         self._git_email = git_email or os.environ.get(
             "LOOM_GIT_EMAIL", "loom-ai@users.noreply.github.com"
         )
+        self._progress: ProgressCallback = on_progress or _NullProgress()
 
     @classmethod
     async def create(
@@ -511,6 +527,11 @@ class DemoAgent:
     ) -> bool:
         """Run implement-review attempts, returning whether approved."""
         for attempt in range(self._MAX_REVIEW_ATTEMPTS):
+            self._progress.report(
+                "review",
+                f"Review round {attempt + 1}/{self._MAX_REVIEW_ATTEMPTS}",
+                55 + (attempt + 1) * 5,
+            )
             status, context = await self._try_attempt(
                 plan,
                 context,
@@ -539,6 +560,7 @@ class DemoAgent:
             metadata={"issue": issue_number or 0},
         )
 
+        self._progress.report("fetch", "Fetching issue...", 10)
         if not issue_text and issue_number:
             try:
                 issue_text = await self._fetch_issue(issue_number)
@@ -551,7 +573,9 @@ class DemoAgent:
             return result
 
         try:
+            self._progress.report("context", "Gathering repo context...", 20)
             context = await self._build_context(issue_text, sid)
+            self._progress.report("plan", "Planning implementation...", 35)
             plan = await self._plan(context)
             result.plan = plan
             logger.info("Generated plan (%d chars)", len(plan))
@@ -561,6 +585,7 @@ class DemoAgent:
                 kind="decision",
             )
 
+            self._progress.report("implement", "Implementing changes...", 55)
             approved = await self._run_review_loop(
                 plan,
                 context,
@@ -569,7 +594,9 @@ class DemoAgent:
             )
 
             if approved:
+                self._progress.report("finalize", "Running lint and tests...", 80)
                 await self._finalize(result, auto_pr, issue_number)
+                self._progress.report("done", "Complete.", 100)
             elif not result.error:
                 result.error = (
                     f"Review not approved after {self._MAX_REVIEW_ATTEMPTS} attempts"

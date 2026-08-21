@@ -22,11 +22,28 @@ import json
 import logging
 import os
 import sys
+import threading
 import urllib.error
 import urllib.parse
 import urllib.request
+import uuid
+from dataclasses import dataclass
+from typing import Any
 
 logger = logging.getLogger(__name__)
+
+
+@dataclass
+class _AsyncTask:
+    task_id: str
+    status: str
+    progress: str
+    result: dict[str, Any] | None = None
+    error: str = ""
+
+
+_ASYNC_TASKS: dict[str, _AsyncTask] = {}
+_ASYNC_LOCK = threading.Lock()
 
 _SUPPORTED_VERSIONS = ["2024-11-05", "2025-03-26"]
 _LATEST_VERSION = _SUPPORTED_VERSIONS[-1]
@@ -245,6 +262,33 @@ _TOOLS: list[dict] = [
             "required": ["issue_number"],
         },
     },
+    {
+        "name": "loom_resolve_issue_async",
+        "description": (
+            "Start issue resolution in the background and return a task_id "
+            "immediately. Poll with loom_resolve_issue_status."
+        ),
+        "inputSchema": {
+            "type": "object",
+            "properties": {
+                "issue_number": _int_prop("GitHub issue number"),
+                "workspace": _str_prop("Repo workspace path"),
+                "issue_text": _str_prop("Issue description text"),
+            },
+            "required": ["issue_number"],
+        },
+    },
+    {
+        "name": "loom_resolve_issue_status",
+        "description": "Poll status of an async issue resolution task by task_id",
+        "inputSchema": {
+            "type": "object",
+            "properties": {
+                "task_id": _str_prop("Task ID from loom_resolve_issue_async"),
+            },
+            "required": ["task_id"],
+        },
+    },
 ]
 
 
@@ -346,6 +390,56 @@ def _dispatch_resolve_issue(args: dict) -> dict:
         }
 
 
+def _run_resolve_thread(task_id: str, args: dict) -> None:
+    """Background thread: run DemoAgent and update task status."""
+    with _ASYNC_LOCK:
+        _ASYNC_TASKS[task_id].status = "running"
+        _ASYNC_TASKS[task_id].progress = "Initializing DemoAgent..."
+    try:
+        result = _dispatch_resolve_issue(args)
+        with _ASYNC_LOCK:
+            task = _ASYNC_TASKS[task_id]
+            task.status = "complete"
+            task.progress = "Resolution complete."
+            task.result = result
+    except Exception as exc:
+        logger.exception("Async resolve task %s failed", task_id)
+        with _ASYNC_LOCK:
+            task = _ASYNC_TASKS[task_id]
+            task.status = "failed"
+            task.progress = "Task failed."
+            task.error = str(exc)
+
+
+def _dispatch_resolve_issue_async(args: dict) -> dict:
+    task_id = uuid.uuid4().hex
+    task = _AsyncTask(task_id=task_id, status="queued", progress="Task queued.")
+    with _ASYNC_LOCK:
+        _ASYNC_TASKS[task_id] = task
+    thread = threading.Thread(
+        target=_run_resolve_thread,
+        args=(task_id, args),
+        daemon=True,
+    )
+    thread.start()
+    return {"task_id": task_id, "status": "queued"}
+
+
+def _dispatch_resolve_issue_status(args: dict) -> dict:
+    task_id = args["task_id"]
+    with _ASYNC_LOCK:
+        task = _ASYNC_TASKS.get(task_id)
+        if task is None:
+            return {"error": f"Task {task_id} not found"}
+        return {
+            "task_id": task.task_id,
+            "status": task.status,
+            "progress": task.progress,
+            "result": task.result,
+            "error": task.error,
+        }
+
+
 def _dispatch_search(args: dict) -> dict:
     q = urllib.parse.quote(args["query"])
     limit = int(args.get("limit", 10))
@@ -429,6 +523,8 @@ _DISPATCH_TABLE = {
     "loom_router_stats": lambda a: _api("GET", "/router/performance"),
     "loom_health": lambda a: _api("GET", "/health"),
     "loom_resolve_issue": _dispatch_resolve_issue,
+    "loom_resolve_issue_async": _dispatch_resolve_issue_async,
+    "loom_resolve_issue_status": _dispatch_resolve_issue_status,
 }
 
 

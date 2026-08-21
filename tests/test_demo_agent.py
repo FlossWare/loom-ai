@@ -278,3 +278,59 @@ class TestMcpResolveIssue:
 
     def test_dispatch_table_has_entry(self):
         assert "loom_resolve_issue" in _DISPATCH_TABLE
+
+    def test_async_tool_definitions_exist(self):
+        names = [t["name"] for t in _TOOLS]
+        assert "loom_resolve_issue_async" in names
+        assert "loom_resolve_issue_status" in names
+
+    def test_async_dispatch_table_entries(self):
+        assert "loom_resolve_issue_async" in _DISPATCH_TABLE
+        assert "loom_resolve_issue_status" in _DISPATCH_TABLE
+
+
+class TestProgressCallback:
+    def test_null_progress_is_noop(self):
+        from loom_ai.demo_agent import _NullProgress
+
+        progress = _NullProgress()
+        progress.report("test", "message", 50.0)
+
+    def test_progress_protocol_check(self):
+        from loom_ai.demo_agent import ProgressCallback, _NullProgress
+
+        assert isinstance(_NullProgress(), ProgressCallback)
+
+    def test_mcp_reporter_writes_jsonrpc(self):
+        from io import StringIO
+
+        from loom_ai.mcp_progress import MCPProgressReporter
+
+        buf = StringIO()
+        reporter = MCPProgressReporter(token="test-token")
+        with patch("sys.stdout", buf):
+            reporter.report("plan", "Planning...", 35.0)
+        output = buf.getvalue()
+        assert "Content-Length:" in output
+        assert "notifications/progress" in output
+        assert "test-token" in output
+
+    async def test_agent_calls_progress(self, tmp_path):
+        stages = []
+
+        class Recorder:
+            def report(self, stage, message, progress_pct):
+                stages.append(stage)
+
+        (tmp_path / "dummy.py").write_text("x = 1\n")
+        _git_init(tmp_path, add_all=True)
+        llm = _make_llm(["plan", "[]"])
+        agent = DemoAgent(
+            llm=llm,
+            workspace=str(tmp_path),
+            on_progress=Recorder(),
+        )
+        await agent.run(issue_text="Fix the thing")
+        assert "fetch" in stages
+        assert "context" in stages
+        assert "plan" in stages

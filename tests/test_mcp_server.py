@@ -51,6 +51,8 @@ class TestToolDefinitions:
         assert "loom_router_stats" in names
         assert "loom_health" in names
         assert "loom_list_models" in names
+        assert "loom_resolve_issue_async" in names
+        assert "loom_resolve_issue_status" in names
 
 
 class TestHandle:
@@ -149,6 +151,43 @@ class TestDispatch:
             },
         )
         assert result["model"] == "gpt-4o"
+
+
+class TestAsyncResolve:
+    def test_async_dispatch_returns_task_id(self):
+        from loom_ai.mcp_server import (
+            _ASYNC_LOCK,
+            _ASYNC_TASKS,
+            _dispatch_resolve_issue_async,
+            _dispatch_resolve_issue_status,
+        )
+
+        # Patch _dispatch_resolve_issue to avoid running the real agent
+        with patch(
+            "loom_ai.mcp_server._dispatch_resolve_issue",
+            return_value={"success": True, "error": "", "plan": "", "pr_url": ""},
+        ):
+            result = _dispatch_resolve_issue_async({"issue_number": 1})
+        assert "task_id" in result
+        assert result["status"] == "queued"
+
+        # Verify status lookup works
+        status = _dispatch_resolve_issue_status({"task_id": result["task_id"]})
+        assert status["task_id"] == result["task_id"]
+        assert status["status"] in ("queued", "running", "complete")
+
+        # Clean up
+        import time
+
+        time.sleep(0.5)
+        with _ASYNC_LOCK:
+            _ASYNC_TASKS.pop(result["task_id"], None)
+
+    def test_status_unknown_task(self):
+        from loom_ai.mcp_server import _dispatch_resolve_issue_status
+
+        result = _dispatch_resolve_issue_status({"task_id": "nonexistent"})
+        assert "error" in result
 
 
 class TestMessageFraming:
