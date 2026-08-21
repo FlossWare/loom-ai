@@ -59,12 +59,11 @@ class CapabilityGuard:
     """Validates and audits privileged operations."""
 
     def __init__(
-        self, audit_logger: AuditLogger,
+        self,
+        audit_logger: AuditLogger,
     ) -> None:
         self._audit = audit_logger
-        self._grants: dict[
-            tuple[str, Capability], CapabilityGrant
-        ] = {}
+        self._grants: dict[tuple[str, Capability], CapabilityGrant] = {}
 
     def grant(
         self,
@@ -98,24 +97,27 @@ class CapabilityGuard:
 
         if g is None:
             self._log(
-                cap, resolved, ctx, "denied",
+                cap,
+                resolved,
+                ctx,
+                "denied",
                 "no valid grant",
             )
             return False
 
         if self._is_expired(g.expires_at):
             self._log(
-                cap, resolved, ctx, "denied",
+                cap,
+                resolved,
+                ctx,
+                "denied",
                 "grant expired",
             )
             return False
 
         ok = self._validate(cap, resolved, g, ctx)
         outcome = "allowed" if ok else "denied"
-        detail = (
-            "" if ok
-            else self._denial_reason(cap, ctx)
-        )
+        detail = "" if ok else self._denial_reason(cap, ctx)
         self._log(cap, resolved, ctx, outcome, detail)
         return ok
 
@@ -127,10 +129,7 @@ class CapabilityGuard:
     ) -> None:
         """Like :meth:`check` but raises on denial."""
         if not self.check(cap, workspace, **ctx):
-            raise PermissionError(
-                f"Capability {cap.value} denied"
-                f" for {workspace}"
-            )
+            raise PermissionError(f"Capability {cap.value} denied for {workspace}")
 
     # -- internals -------------------------------------------
 
@@ -164,14 +163,16 @@ class CapabilityGuard:
         ctx: dict[str, Any],
     ) -> bool:
         allowed = grant.constraints.get(
-            "allowed_cmds", [],
+            "allowed_cmds",
+            [],
         )
         cmd = ctx.get("cmd", "")
         return cmd in allowed
 
     @staticmethod
     def _check_fs(
-        workspace: str, ctx: dict[str, Any],
+        workspace: str,
+        ctx: dict[str, Any],
     ) -> bool:
         path = ctx.get("path", "")
         if not path:
@@ -195,14 +196,16 @@ class CapabilityGuard:
         ctx: dict[str, Any],
     ) -> bool:
         allowed = grant.constraints.get(
-            "allowed_repos", [],
+            "allowed_repos",
+            [],
         )
         repo = ctx.get("repo", "")
         return repo in allowed
 
     @staticmethod
     def _denial_reason(
-        cap: Capability, ctx: dict[str, Any],
+        cap: Capability,
+        ctx: dict[str, Any],
     ) -> str:
         if cap == Capability.SUBPROCESS:
             return f"cmd not allowed: {ctx.get('cmd')}"
@@ -257,9 +260,7 @@ class SecretGuard:
                 detail="not found",
                 outcome="denied",
             )
-            raise KeyError(
-                f"Secret not found: {name}"
-            )
+            raise KeyError(f"Secret not found: {name}")
         self._accessed.add(name)
         self._audit.log(
             actor="secret_guard",
