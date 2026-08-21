@@ -49,17 +49,25 @@ class TestFreeModelRouterConsensus:
             call_count += 1
             if call_count <= 3:
                 return ChatResponse(
-                    "worker output", ep.model_id, ep.provider,
+                    "worker output",
+                    ep.model_id,
+                    ep.provider,
                 )
             return ChatResponse(
-                "synthesized answer", ep.model_id, ep.provider,
+                "synthesized answer",
+                ep.model_id,
+                ep.provider,
             )
 
         with patch.object(
-            self.router, "_call", side_effect=mock_call,
+            self.router,
+            "_call",
+            side_effect=mock_call,
         ):
             result = await self.router.consensus_chat(
-                messages, n_workers=3, temperature=0.7,
+                messages,
+                n_workers=3,
+                temperature=0.7,
             )
 
         assert result.content == "synthesized answer"
@@ -74,15 +82,21 @@ class TestFreeModelRouterConsensus:
             call_count += 1
             if call_count <= 2:
                 return ChatResponse(
-                    "worker fallback", ep.model_id, ep.provider,
+                    "worker fallback",
+                    ep.model_id,
+                    ep.provider,
                 )
             raise RuntimeError("Arbiter failed")
 
         with patch.object(
-            self.router, "_call", side_effect=mock_call,
+            self.router,
+            "_call",
+            side_effect=mock_call,
         ):
             result = await self.router.consensus_chat(
-                messages, n_workers=2, temperature=0.7,
+                messages,
+                n_workers=2,
+                temperature=0.7,
             )
 
         assert result.content == "worker fallback"
@@ -93,23 +107,36 @@ class TestFreeModelRouterConsensus:
         router._initialized = True
         router._endpoints = [
             _ModelEndpoint(
-                "openai", "gpt-4", "k1", "a1",
+                "openai",
+                "gpt-4",
+                "k1",
+                "a1",
             ),
             _ModelEndpoint(
-                "openai", "gpt-3.5", "k2", "a2",
+                "openai",
+                "gpt-3.5",
+                "k2",
+                "a2",
             ),
             _ModelEndpoint(
-                "openai", "gpt-4o", "k3", "a3",
+                "openai",
+                "gpt-4o",
+                "k3",
+                "a3",
             ),
         ]
 
         async def mock_call(ep, msgs, temp, max_tokens):
             return ChatResponse(
-                "output", ep.model_id, ep.provider,
+                "output",
+                ep.model_id,
+                ep.provider,
             )
 
         with patch.object(
-            router, "_call", side_effect=mock_call,
+            router,
+            "_call",
+            side_effect=mock_call,
         ):
             result = await router.consensus_chat(
                 [ChatMessage("user", "test")],
