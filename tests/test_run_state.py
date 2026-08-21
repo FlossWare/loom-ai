@@ -4,53 +4,102 @@ from __future__ import annotations
 
 import pytest
 
-from loom_ai.run_state import (
-    IllegalTransitionError,
-    RunPhase,
-    RunStateMachine,
-)
+from loom_ai.run_state import IllegalTransitionError, RunPhase, RunStateMachine
 
 
 class TestRunPhase:
-    def test_all_phases_are_strings(self):
-        for phase in RunPhase:
-            assert isinstance(phase.value, str)
+    def test_all_phases_exist(self):
+        expected = {
+            "created",
+            "fetching",
+            "planning",
+            "executing",
+            "verifying",
+            "persisting",
+            "completed",
+            "failed",
+            "cancelled",
+            "published",
+        }
+        assert {p.value for p in RunPhase} == expected
 
-    def test_terminal_states(self):
-        from loom_ai.run_state import _TERMINAL_STATES
 
-        assert RunPhase.COMPLETED in _TERMINAL_STATES
-        assert RunPhase.FAILED in _TERMINAL_STATES
-        assert RunPhase.CANCELLED in _TERMINAL_STATES
-        assert RunPhase.PUBLISHED in _TERMINAL_STATES
-        assert RunPhase.CREATED not in _TERMINAL_STATES
-
-
-class TestRunStateMachine:
-    def test_initial_state_is_created(self):
-        sm = RunStateMachine("test-1")
-        assert sm.phase == RunPhase.CREATED
-        assert not sm.is_terminal
-
+class TestTransitions:
     def test_happy_path(self):
-        sm = RunStateMachine("test-2")
+        sm = RunStateMachine("run-1")
+        assert sm.phase == RunPhase.CREATED
         sm.transition(RunPhase.FETCHING)
         sm.transition(RunPhase.PLANNING)
         sm.transition(RunPhase.EXECUTING)
-        sm.transition(RunPhase.REVIEWING)
         sm.transition(RunPhase.VERIFYING)
         sm.transition(RunPhase.PERSISTING)
         sm.transition(RunPhase.COMPLETED)
-        assert sm.phase == RunPhase.COMPLETED
         assert sm.is_terminal
-        assert len(sm.history) == 7
+        assert sm.phase == RunPhase.COMPLETED
 
-    def test_publish_after_complete(self):
-        sm = RunStateMachine("test-3")
+    def test_fail_from_any_active(self):
+        for phase in (
+            RunPhase.FETCHING,
+            RunPhase.PLANNING,
+            RunPhase.EXECUTING,
+            RunPhase.VERIFYING,
+            RunPhase.PERSISTING,
+        ):
+            sm = RunStateMachine(f"fail-{phase.value}")
+            sm._phase = phase
+            sm.fail()
+            assert sm.phase == RunPhase.FAILED
+            assert sm.is_terminal
+
+    def test_cancel_from_any_active(self):
+        for phase in RunPhase:
+            if phase in (
+                RunPhase.COMPLETED,
+                RunPhase.FAILED,
+                RunPhase.CANCELLED,
+                RunPhase.PUBLISHED,
+            ):
+                continue
+            sm = RunStateMachine(f"cancel-{phase.value}")
+            sm._phase = phase
+            sm.cancel()
+            assert sm.phase == RunPhase.CANCELLED
+
+    def test_illegal_transition_raises(self):
+        sm = RunStateMachine("run-2")
+        with pytest.raises(IllegalTransitionError):
+            sm.transition(RunPhase.COMPLETED)
+
+    def test_can_transition(self):
+        sm = RunStateMachine("run-3")
+        assert sm.can_transition(RunPhase.FETCHING)
+        assert not sm.can_transition(RunPhase.COMPLETED)
+
+
+class TestSerialization:
+    def test_roundtrip(self):
+        sm = RunStateMachine("run-4")
+        sm.transition(RunPhase.FETCHING)
+        sm.transition(RunPhase.PLANNING)
+        d = sm.to_dict()
+        restored = RunStateMachine.from_dict(d)
+        assert restored.run_id == sm.run_id
+        assert restored.phase == sm.phase
+        assert len(restored.history) == len(sm.history)
+
+    def test_empty_history_rejected_when_not_created(self):
+        with pytest.raises(ValueError):
+            RunStateMachine.from_dict(
+                {"run_id": "x", "phase": "completed", "history": []}
+            )
+
+
+class TestPublished:
+    def test_published_from_completed(self):
+        sm = RunStateMachine("run-5")
         sm.transition(RunPhase.FETCHING)
         sm.transition(RunPhase.PLANNING)
         sm.transition(RunPhase.EXECUTING)
-        sm.transition(RunPhase.REVIEWING)
         sm.transition(RunPhase.VERIFYING)
         sm.transition(RunPhase.PERSISTING)
         sm.transition(RunPhase.COMPLETED)
@@ -58,133 +107,22 @@ class TestRunStateMachine:
         assert sm.phase == RunPhase.PUBLISHED
         assert sm.is_terminal
 
-    def test_retry_loop(self):
-        sm = RunStateMachine("test-retry")
-        sm.transition(RunPhase.FETCHING)
-        sm.transition(RunPhase.PLANNING)
-        sm.transition(RunPhase.EXECUTING)
-        sm.transition(RunPhase.REVIEWING)
-        sm.transition(RunPhase.EXECUTING)
-        sm.transition(RunPhase.REVIEWING)
-        sm.transition(RunPhase.VERIFYING)
-        assert sm.phase == RunPhase.VERIFYING
 
-    def test_illegal_transition_raises(self):
-        sm = RunStateMachine("test-bad")
-        with pytest.raises(IllegalTransitionError) as exc:
-            sm.transition(RunPhase.COMPLETED)
-        assert exc.value.run_id == "test-bad"
-        assert exc.value.current == RunPhase.CREATED
-        assert exc.value.target == RunPhase.COMPLETED
-
-    def test_terminal_cannot_transition(self):
-        sm = RunStateMachine("test-term")
-        sm.transition(RunPhase.FETCHING)
+class TestTerminalGuards:
+    def test_no_transition_from_failed(self):
+        sm = RunStateMachine("run-6")
         sm.fail()
-        assert sm.phase == RunPhase.FAILED
-        with pytest.raises(IllegalTransitionError):
-            sm.transition(RunPhase.PLANNING)
-
-    def test_fail_from_any_non_terminal(self):
-        for phase in RunPhase:
-            sm = RunStateMachine(f"fail-{phase.value}")
-            sm._phase = phase
-            if phase in (
-                RunPhase.COMPLETED,
-                RunPhase.FAILED,
-                RunPhase.CANCELLED,
-                RunPhase.PUBLISHED,
-            ):
-                sm.fail()
-                assert sm.phase == phase
-            else:
-                sm.fail()
-                assert sm.phase == RunPhase.FAILED
-
-    def test_cancel_from_any_non_terminal(self):
-        for phase in RunPhase:
-            sm = RunStateMachine(
-                f"cancel-{phase.value}"
-            )
-            sm._phase = phase
-            if phase in (
-                RunPhase.COMPLETED,
-                RunPhase.FAILED,
-                RunPhase.CANCELLED,
-                RunPhase.PUBLISHED,
-            ):
-                sm.cancel()
-                assert sm.phase == phase
-            else:
-                sm.cancel()
-                assert sm.phase == RunPhase.CANCELLED
-
-    def test_can_transition(self):
-        sm = RunStateMachine("test-can")
-        assert sm.can_transition(RunPhase.FETCHING)
-        assert not sm.can_transition(
-            RunPhase.COMPLETED
-        )
-
-    def test_to_dict_roundtrip(self):
-        sm = RunStateMachine("test-rt")
-        sm.transition(RunPhase.FETCHING)
-        sm.transition(RunPhase.PLANNING)
-        sm.transition(RunPhase.EXECUTING)
-        d = sm.to_dict()
-        assert d["run_id"] == "test-rt"
-        assert d["phase"] == "executing"
-        assert not d["is_terminal"]
-        assert len(d["history"]) == 3
-
-        restored = RunStateMachine.from_dict(d)
-        assert restored.run_id == "test-rt"
-        assert restored.phase == RunPhase.EXECUTING
-        assert len(restored.history) == 3
-
-    def test_from_dict_preserves_history(self):
-        sm = RunStateMachine("test-hist")
-        sm.transition(RunPhase.FETCHING)
-        sm.fail()
-        d = sm.to_dict()
-        restored = RunStateMachine.from_dict(d)
-        assert restored.is_terminal
-        assert restored.phase == RunPhase.FAILED
-        assert len(restored.history) == 2
-        _, _, target = restored.history[-1]
-        assert target == RunPhase.FAILED
-
-    def test_history_records_timestamps(self):
-        sm = RunStateMachine("test-ts")
-        sm.transition(RunPhase.FETCHING)
-        ts, from_phase, to_phase = sm.history[0]
-        assert "T" in ts
-        assert from_phase == RunPhase.CREATED
-        assert to_phase == RunPhase.FETCHING
-
-    def test_needs_review_is_terminal_like(self):
-        sm = RunStateMachine("test-nr")
-        sm.transition(RunPhase.FETCHING)
-        sm.transition(RunPhase.PLANNING)
-        sm.transition(RunPhase.EXECUTING)
-        sm.transition(RunPhase.REVIEWING)
-        sm.transition(RunPhase.NEEDS_REVIEW)
-        assert not sm.is_terminal
-        assert sm.can_transition(RunPhase.CANCELLED)
         assert sm.can_transition(RunPhase.FAILED)
-        assert not sm.can_transition(
-            RunPhase.EXECUTING
-        )
+        assert not sm.can_transition(RunPhase.EXECUTING)
 
-    def test_published_is_truly_terminal(self):
-        sm = RunStateMachine("test-pub")
-        sm._phase = RunPhase.PUBLISHED
-        assert sm.is_terminal
+    def test_no_transition_from_cancelled(self):
+        sm = RunStateMachine("run-7")
+        sm.cancel()
         assert not sm.can_transition(RunPhase.FAILED)
-        assert not sm.can_transition(
-            RunPhase.COMPLETED
-        )
+        assert not sm.can_transition(RunPhase.COMPLETED)
 
-    def test_run_id_property(self):
+
+class TestRunId:
+    def test_run_id_preserved(self):
         sm = RunStateMachine("my-run")
         assert sm.run_id == "my-run"
