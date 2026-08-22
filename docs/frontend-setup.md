@@ -4,11 +4,11 @@
 
 loom-ai can serve as the AI backend for any coding assistant that supports
 OpenAI-compatible APIs or MCP. All LLM calls are routed through
-`FreeModelRouter` to free API models — zero paid tokens.
+free-model routing to free API models — zero paid tokens.
 
-`FreeModelRouter` (`loom_ai.backends.free_model_router`) uses Thompson Sampling
-to dynamically select the best-performing free model from providers like Cohere,
-Groq, Cloudflare Workers AI, Cerebras, and HuggingFace.
+Model routing is provided by [model-router-ai](https://github.com/FlossWare/model-router-ai),
+which uses Thompson Sampling to dynamically select the best-performing free model
+from providers like Cohere, Groq, Cerebras, and OpenRouter.
 
 ## Architecture
 
@@ -17,7 +17,7 @@ Frontend (Crush/OpenCode/Aider)
     ↓
 loom-ai server (localhost:5000)
     ↓
-FreeModelRouter (Thompson Sampling)
+model-router-ai (Thompson Sampling)
     ↓
 Free APIs (Cohere, Groq, Cloudflare, Cerebras, HuggingFace, ...)
 ```
@@ -134,7 +134,7 @@ an LLM backend is configured.
 
 ## Token Savings
 
-All frontends use free models via FreeModelRouter — approximately **99.5%
+All frontends use free models via model-router-ai — approximately **99.5%
 token savings** vs direct Claude/GPT usage. See
 [token-savings.md](token-savings.md) for details.
 

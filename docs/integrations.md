@@ -50,7 +50,7 @@ for the latest directory of community MCP servers.
 3. Frontend calls **Trello MCP** → moves card to "In Review"
 4. Frontend calls **Slack MCP** → notifies team channel with PR link
 
-All LLM work in step 2 is done by free models via FreeModelRouter — zero
+All LLM work in step 2 is done by free models via model-router-ai — zero
 paid tokens.
 
 ## Configuration
@@ -101,4 +101,4 @@ ecosystem of MCP-compatible tools.
 
 - [MCP Tool Reference](mcp-tools.md) — all 16 loom-ai MCP tools with parameters
 - [Frontend Setup](frontend-setup.md) — connect Crush, OpenCode, Aider, Cursor, Claude Code
-- [Token Savings](token-savings.md) — cost analysis and FreeModelRouter savings
+- [Token Savings](token-savings.md) — cost analysis and model-router-ai savings

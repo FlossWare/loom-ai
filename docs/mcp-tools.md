@@ -47,14 +47,14 @@ python -m loom_ai.mcp_server
 **How it Works:**
 1. **Fetch Issue**: Retrieves the specified GitHub issue.
 2. **Gather Context**: Collects relevant context from the issue and repository.
-3. **Plan**: Generates a plan using a free model via `FreeModelRouter`.
+3. **Plan**: Generates a plan using a free model via `model-router-ai`.
 4. **Implement**: Executes the plan, implementing the necessary changes.
 5. **Review Loop**: Multi-model review of the implementation.
 6. **Lint & Test**: Runs linting and testing on the changes.
 7. **Commit & PR**: Commits the changes and creates a pull request.
 
 **Key Features:**
-- All LLM work is performed by free models (e.g., Cohere, Groq) via `FreeModelRouter`.
+- All LLM work is performed by free models (e.g., Cohere, Groq) via `model-router-ai`.
 - **Zero paid tokens consumed**.
 - Returns the PR URL on success.
 
@@ -72,5 +72,5 @@ python -m loom_ai.mcp_server
 
 - [Frontend Setup](frontend-setup.md) — connect Crush, OpenCode, Aider, Cursor, Claude Code
 - [Integrations](integrations.md) — compose loom-ai with Trello, Notion, Slack via MCP
-- [Token Savings](token-savings.md) — how FreeModelRouter saves ~99.5% of paid tokens
+- [Token Savings](token-savings.md) — how model-router-ai saves ~99.5% of paid tokens
 - [Architecture](architecture.md) — overall loom-ai design and contract layer

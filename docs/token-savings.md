@@ -13,13 +13,13 @@ Modern coding assistants (e.g., **Claude Code**, **Cursor**) rely on large-lan
 
 ## 2. The Solution  
 
-**loom-ai** introduces the **FreeModelRouter**:  
+**loom-ai** uses free-model routing (now provided by [model-router-ai](https://github.com/FlossWare/model-router-ai)):  
 
 | What it does | How it works |
 |--------------|--------------|
 | **Routes every LLM call** to **free** API models (Cohere, Groq, Cloudflare Workers AI, Cerebras, HuggingFace, etc.) | Uses **Thompson Sampling** to dynamically pick the best-performing free model for each sub-task |
 | **Keeps the client** (Claude Code, Cursor, etc.) **agnostic** to the underlying model | The client only pays the tiny overhead of the **MCP tool call** (~500 tokens) |
-| **Maintains quality** via multi-model consensus and a lightweight review loop | FreeModelRouter can fall back to a second free model if the first response fails quality checks |
+| **Maintains quality** via multi-model consensus and a lightweight review loop | model-router-ai can fall back to a second free model if the first response fails quality checks |
 
 Result: the client sees **premium-grade assistance** while paying **only for the tool-call overhead**.
 
@@ -56,7 +56,7 @@ Result: the client sees **premium-grade assistance** while paying **only for the
    loom_resolve_issue(issue_number=123)   # ≈ 200 tokens
    ```  
 
-2. **FreeModelRouter** – `DemoAgent` orchestrates the full resolution pipeline (retrieval, analysis, code generation, review) **exclusively on free models**. The internal token usage (70 k–120 k) is **$0** because the APIs are free.  
+2. **model-router-ai** – `DemoAgent` orchestrates the full resolution pipeline (retrieval, analysis, code generation, review) **exclusively on free models**. The internal token usage (70 k–120 k) is **$0** because the APIs are free.  
 
 3. **Result return** – The final answer is sent back to the client, incurring only the response overhead:  
 

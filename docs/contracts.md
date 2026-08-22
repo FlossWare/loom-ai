@@ -65,7 +65,7 @@ routing, execution patterns, RAG ingestion, and knowledge pipelines.
 | `StructuredOutputMixin` | `contracts_core` | Schema-validated LLM output with retries | stable | `StructuredOutputBackend` |
 | `ConversationManager` | `contracts_core` | Multi-turn session management | stable | `InMemoryConversationManager` |
 | `PersistentMemoryBackend` | `contracts_core` | Named memory storage and recall across sessions | stable | `InMemoryPersistentMemory`, `PostgresqlPersistentMemory` |
-| `ModelRouter` | `contracts_core` | Provider-aware routing with fallback and cost | stable | `SimpleModelRouter`, `AdaptiveModelRouter` |
+| `ModelRouter` | `contracts_core` | Provider-aware routing with fallback and cost | extracted | Now in [model-router-ai](https://github.com/FlossWare/model-router-ai) |
 | `ExecutionPattern` | `contracts_core` | Pluggable multi-model execution strategies | stable | `ConsensusPattern`, `CascadePattern`, `MapReducePattern` |
 | `ChunkingStrategy` | `contracts_core` | Synchronous text-chunking for RAG ingestion | stable | `TokenChunker` |
 | `KnowledgePipeline` | `contracts_core` | End-to-end RAG ingestion and retrieval | stable | `InMemoryKnowledgePipeline`, `PostgresqlKnowledgeStore` |
