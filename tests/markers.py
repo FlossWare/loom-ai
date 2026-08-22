@@ -15,10 +15,7 @@ BACKEND_GROUPS: dict[str, list[str]] = {
         "tests/test_server_validation.py",
         "tests/test_queue_validation.py",
     ],
-    "openai": [
-        "tests/test_model_router.py",
-        "tests/test_provider_health.py",
-    ],
+    "openai": [],
     "litellm": [
         "tests/test_resilience.py",
     ],

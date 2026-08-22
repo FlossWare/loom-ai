@@ -16,7 +16,6 @@ import os
 from dataclasses import dataclass
 from typing import Any
 
-from loom_ai.backends.adaptive_router import AdaptiveModelRouter
 from loom_ai.consensus import ConsensusEngine
 from loom_ai.contracts_graph import KnowledgeGraph
 from loom_ai.protocols import (
@@ -64,7 +63,7 @@ class LoomConfig:
     consensus: ConsensusEngine | None = None
     tools: ToolProvider | None = None
     resources: ResourceProvider | None = None
-    router: AdaptiveModelRouter | None = None
+    router: Any | None = None
 
     async def close(self) -> None:
         """Shut down all resource-owning backends."""
@@ -386,15 +385,6 @@ class LoomConfig:
     async def _build_llm() -> LLMBackend | None:
         provider = os.environ.get("LOOM_LLM_PROVIDER", "openai-compatible")
 
-        if provider == "free":
-            from loom_ai.backends.free_model_router import FreeModelRouter
-
-            router = FreeModelRouter(
-                pg_dsn=os.environ.get("LOOM_PG_DSN", ""),
-            )
-            await router.initialize()
-            return router
-
         base_url = os.environ.get("LOOM_LLM_BASE_URL")
         if not base_url:
             return None
@@ -433,11 +423,11 @@ class LoomConfig:
         )
 
     @staticmethod
-    def _build_router(kind: str) -> AdaptiveModelRouter | None:
+    def _build_router(kind: str) -> Any | None:
         if kind == "disabled":
             return None
-        if kind == "adaptive":
-            return AdaptiveModelRouter()
         raise ValueError(
-            f"Unknown router backend: {kind!r}.  Valid options: disabled, adaptive"
+            f"Unknown router backend: {kind!r}.  "
+            f"Model routing has been extracted to model-router-ai. "
+            f"Valid options: disabled"
         )

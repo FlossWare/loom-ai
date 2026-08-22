@@ -89,8 +89,8 @@ async def _read_file(path: Path) -> str:
 class DemoAgent:
     """Loom agent that resolves issues end-to-end.
 
-    Uses any :class:`~loom_ai.protocols.LLMBackend` (including
-    ``FreeModelRouter``) for planning and code generation.
+    Uses any :class:`~loom_ai.protocols.LLMBackend` for planning
+    and code generation.
     """
 
     def __init__(
@@ -137,20 +137,9 @@ class DemoAgent:
             )
 
         if llm is None:
-            try:
-                from loom_ai.backends.free_model_router import (
-                    FreeModelRouter,
-                )
-
-                llm = FreeModelRouter()
-                await llm.initialize()
-            except Exception as exc:
-                logger.warning("FreeModelRouter unavailable: %s", exc)
-
-        if llm is None:
             raise RuntimeError(
-                "No LLM backend available. Set LOOM_LLM_BASE_URL or "
-                "configure FreeModelRouter."
+                "No LLM backend available. Set LOOM_LLM_BASE_URL. "
+                "Free-model routing has been extracted to model-router-ai."
             )
 
         session_mgr = await cls._build_session_manager()

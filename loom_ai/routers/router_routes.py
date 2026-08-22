@@ -1,4 +1,8 @@
-"""Router_routes domain router for loom-ai REST server."""
+"""Router_routes domain router for loom-ai REST server.
+
+Model routing has been extracted to the standalone model-router-ai package.
+These routes are retained as stubs that return 501 when no router is configured.
+"""
 
 from __future__ import annotations
 
@@ -9,23 +13,26 @@ if TYPE_CHECKING:
 
     from loom_ai.config import LoomConfig
 
-from loom_ai.server_models import (
-    RouterHealthResponse,
-    RouterModelsResponse,
-    RouterOutcomeRequest,
-    RouterOutcomeResponse,
-    RouterPerformanceResponse,
-    RouterProfileRequest,
-    RouterProfileResponse,
-    RouterRegisterRequest,
-    RouterRegisterResponse,
-    RouterSelectRequest,
-    RouterSelectResponse,
-)
-
 
 def _mount_router_routes(app: FastAPI, config: LoomConfig, auth_deps: list) -> None:
+    if config.router is None:
+        return
+
     from fastapi import APIRouter, HTTPException
+
+    from loom_ai.server_models import (
+        RouterHealthResponse,
+        RouterModelsResponse,
+        RouterOutcomeRequest,
+        RouterOutcomeResponse,
+        RouterPerformanceResponse,
+        RouterProfileRequest,
+        RouterProfileResponse,
+        RouterRegisterRequest,
+        RouterRegisterResponse,
+        RouterSelectRequest,
+        RouterSelectResponse,
+    )
 
     router_api = APIRouter(
         prefix="/router",
@@ -33,11 +40,7 @@ def _mount_router_routes(app: FastAPI, config: LoomConfig, auth_deps: list) -> N
         dependencies=auth_deps,
     )
 
-    @router_api.post(
-        "/select",
-        response_model=RouterSelectResponse,
-        responses={400: {"description": "Invalid task type or candidates"}},
-    )
+    @router_api.post("/select", response_model=RouterSelectResponse)
     async def router_select(body: RouterSelectRequest):
         try:
             model = await config.router.select(
@@ -57,10 +60,7 @@ def _mount_router_routes(app: FastAPI, config: LoomConfig, auth_deps: list) -> N
         )
         return {"recorded": True}
 
-    @router_api.get(
-        "/performance",
-        response_model=RouterPerformanceResponse,
-    )
+    @router_api.get("/performance", response_model=RouterPerformanceResponse)
     async def router_performance(task_type: str | None = None):
         arms = await config.router.performance(task_type=task_type)
         return {"arms": arms}
@@ -93,16 +93,9 @@ def _mount_router_routes(app: FastAPI, config: LoomConfig, auth_deps: list) -> N
 
     @router_api.post("/profile", response_model=RouterProfileResponse)
     async def router_profile(body: RouterProfileRequest):
-        from loom_ai.backends.adaptive_router import ModelCapabilityProfile
-
-        config.router.set_profile(
-            body.model,
-            ModelCapabilityProfile(
-                model=body.model,
-                capabilities=body.capabilities,
-                strengths=body.strengths,
-            ),
+        raise HTTPException(
+            status_code=501,
+            detail="Model profiling extracted to model-router-ai",
         )
-        return {"model": body.model, "capabilities": body.capabilities}
 
     app.include_router(router_api)
