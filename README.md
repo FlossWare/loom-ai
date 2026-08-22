@@ -403,23 +403,23 @@ Request lifecycle, error handling, and middleware protocols.
 
 ## Backend Implementations
 
-63 pluggable backend modules in `loom_ai/backends/`:
+Pluggable backend modules in `loom_ai/backends/`:
 
 | Backend | Purpose |
 |---------|---------|
-| `adaptive_router` | Thompson Sampling model routing |
 | `adversarial` | Independent model panel verification |
 | `consensus_strategies` | Majority vote, weighted, quality threshold |
 | `fleet` | Worker pool + 3 load-balancing strategies |
 | `genetic_optimizer` | GA-based strategy parameter optimization |
 | `graph` | In-memory knowledge graph with BFS/DFS |
 | `postgresql` | PostgreSQL + pgvector storage/search |
-| `provider_health` | Health tracking, rate limiting, circuit breaker |
 | `rag` | Document ingestion, embeddings, hybrid search |
 | `redis_queue` | Durable queue with priorities, leases, DLQ |
 | `security` | Config validation, secret masking, audit logging |
 | `task_classifier` | Rule-based task classification + blueprints |
 | `telemetry` | Execution telemetry, cost tracking, model feedback |
+
+> **Note:** Model routing (`adaptive_router`, `free_model_router`, `provider_health`, `provider_discovery`) has been extracted to [model-router-ai](https://github.com/FlossWare/model-router-ai).
 
 See `examples/demo.py` for a runnable walkthrough using in-memory backends.
 

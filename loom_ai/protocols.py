@@ -308,7 +308,7 @@ class ModelSelectionStrategy(Protocol):
     """Pluggable scoring strategy for model endpoint selection.
 
     Implementations return a float score for each candidate endpoint.
-    Higher scores are tried first.  Called by ``FreeModelRouter`` on
+    Higher scores are tried first.  Called by model routers on
     every ``chat()`` invocation.
     """
 
