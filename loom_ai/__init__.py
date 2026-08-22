@@ -103,6 +103,12 @@ from loom_ai.protocols import (
     TaskRunner,
     ToolProvider,
 )
+from loom_ai.workflow_lang import (
+    WorkflowBuilder,
+    WorkflowDefinition,
+    WorkflowNode,
+    WorkflowValidationError,
+)
 
 __all__ = [
     "LoomConfig",
@@ -161,6 +167,11 @@ __all__ = [
     "StructuredOutputMixin",
     "WorkerRegistry",
     "WorkflowEngine",
+    # Declarative workflow language
+    "WorkflowBuilder",
+    "WorkflowDefinition",
+    "WorkflowNode",
+    "WorkflowValidationError",
 ]
 
-__version__ = "1.2"
+__version__ = "1.3"
