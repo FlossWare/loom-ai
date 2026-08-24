@@ -4,7 +4,7 @@ build-backend = "hatchling.build"
 
 [project]
 name = "flossware-loom-ai"
-version = "0.2"
+version = "0.3"
 description = "Pluggable AI orchestration framework with backend-agnostic protocols"
 requires-python = ">=3.11"
 license = "Apache-2.0"
@@ -28,13 +28,15 @@ openai = ["openai>=1.0"]
 litellm = ["litellm>=1.0"]
 server = ["fastapi>=0.110", "uvicorn[standard]>=0.29"]
 observability = ["structlog>=24.0"]
-cli = []  # stdlib client only; use [server] for REST
-all = ["flossware-loom-ai[postgresql,redis,orientdb,openai,litellm,server,observability,cli]"]
+cli = []
+tui = ["curses-themes @ git+https://github.com/FlossWare/curses-themes.git"]
+all = ["flossware-loom-ai[postgresql,redis,orientdb,openai,litellm,server,observability,cli,tui]"]
 dev = ["pytest>=7.0", "pytest-asyncio>=0.23", "pytest-benchmark>=4.0", "ruff>=0.4", "httpx>=0.24", "httpx2>=0.1", "pip-audit>=2.7", "pre-commit>=3.7", "hypothesis>=6.0"]
 loadtest = ["locust>=2.20"]
 
 [project.scripts]
 loom = "loom_ai.clients.cli.app:main"
+loom-tui = "loom_ai.clients.tui:main"
 
 [tool.hatch.build.targets.wheel]
 packages = ["loom_ai"]
@@ -73,8 +75,4 @@ omit = ["*/tests/*", "*/__main__.py"]
 [tool.coverage.report]
 fail_under = 60
 show_missing = true
-exclude_lines = [
-    "pragma: no cover",
-    "if TYPE_CHECKING:",
-    "if __name__",
-]
+exclude_lines = ["pragma: no cover", "if TYPE_CHECKING:", "if __name__"]
