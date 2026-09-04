@@ -1,0 +1,17 @@
+{
+  "id": "doc-1:0",
+  "document_id": "doc-1",
+  "sequence": 0,
+  "content": "First sentence.",
+  "token_count": 4,
+  "start_offset": 0,
+  "end_offset": 15,
+  "metadata": {
+    "uri": "file://exports/papers/example.pdf",
+    "media_type": "application/pdf"
+  },
+  "provenance": {
+    "source": "scraping",
+    "content_hash": "sha256:example"
+  }
+}
