@@ -2,32 +2,23 @@
 
 from __future__ import annotations
 
+import json
+from pathlib import Path
+
 import pytest
 
 from loom_ai.chunk_contract import CanonicalChunk
 
 
-FIXTURE = {
-    "id": "doc-1:0",
-    "document_id": "doc-1",
-    "sequence": 0,
-    "content": "First sentence.",
-    "token_count": 4,
-    "start_offset": 0,
-    "end_offset": 15,
-    "metadata": {
-        "uri": "file://exports/papers/example.pdf",
-        "media_type": "application/pdf",
-    },
-    "provenance": {
-        "source": "scraping",
-        "content_hash": "sha256:example",
-    },
-}
+FIXTURE_PATH = Path(__file__).parent / "fixtures" / "canonical_chunk.json"
+
+
+def load_fixture() -> dict:
+    return json.loads(FIXTURE_PATH.read_text(encoding="utf-8"))
 
 
 def test_canonical_chunk_is_consumable_without_chunking_dependency() -> None:
-    canonical = CanonicalChunk.from_resource(FIXTURE)
+    canonical = CanonicalChunk.from_resource(load_fixture())
     chunk = canonical.to_loom_chunk()
 
     assert canonical.id == chunk.id
@@ -38,7 +29,7 @@ def test_canonical_chunk_is_consumable_without_chunking_dependency() -> None:
 
 
 def test_canonical_chunk_preserves_source_contract_fields() -> None:
-    canonical = CanonicalChunk.from_resource(FIXTURE)
+    canonical = CanonicalChunk.from_resource(load_fixture())
 
     assert canonical.start_offset == 0
     assert canonical.end_offset == len(canonical.content)
@@ -52,7 +43,7 @@ def test_canonical_chunk_preserves_source_contract_fields() -> None:
     ["id", "document_id", "sequence", "content", "start_offset", "end_offset"],
 )
 def test_canonical_chunk_rejects_missing_required_fields(missing: str) -> None:
-    resource = dict(FIXTURE)
+    resource = load_fixture()
     del resource[missing]
 
     with pytest.raises(ValueError, match="missing field"):
@@ -60,7 +51,7 @@ def test_canonical_chunk_rejects_missing_required_fields(missing: str) -> None:
 
 
 def test_canonical_chunk_rejects_inconsistent_offsets() -> None:
-    resource = dict(FIXTURE)
+    resource = load_fixture()
     resource["end_offset"] = resource["start_offset"] + 1
 
     with pytest.raises(ValueError, match="offsets do not match"):
