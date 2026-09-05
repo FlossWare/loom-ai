@@ -262,7 +262,7 @@ class PostgresqlStorageBackend:
         async with self._pool.acquire() as conn:
             records = []
             for c in chunks:
-                meta = dict(c.metadata)
+                meta = dict(c.metadata) if isinstance(c.metadata, dict) else {}
                 meta["_canonical"] = {
                     "token_count": c.token_count,
                     "start_offset": c.start_offset,
