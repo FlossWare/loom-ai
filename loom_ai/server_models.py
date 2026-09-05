@@ -141,7 +141,24 @@ try:
         document_id: str
         content: str
         chunk_index: int
+        sequence: int = 0
         content_hash: str = ""
+        token_count: int = 0
+        start_offset: int = 0
+        end_offset: int = 0
+        metadata: dict = Field(default_factory=dict)
+        provenance: dict = Field(default_factory=dict)
+
+        @model_validator(mode="before")
+        @classmethod
+        def _populate_sequence(cls, data: Any) -> Any:
+            if isinstance(data, dict):
+                if "sequence" not in data or data["sequence"] is None or data["sequence"] == 0:
+                    data["sequence"] = data.get("chunk_index", 0)
+            elif hasattr(data, "chunk_index"):
+                if not hasattr(data, "sequence") or getattr(data, "sequence", None) in (None, 0):
+                    setattr(data, "sequence", getattr(data, "chunk_index", 0))
+            return data
 
     class SearchResultOut(BaseModel):
         chunk_id: str
@@ -233,6 +250,10 @@ try:
         stored: bool
 
     class PendingChunksResponse(BaseModel):
+        chunks: list[ChunkOut]
+        count: int
+
+    class GetChunksResponse(BaseModel):
         chunks: list[ChunkOut]
         count: int
 

@@ -212,6 +212,23 @@ class PostgresqlStorageBackend:
 
     # -- Chunks -----------------------------------------------------------
 
+    @staticmethod
+    def _row_to_chunk(r: Any) -> Chunk:
+        meta = r.get("metadata") if hasattr(r, "get") else r["metadata"]
+        prov = r.get("provenance") if hasattr(r, "get") else r["provenance"]
+        return Chunk(
+            id=r["id"],
+            document_id=r["document_id"],
+            content=r["content"],
+            chunk_index=r["chunk_index"],
+            content_hash=r.get("content_hash", "") or "",
+            token_count=r.get("token_count", 0) or 0,
+            start_offset=r.get("start_offset", 0) or 0,
+            end_offset=r.get("end_offset", 0) or 0,
+            metadata=json.loads(meta) if isinstance(meta, str) else (meta or {}),
+            provenance=json.loads(prov) if isinstance(prov, str) else (prov or {}),
+        )
+
     async def store_chunks(self, document_id: str, chunks: list[Chunk]) -> int:
         if not chunks:
             return 0
@@ -219,15 +236,33 @@ class PostgresqlStorageBackend:
             await conn.executemany(
                 """
                 INSERT INTO chunks (id, document_id, content, chunk_index,
-                                    content_hash)
-                VALUES ($1, $2, $3, $4, $5)
+                                    content_hash, token_count, start_offset,
+                                    end_offset, metadata, provenance)
+                VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10)
                 ON CONFLICT (id) DO UPDATE SET
+                    document_id = EXCLUDED.document_id,
                     content = EXCLUDED.content,
                     chunk_index = EXCLUDED.chunk_index,
-                    content_hash = EXCLUDED.content_hash
+                    content_hash = EXCLUDED.content_hash,
+                    token_count = EXCLUDED.token_count,
+                    start_offset = EXCLUDED.start_offset,
+                    end_offset = EXCLUDED.end_offset,
+                    metadata = EXCLUDED.metadata,
+                    provenance = EXCLUDED.provenance
                 """,
                 [
-                    (c.id, document_id, c.content, c.chunk_index, c.content_hash)
+                    (
+                        c.id,
+                        c.document_id or document_id,
+                        c.content,
+                        c.chunk_index,
+                        c.content_hash,
+                        c.token_count,
+                        c.start_offset,
+                        c.end_offset,
+                        json.dumps(c.metadata),
+                        json.dumps(c.provenance),
+                    )
                     for c in chunks
                 ],
             )
@@ -239,16 +274,7 @@ class PostgresqlStorageBackend:
                 "SELECT * FROM chunks WHERE document_id = $1 ORDER BY chunk_index",
                 document_id,
             )
-        return [
-            Chunk(
-                id=r["id"],
-                document_id=r["document_id"],
-                content=r["content"],
-                chunk_index=r["chunk_index"],
-                content_hash=r.get("content_hash", ""),
-            )
-            for r in rows
-        ]
+        return [self._row_to_chunk(r) for r in rows]
 
     async def get_chunks_batch(self, chunk_ids: list[str]) -> list[Chunk]:
         if not chunk_ids:
@@ -257,16 +283,7 @@ class PostgresqlStorageBackend:
             rows = await conn.fetch(
                 "SELECT * FROM chunks WHERE id = ANY($1::text[])", chunk_ids
             )
-        return [
-            Chunk(
-                id=r["id"],
-                document_id=r["document_id"],
-                content=r["content"],
-                chunk_index=r["chunk_index"],
-                content_hash=r.get("content_hash", ""),
-            )
-            for r in rows
-        ]
+        return [self._row_to_chunk(r) for r in rows]
 
     async def get_pending_chunks(
         self, limit: int, *, after_id: str | None = None
@@ -293,16 +310,7 @@ class PostgresqlStorageBackend:
                     """,
                     limit,
                 )
-        return [
-            Chunk(
-                id=r["id"],
-                document_id=r["document_id"],
-                content=r["content"],
-                chunk_index=r["chunk_index"],
-                content_hash=r.get("content_hash", ""),
-            )
-            for r in rows
-        ]
+        return [self._row_to_chunk(r) for r in rows]
 
     async def delete_chunks(self, document_id: str) -> bool:
         async with self._pool.acquire() as conn:
