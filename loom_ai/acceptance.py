@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import json
 import time
 from dataclasses import dataclass, field
 from datetime import datetime, timezone
@@ -56,10 +57,6 @@ class AcceptanceHarness:
         start = time.perf_counter()
         try:
             evidence = check_fn()
-            # A check may return structured evidence containing its own
-            # verdict. Never turn {"passed": false} or {"ready": false}
-            # into a successful acceptance step merely because no
-            # exception was raised.
             if "passed" in evidence:
                 passed = bool(evidence["passed"])
             elif "ready" in evidence:
@@ -158,3 +155,27 @@ class AcceptanceHarness:
             python_version=python_version,
             gates=gates,
         )
+
+
+def main() -> int:
+    """Run the deterministic acceptance gate used by live dogfood."""
+    import argparse
+    import os
+    import platform
+    import sys
+
+    parser = argparse.ArgumentParser(description="Run Loom dogfood acceptance checks")
+    parser.add_argument("--workspace", default=os.getcwd())
+    args = parser.parse_args()
+
+    harness = AcceptanceHarness(args.workspace)
+    harness.run_preflight()
+    report = harness.report()
+    report["commit_sha"] = os.environ.get("GIT_COMMIT", "")
+    report["python_version"] = platform.python_version()
+    print(json.dumps(report, indent=2, sort_keys=True))
+    return 0 if harness.all_passed() else 1
+
+
+if __name__ == "__main__":
+    raise SystemExit(main())
