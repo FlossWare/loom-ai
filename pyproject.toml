@@ -30,6 +30,9 @@ loadtest = ["locust>=2.20"]
 loom = "loom_ai.clients.cli.app:main"
 loom-tui = "loom_ai.clients.tui:main"
 
+[tool.hatch.metadata]
+allow-direct-references = true
+
 [tool.hatch.build.targets.wheel]
 packages = ["loom_ai"]
 

@@ -33,6 +33,16 @@ class Chunk:
     content: str
     chunk_index: int
     content_hash: str = ""
+    token_count: int = 0
+    start_offset: int = 0
+    end_offset: int = 0
+    metadata: dict = field(default_factory=dict)
+    provenance: dict = field(default_factory=dict)
+
+    @property
+    def sequence(self) -> int:
+        """Alias for chunk_index to support sequence semantics from FlossWare/chunking."""
+        return self.chunk_index
 
 
 @dataclass

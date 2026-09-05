@@ -141,7 +141,44 @@ try:
         document_id: str
         content: str
         chunk_index: int
+        sequence: int = 0
         content_hash: str = ""
+        token_count: int = 0
+        start_offset: int = 0
+        end_offset: int = 0
+        metadata: dict = Field(default_factory=dict)
+        provenance: dict = Field(default_factory=dict)
+
+        @model_validator(mode="before")
+        @classmethod
+        def _populate_sequence(cls, data: Any) -> Any:
+            if isinstance(data, dict):
+                has_seq = "sequence" in data and data["sequence"] is not None
+                has_idx = "chunk_index" in data and data["chunk_index"] is not None
+                if (
+                    has_seq
+                    and has_idx
+                    and int(data["sequence"]) != int(data["chunk_index"])
+                ):
+                    raise ValueError(
+                        f"Conflicting 'sequence' ({data['sequence']}) and 'chunk_index' ({data['chunk_index']}) values"
+                    )
+                if not has_seq and has_idx:
+                    data["sequence"] = data["chunk_index"]
+                elif not has_idx and has_seq:
+                    data["chunk_index"] = data["sequence"]
+            elif hasattr(data, "chunk_index"):
+                seq = getattr(data, "sequence", None)
+                idx = getattr(data, "chunk_index", None)
+                if seq is not None and idx is not None and int(seq) != int(idx):
+                    raise ValueError(
+                        f"Conflicting 'sequence' ({seq}) and 'chunk_index' ({idx}) values"
+                    )
+                if seq is None and idx is not None:
+                    setattr(data, "sequence", idx)
+                elif idx is None and seq is not None:
+                    setattr(data, "chunk_index", seq)
+            return data
 
     class SearchResultOut(BaseModel):
         chunk_id: str
@@ -233,6 +270,10 @@ try:
         stored: bool
 
     class PendingChunksResponse(BaseModel):
+        chunks: list[ChunkOut]
+        count: int
+
+    class GetChunksResponse(BaseModel):
         chunks: list[ChunkOut]
         count: int
 
