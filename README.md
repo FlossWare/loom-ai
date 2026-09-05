@@ -21,7 +21,8 @@ The intended FlossWare control/data flow is:
                               |
                     +---------+---------+
                     |                   |
-                 Workers             Arbiter
+             Fleet Workers          Arbiter
+              W1 W2 ... WN              |
                     |                   |
                     +---------+---------+
                               |
@@ -30,6 +31,8 @@ The intended FlossWare control/data flow is:
                               |
                  persistence / API / TUI
 ```
+
+**Important:** Loom currently has an internal worker/arbiter consensus abstraction, but the independently runnable **distributed fleet-worker layer is not yet implemented**. That is a required P1 implementation tracked in [#935](https://github.com/FlossWare/loom-ai/issues/935). The architecture diagram shows the target architecture, not a claim that fleet execution is already complete.
 
 ### Responsibility boundaries
 
@@ -47,13 +50,29 @@ These boundaries are intentional. Loom may integrate with another project, but a
 ## What Loom provides
 
 - **Execution engine** for dependency-aware work and orchestration.
-- **Worker fan-out and arbiter synthesis** for multi-worker tasks.
+- **Internal worker fan-out and arbiter synthesis** for multi-worker tasks.
 - **Provider-neutral contracts** using structural interfaces rather than hard-coded implementations.
 - **Session lifecycle and transcript/state persistence.**
 - **Evidence and provenance boundaries** for qualification and verification.
 - **Storage, queue, search, embedding, graph, secrets, and task-runner interfaces** with replaceable backends.
 - **REST/API, CLI, TUI, SDK, and MCP integration surfaces** where enabled.
 - **Deterministic canonical chunk handling** so upstream chunk identity and ordering survive the Loom boundary.
+
+### Distributed fleet workers: required implementation
+
+The distributed fleet-worker layer is a **required implementation**, not merely a documentation item. It will provide independently runnable workers across the FlossWare fleet, with explicit contracts for:
+
+- worker registration and stable identity;
+- capability advertisement and scheduling;
+- task leasing/claiming and explicit task state;
+- heartbeats, liveness, and lease expiry;
+- failure recovery, retry/requeue, and idempotent completion;
+- correlated result reporting and provenance;
+- worker process/runtime isolation;
+- secure transport and authentication; and
+- deterministic local multi-worker dogfooding plus live fleet qualification.
+
+The implementation is tracked in [issue #935](https://github.com/FlossWare/loom-ai/issues/935). Do not treat the existing in-process `ConsensusEngine` fan-out as completion of this requirement.
 
 ## What Loom does not own
 
@@ -134,18 +153,20 @@ curl -fsSL https://raw.githubusercontent.com/FlossWare/loom-ai/main/scripts/dogf
 
 Live mode adds the environment doctor/preflight gate and the acceptance harness. It verifies that the configured environment can actually run Loom rather than merely import it.
 
-The live path is conceptually:
+The target live architecture is:
 
 ```text
 agent-setup
     -> model-router
         -> Loom
-            -> workers
+            -> distributed fleet workers
                 -> arbiter
                     -> knowledge/chunking
                         -> persistence
                             -> API/TUI
 ```
+
+The current live qualification path does **not** imply that distributed fleet execution is complete. The fleet-worker implementation in [#935](https://github.com/FlossWare/loom-ai/issues/935) must extend qualification to exercise independently running workers before that architectural milestone is considered complete.
 
 ### Qualifying another revision
 
@@ -174,7 +195,7 @@ The live qualification gate checks more than CI:
 - REST storage round trips without replacement IDs or sequence numbers; and
 - CLI/TUI diagnostic startup and health paths.
 
-A green CI run by itself is **not** release qualification.
+As distributed fleet workers are implemented, their registration, leasing, heartbeat, failure/retry, result, and multi-worker execution paths become mandatory qualification checks. A green CI run by itself is **not** release qualification.
 
 ### Failure classification
 
@@ -270,7 +291,7 @@ For architectural changes, run the dogfood procedure after the relevant automate
 
 ## Project status
 
-Loom is under active development. The current qualification work has established the canonical chunk contract and its persistence/API behavior. The next architectural priorities are the control-plane/model-router integration, worker isolation, and prompt-security hardening.
+Loom is under active development. The current qualification work has established the canonical chunk contract and its persistence/API behavior. The next architectural implementation priorities are control-plane/model-router integration, agent-setup binding, **distributed fleet workers (#935)**, and prompt-security hardening.
 
 Changes should be independently reviewed and dogfooded rather than accumulating unrelated architectural work in a single implementation.
 
