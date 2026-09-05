@@ -153,10 +153,17 @@ try:
         @classmethod
         def _populate_sequence(cls, data: Any) -> Any:
             if isinstance(data, dict):
-                if "sequence" not in data or data["sequence"] is None or data["sequence"] == 0:
+                if (
+                    "sequence" not in data
+                    or data["sequence"] is None
+                    or data["sequence"] == 0
+                ):
                     data["sequence"] = data.get("chunk_index", 0)
             elif hasattr(data, "chunk_index"):
-                if not hasattr(data, "sequence") or getattr(data, "sequence", None) in (None, 0):
+                if not hasattr(data, "sequence") or getattr(data, "sequence", None) in (
+                    None,
+                    0,
+                ):
                     setattr(data, "sequence", getattr(data, "chunk_index", 0))
             return data
 

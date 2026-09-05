@@ -70,12 +70,21 @@ def _extract_chunk_object(c: Any, document_id: str, index: int) -> Any:
         chunk_idx = int(seq)
 
         content = c.get("content") or c.get("text") or ""
-        content_hash = c.get("content_hash") or hashlib.sha256(str(content).encode()).hexdigest()[:16]  # noqa: S324
-        token_count = c.get("token_count") if c.get("token_count") is not None else c.get("tokens", 0)
+        content_hash = (
+            c.get("content_hash")
+            or hashlib.sha256(str(content).encode()).hexdigest()[:16]
+        )  # noqa: S324
+        token_count = (
+            c.get("token_count")
+            if c.get("token_count") is not None
+            else c.get("tokens", 0)
+        )
         start_offset = c.get("start_offset", 0)
         end_offset = c.get("end_offset", 0)
         metadata = c.get("metadata") if isinstance(c.get("metadata"), dict) else {}
-        provenance = c.get("provenance") if isinstance(c.get("provenance"), dict) else {}
+        provenance = (
+            c.get("provenance") if isinstance(c.get("provenance"), dict) else {}
+        )
 
         return Chunk(
             id=str(chunk_id),
@@ -91,7 +100,11 @@ def _extract_chunk_object(c: Any, document_id: str, index: int) -> Any:
         )
 
     if hasattr(c, "content"):
-        chunk_id = getattr(c, "id", None) or getattr(c, "chunk_id", None) or f"chunk-{document_id}-{index}"
+        chunk_id = (
+            getattr(c, "id", None)
+            or getattr(c, "chunk_id", None)
+            or f"chunk-{document_id}-{index}"
+        )
         doc_id = getattr(c, "document_id", None) or document_id
         seq = getattr(c, "sequence", None)
         if seq is None:
@@ -100,7 +113,10 @@ def _extract_chunk_object(c: Any, document_id: str, index: int) -> Any:
             seq = index
         chunk_idx = int(seq)
         content = getattr(c, "content", "")
-        content_hash = getattr(c, "content_hash", "") or hashlib.sha256(str(content).encode()).hexdigest()[:16]  # noqa: S324
+        content_hash = (
+            getattr(c, "content_hash", "")
+            or hashlib.sha256(str(content).encode()).hexdigest()[:16]
+        )  # noqa: S324
         token_count = getattr(c, "token_count", 0)
         start_offset = getattr(c, "start_offset", 0)
         end_offset = getattr(c, "end_offset", 0)

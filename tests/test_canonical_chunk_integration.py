@@ -201,7 +201,9 @@ def test_canonical_chunk_unicode_offset_semantics():
     In Python str and FlossWare/chunking contracts, offsets specify character code
     point indices into the document content string.
     """
-    doc_content = "Intro: Hello 🚀 world! 🌟 Canonical chunking test with multi-byte unicode."
+    doc_content = (
+        "Intro: Hello 🚀 world! 🌟 Canonical chunking test with multi-byte unicode."
+    )
     # Slice character offsets:
     start_offset = 7
     end_offset = 21
