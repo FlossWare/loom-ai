@@ -214,57 +214,84 @@ class PostgresqlStorageBackend:
 
     @staticmethod
     def _row_to_chunk(r: Any) -> Chunk:
-        meta = r.get("metadata") if hasattr(r, "get") else r["metadata"]
-        prov = r.get("provenance") if hasattr(r, "get") else r["provenance"]
+        meta_raw = r.get("metadata") if hasattr(r, "get") else r["metadata"]
+        meta_json = (
+            json.loads(meta_raw) if isinstance(meta_raw, str) else (meta_raw or {})
+        )
+
+        canonical_data = (
+            meta_json.pop("_canonical", {}) if isinstance(meta_json, dict) else {}
+        )
+        prov = (
+            canonical_data.get("provenance", {})
+            or (r.get("provenance", {}) if hasattr(r, "get") else {})
+            or {}
+        )
+        token_count = (
+            canonical_data.get("token_count", 0)
+            or (r.get("token_count", 0) if hasattr(r, "get") else 0)
+            or 0
+        )
+        start_offset = (
+            canonical_data.get("start_offset", 0)
+            or (r.get("start_offset", 0) if hasattr(r, "get") else 0)
+            or 0
+        )
+        end_offset = (
+            canonical_data.get("end_offset", 0)
+            or (r.get("end_offset", 0) if hasattr(r, "get") else 0)
+            or 0
+        )
+
         return Chunk(
             id=r["id"],
             document_id=r["document_id"],
             content=r["content"],
             chunk_index=r["chunk_index"],
             content_hash=r.get("content_hash", "") or "",
-            token_count=r.get("token_count", 0) or 0,
-            start_offset=r.get("start_offset", 0) or 0,
-            end_offset=r.get("end_offset", 0) or 0,
-            metadata=json.loads(meta) if isinstance(meta, str) else (meta or {}),
-            provenance=json.loads(prov) if isinstance(prov, str) else (prov or {}),
+            token_count=int(token_count),
+            start_offset=int(start_offset),
+            end_offset=int(end_offset),
+            metadata=meta_json if isinstance(meta_json, dict) else {},
+            provenance=prov if isinstance(prov, dict) else {},
         )
 
     async def store_chunks(self, document_id: str, chunks: list[Chunk]) -> int:
         if not chunks:
             return 0
         async with self._pool.acquire() as conn:
-            await conn.executemany(
-                """
-                INSERT INTO chunks (id, document_id, content, chunk_index,
-                                    content_hash, token_count, start_offset,
-                                    end_offset, metadata, provenance)
-                VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10)
-                ON CONFLICT (id) DO UPDATE SET
-                    document_id = EXCLUDED.document_id,
-                    content = EXCLUDED.content,
-                    chunk_index = EXCLUDED.chunk_index,
-                    content_hash = EXCLUDED.content_hash,
-                    token_count = EXCLUDED.token_count,
-                    start_offset = EXCLUDED.start_offset,
-                    end_offset = EXCLUDED.end_offset,
-                    metadata = EXCLUDED.metadata,
-                    provenance = EXCLUDED.provenance
-                """,
-                [
+            records = []
+            for c in chunks:
+                meta = dict(c.metadata)
+                meta["_canonical"] = {
+                    "token_count": c.token_count,
+                    "start_offset": c.start_offset,
+                    "end_offset": c.end_offset,
+                    "provenance": c.provenance,
+                }
+                records.append(
                     (
                         c.id,
                         c.document_id or document_id,
                         c.content,
                         c.chunk_index,
                         c.content_hash,
-                        c.token_count,
-                        c.start_offset,
-                        c.end_offset,
-                        json.dumps(c.metadata),
-                        json.dumps(c.provenance),
+                        json.dumps(meta),
                     )
-                    for c in chunks
-                ],
+                )
+            await conn.executemany(
+                """
+                INSERT INTO chunks (id, document_id, content, chunk_index,
+                                    content_hash, metadata)
+                VALUES ($1, $2, $3, $4, $5, $6)
+                ON CONFLICT (id) DO UPDATE SET
+                    document_id = EXCLUDED.document_id,
+                    content = EXCLUDED.content,
+                    chunk_index = EXCLUDED.chunk_index,
+                    content_hash = EXCLUDED.content_hash,
+                    metadata = EXCLUDED.metadata
+                """,
+                records,
             )
         return len(chunks)
 

@@ -63,11 +63,13 @@ def _extract_chunk_object(c: Any, document_id: str, index: int) -> Any:
         doc_id = c.get("document_id") or document_id
 
         seq = c.get("sequence")
-        if seq is None:
-            seq = c.get("chunk_index")
-        if seq is None:
-            seq = index
-        chunk_idx = int(seq)
+        idx = c.get("chunk_index")
+        if seq is not None and idx is not None and int(seq) != int(idx):
+            raise ValueError(
+                f"Conflicting 'sequence' ({seq}) and 'chunk_index' ({idx}) values provided in chunk payload"
+            )
+        chosen_seq = seq if seq is not None else (idx if idx is not None else index)
+        chunk_idx = int(chosen_seq)
 
         content = c.get("content") or c.get("text") or ""
         content_hash = (
@@ -107,11 +109,13 @@ def _extract_chunk_object(c: Any, document_id: str, index: int) -> Any:
         )
         doc_id = getattr(c, "document_id", None) or document_id
         seq = getattr(c, "sequence", None)
-        if seq is None:
-            seq = getattr(c, "chunk_index", None)
-        if seq is None:
-            seq = index
-        chunk_idx = int(seq)
+        idx = getattr(c, "chunk_index", None)
+        if seq is not None and idx is not None and int(seq) != int(idx):
+            raise ValueError(
+                f"Conflicting 'sequence' ({seq}) and 'chunk_index' ({idx}) values provided in chunk payload"
+            )
+        chosen_seq = seq if seq is not None else (idx if idx is not None else index)
+        chunk_idx = int(chosen_seq)
         content = getattr(c, "content", "")
         content_hash = (
             getattr(c, "content_hash", "")

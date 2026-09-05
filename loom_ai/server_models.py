@@ -153,18 +153,31 @@ try:
         @classmethod
         def _populate_sequence(cls, data: Any) -> Any:
             if isinstance(data, dict):
+                has_seq = "sequence" in data and data["sequence"] is not None
+                has_idx = "chunk_index" in data and data["chunk_index"] is not None
                 if (
-                    "sequence" not in data
-                    or data["sequence"] is None
-                    or data["sequence"] == 0
+                    has_seq
+                    and has_idx
+                    and int(data["sequence"]) != int(data["chunk_index"])
                 ):
-                    data["sequence"] = data.get("chunk_index", 0)
+                    raise ValueError(
+                        f"Conflicting 'sequence' ({data['sequence']}) and 'chunk_index' ({data['chunk_index']}) values"
+                    )
+                if not has_seq and has_idx:
+                    data["sequence"] = data["chunk_index"]
+                elif not has_idx and has_seq:
+                    data["chunk_index"] = data["sequence"]
             elif hasattr(data, "chunk_index"):
-                if not hasattr(data, "sequence") or getattr(data, "sequence", None) in (
-                    None,
-                    0,
-                ):
-                    setattr(data, "sequence", getattr(data, "chunk_index", 0))
+                seq = getattr(data, "sequence", None)
+                idx = getattr(data, "chunk_index", None)
+                if seq is not None and idx is not None and int(seq) != int(idx):
+                    raise ValueError(
+                        f"Conflicting 'sequence' ({seq}) and 'chunk_index' ({idx}) values"
+                    )
+                if seq is None and idx is not None:
+                    setattr(data, "sequence", idx)
+                elif idx is None and seq is not None:
+                    setattr(data, "chunk_index", seq)
             return data
 
     class SearchResultOut(BaseModel):

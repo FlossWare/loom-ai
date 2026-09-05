@@ -104,6 +104,63 @@ async def test_canonical_chunk_sequence_preservation():
 
 
 @pytest.mark.asyncio
+async def test_canonical_chunk_sequence_zero_preserved():
+    """Verify that explicit sequence=0 is preserved and not treated as missing."""
+    storage = MemoryStorageBackend()
+    fixture = _make_canonical_chunk_fixture(sequence=0)
+
+    cfg = LoomConfig(
+        storage=storage,
+        queue=None,  # type: ignore[arg-type]
+        secrets=None,  # type: ignore[arg-type]
+        embedding=None,  # type: ignore[arg-type]
+        search=None,  # type: ignore[arg-type]
+    )
+    app = create_app(cfg)
+    client = TestClient(app)
+
+    store_resp = client.post(
+        "/knowledge/chunks/store",
+        json={"document_id": "doc-zero-1", "chunks": [fixture]},
+    )
+    assert store_resp.status_code == 200
+
+    get_resp = client.get("/knowledge/documents/doc-zero-1/chunks")
+    assert get_resp.status_code == 200
+    chunk = get_resp.json()["chunks"][0]
+    assert chunk["sequence"] == 0
+    assert chunk["chunk_index"] == 0
+
+
+def test_conflicting_sequence_and_chunk_index_raises():
+    """Verify that payloads providing conflicting sequence and chunk_index values raise ValueError."""
+    storage = MemoryStorageBackend()
+    cfg = LoomConfig(
+        storage=storage,
+        queue=None,  # type: ignore[arg-type]
+        secrets=None,  # type: ignore[arg-type]
+        embedding=None,  # type: ignore[arg-type]
+        search=None,  # type: ignore[arg-type]
+    )
+    app = create_app(cfg)
+    client = TestClient(app)
+
+    conflicting_payload = {
+        "id": "c-conflict-1",
+        "document_id": "doc-conflict",
+        "sequence": 5,
+        "chunk_index": 10,
+        "content": "Conflicting sequence data",
+    }
+
+    with pytest.raises(ValueError, match="Conflicting 'sequence'"):
+        client.post(
+            "/knowledge/chunks/store",
+            json={"document_id": "doc-conflict", "chunks": [conflicting_payload]},
+        )
+
+
+@pytest.mark.asyncio
 async def test_canonical_chunk_metadata_preservation():
     """Verify that multiple metadata fields survive storage and retrieval."""
     storage = MemoryStorageBackend()
