@@ -6,12 +6,12 @@ The goal is to validate the **usable system**, not merely confirm that unit test
 
 ## Qualification gate
 
-A P0 implementation is considered dogfood-ready only when:
+A P0 implementation is considered ready to advance only when:
 
 1. `main` is clean and the expected commit is installed.
 2. The full automated test suite passes.
 3. Formatting, linting, packaging, and build checks pass.
-4. The Loom doctor/preflight gate passes.
+4. The live Loom doctor/preflight gate passes.
 5. The canonical chunk contract passes end-to-end through the API/storage path.
 6. Configured persistence backends can be exercised.
 7. The CLI/TUI smoke path starts and performs its basic health checks.
@@ -20,7 +20,11 @@ A P0 implementation is considered dogfood-ready only when:
 
 A green CI run alone is **not** sufficient for dogfood qualification.
 
-## Fast path: one command
+## Fast path
+
+There are two modes because not every machine has a live model provider and infrastructure available.
+
+### Baseline qualification
 
 From an existing Loom checkout:
 
@@ -28,65 +32,68 @@ From an existing Loom checkout:
 ./scripts/dogfood.sh
 ```
 
-For a clean-machine qualification directly from GitHub:
+From a clean machine directly from GitHub:
 
 ```bash
 curl -fsSL https://raw.githubusercontent.com/FlossWare/loom-ai/main/scripts/dogfood.sh | bash
 ```
 
-The curl form clones a shallow copy of `main` into a temporary directory and executes the repository's qualification script. Set `LOOM_DOGFOOD_REF` to qualify another branch or tag, and `LOOM_DOGFOOD_KEEP=1` to retain the temporary checkout for investigation.
+This mode creates an isolated `.venv`, installs the development/qualification dependencies, runs Ruff, the complete pytest suite, and the package build. It does not require a live LLM, embeddings service, PostgreSQL, Redis, OrientDB, or Podman.
 
-The dogfood script intentionally uses the repository's existing environment and configuration. It does **not** manufacture provider credentials, databases, or other infrastructure. Configure the environment first when running the full live gate.
+### Full live dogfood
+
+Run the same script with the live gate enabled:
+
+```bash
+LOOM_DOGFOOD_LIVE=1 ./scripts/dogfood.sh
+```
+
+Or directly from GitHub:
+
+```bash
+curl -fsSL https://raw.githubusercontent.com/FlossWare/loom-ai/main/scripts/dogfood.sh | LOOM_DOGFOOD_LIVE=1 bash
+```
+
+Live mode additionally runs `scripts/doctor.sh` and the Loom acceptance harness. The environment must already have the required provider, embedding, and infrastructure configuration. The script never manufactures credentials or production infrastructure.
+
+### Qualifying another revision
+
+```bash
+LOOM_DOGFOOD_REF=0.3 ./scripts/dogfood.sh
+```
+
+For a remote run, `LOOM_DOGFOOD_REF` is passed to the shallow clone. Set `LOOM_DOGFOOD_KEEP=1` to retain the temporary checkout after a remote run.
 
 ## What the script validates
 
-The qualification script performs these stages:
+### Baseline mode
 
-### 1. Source and environment
+1. **Source and environment**
+   - verifies Git and Python 3.11+
+   - records the exact commit SHA, Python version, and operating system
+   - requires the Loom canary gate (`LOOM_CANARY=1`)
+   - creates an isolated virtual environment
+   - installs the project and development dependencies
 
-- verifies the Git checkout
-- records the exact commit SHA, Python version, and operating system
-- requires the Loom canary gate (`LOOM_CANARY=1`)
+2. **Static quality**
+   - Ruff formatting check
+   - Ruff lint check
 
-### 2. Doctor/preflight
+3. **Automated tests**
+   - complete pytest suite
+   - canonical chunk integration tests as part of the full suite
 
-`./scripts/doctor.sh` verifies the supported host environment and configured dogfood dependencies, including Python, Git, curl, rootless Podman, Loom importability, the configured LLM provider, and a non-noop embedding backend. PostgreSQL availability is checked when PostgreSQL storage is selected.
+4. **Package validation**
+   - wheel build
+   - source distribution build
+
+### Live mode
+
+Live mode adds `scripts/doctor.sh`, which verifies the supported host environment and configured dogfood dependencies, including Python, Git, curl, rootless Podman, Loom importability, the configured LLM provider, and a non-noop embedding backend. PostgreSQL availability is checked when PostgreSQL storage is selected.
+
+The live acceptance harness then performs the repository's deterministic acceptance checks and records qualification evidence.
 
 The doctor gate is intentionally stricter than ordinary development setup. A machine that can import Loom is not necessarily a machine that can dogfood Loom.
-
-### 3. Static quality
-
-- Ruff formatting check
-- Ruff lint check
-
-### 4. Automated tests
-
-- complete pytest suite
-- canonical chunk integration tests as part of the full suite
-
-### 5. Package validation
-
-- wheel build
-- source distribution build, when the Python build module is installed
-
-## Baseline tests versus full dogfood
-
-There are two useful levels of validation.
-
-### Baseline CI qualification
-
-Use this when you only need to verify source-level correctness and do not have live provider/infrastructure configuration:
-
-```bash
-python3 -m pytest -q
-ruff format --check .
-ruff check .
-python3 -m build --wheel --sdist
-```
-
-### Full dogfood qualification
-
-Use `./scripts/dogfood.sh`. This is the release/advancement gate and requires the environment checks in `scripts/doctor.sh` to pass, including a real LLM provider and non-noop embeddings.
 
 ## Manual live qualification
 
@@ -133,7 +140,7 @@ The API must not manufacture replacement IDs or sequence numbers when canonical 
 
 ### TUI/CLI smoke test
 
-Verify that the installed command starts, reports its health/configuration state, and exits cleanly from the basic diagnostic path. A TUI that technically imports but cannot start is not dogfood-ready. Humans have somehow made this distinction necessary.
+Verify that the installed command starts, reports its health/configuration state, and exits cleanly from the basic diagnostic path. A TUI that technically imports but cannot start is not dogfood-ready.
 
 ## Failure classification
 
@@ -158,9 +165,9 @@ For each qualification run record:
 - installation method
 - test command and result
 - lint/format/build results
-- doctor result
+- doctor result, when live mode is used
 - enabled backends
-- model/provider used
+- model/provider used, when live mode is used
 - first failing command and error
 - priority classification
 - whether the failure reproduces from a clean environment
@@ -169,6 +176,6 @@ A concise failure report should include the exact command, relevant error output
 
 ## Advancement rule
 
-Only advance to the next architectural implementation priority after the current P0 passes the dogfood gate.
+Only advance to the next architectural implementation priority after the **live dogfood gate** passes for a P0 implementation.
 
-For the current roadmap, the expected next architectural work after canonical chunk qualification is the P1 control-plane/model-router integration, followed by worker isolation and prompt-security hardening. Those changes should be independently reviewed and qualified rather than folded into the canonical chunk fix.
+For the current roadmap, the next architectural work after canonical chunk qualification is the P1 control-plane/model-router integration, followed by worker isolation and prompt-security hardening. Those changes should be independently reviewed and qualified rather than folded into the canonical chunk fix.
