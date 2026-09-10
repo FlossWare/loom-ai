@@ -6,6 +6,8 @@ from unittest.mock import patch
 
 import pytest
 
+pytest.importorskip("uvicorn", reason="uvicorn not installed (server extra)")
+
 
 def _run_main_with_port(port_value: str) -> None:
     """Call main() with LOOM_PORT set to *port_value*, stubbing uvicorn."""

@@ -31,7 +31,7 @@ if TYPE_CHECKING:
         TaskState,
         WorkspaceSnapshot,
     )
-    from loom_ai.models_agent import ContextSource # For integration
+    from loom_ai.models_agent import ContextSource  # For integration
 
 
 # -- Workspace Management ---------------------------------------------------
@@ -75,7 +75,9 @@ class TaskStateManager(Protocol):
         """Updates the state for a given task ID."""
         ...
 
-    async def get_git_diff(self, path: FilePath, since_commit: str | None = None) -> GitDiff:
+    async def get_git_diff(
+        self, path: FilePath, since_commit: str | None = None
+    ) -> GitDiff:
         """Retrieves git changes for the workspace or specific files."""
         ...
 
@@ -125,7 +127,6 @@ class KnowledgeBase(Protocol):
     ) -> list[KnowledgeQueryResult]:
         """Queries the knowledge base for relevant information."""
         ...
-
 ```
 
 ## Data Models
@@ -144,30 +145,40 @@ FilePath = str
 FileContent = str
 GitDiff = str  # For simplicity, raw diff string
 
+
 @dataclass(frozen=True)
 class WorkspaceSnapshot:
     """A snapshot of the workspace directory structure."""
+
     root_path: FilePath
     files: List[FilePath]
     directories: List[FilePath]
 
+
 @dataclass(frozen=True)
 class ProjectStructureNode:
     """Represents a node in the project's file/module structure."""
+
     name: str
     path: FilePath
     type: Literal["file", "directory", "module", "package"]
     children: List["ProjectStructureNode"] = field(default_factory=list)
-    metadata: Dict[str, Any] = field(default_factory=dict) # e.g., language, dependencies
+    metadata: Dict[str, Any] = field(
+        default_factory=dict
+    )  # e.g., language, dependencies
+
 
 @dataclass(frozen=True)
 class ProjectStructure:
     """The hierarchical structure of a project."""
+
     root: ProjectStructureNode
+
 
 @dataclass(frozen=True)
 class TaskState:
     """The current state of a coding task."""
+
     task_id: str
     status: str
     current_step: str
@@ -177,14 +188,15 @@ class TaskState:
     build_logs: Optional[str] = None
     # Add other task-specific state as needed
 
+
 @dataclass(frozen=True)
 class KnowledgeQueryResult:
     """A result from a knowledge base query."""
+
     content: str
     source_uri: str
     relevance_score: float
     metadata: Dict[str, Any] = field(default_factory=dict)
-
 ```
 
 ## In-Memory Implementation Strategy

@@ -45,9 +45,10 @@ Expected output:
 
 ```python
 from loom_ai.session_persistence import SessionManager
+
 sm = SessionManager()
-print(sm.list_sessions())            # should contain the current session_id
-print(sm.get_knowledge(session_id))   # should show the knowledge generated above
+print(sm.list_sessions())  # should contain the current session_id
+print(sm.get_knowledge(session_id))  # should show the knowledge generated above
 ```
 
 If `LOOM_STORAGE=postgresql`, query the `sessions` table to see the row.
@@ -167,9 +168,10 @@ The response should be based on persisted Loom knowledge and cite or otherwise e
 
 ```python
 from loom_ai.session_persistence import SessionManager
+
 sm = SessionManager()
 knowledge = sm.get_knowledge(session_id)
-print(len(knowledge))   # should be >= 2 (original + follow-up)
+print(len(knowledge))  # should be >= 2 (original + follow-up)
 ```
 
 ## Verification Checklist

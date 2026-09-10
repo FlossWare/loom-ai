@@ -34,6 +34,7 @@ if TYPE_CHECKING:
 
 # -- Session Memory (#66) -------------------------------------------------------
 
+
 @runtime_checkable
 class SessionKnowledgeStore(Protocol):
     """Manages durable, unbounded session context and conversational memory.
@@ -52,11 +53,15 @@ class SessionKnowledgeStore(Protocol):
         """Retrieves the most recent interaction snippets."""
         ...
 
-    async def get_summarized_history(self, session_id: str, max_tokens: int) -> list[SessionContextSnippet]:
+    async def get_summarized_history(
+        self, session_id: str, max_tokens: int
+    ) -> list[SessionContextSnippet]:
         """Retrieves summarized historical context for a session, respecting token limits."""
         ...
 
-    async def get_structured_knowledge(self, query: str | None = None) -> list[SessionFact]:
+    async def get_structured_knowledge(
+        self, query: str | None = None
+    ) -> list[SessionFact]:
         """Retrieves structured facts or decisions from the session knowledge."""
         ...
 
@@ -109,6 +114,7 @@ from datetime import datetime
 from enum import Enum
 from typing import Any, Dict, List, Optional
 
+
 class SessionEventType(str, Enum):
     USER_INPUT = "user_input"
     AGENT_OUTPUT = "agent_output"
@@ -119,6 +125,7 @@ class SessionEventType(str, Enum):
     FACT = "fact"
     SUMMARY = "summary"
 
+
 class ContextSnippetType(str, Enum):
     RAW_EVENT = "raw_event"
     SUMMARY = "summary"
@@ -127,57 +134,75 @@ class ContextSnippetType(str, Enum):
     TOOL_RESULT = "tool_result"
     PINNED = "pinned"
 
+
 @dataclass(frozen=True)
 class SessionEvent:
     """Represents a single interaction or internal event within a session."""
+
     id: str
     session_id: str
     timestamp: datetime
     event_type: SessionEventType
     content: str
     metadata: Dict[str, Any] = field(default_factory=dict)
-    provenance_id: Optional[str] = None # Link to original source if extracted/summarized
+    provenance_id: Optional[str] = (
+        None  # Link to original source if extracted/summarized
+    )
+
 
 @dataclass(frozen=True)
 class SessionContextSnippet:
     """A piece of context, potentially extracted, summarized, or a raw event."""
+
     id: str
     session_id: str
     timestamp: datetime
     content: str
     snippet_type: ContextSnippetType
-    source_event_ids: List[str] = field(default_factory=list) # IDs of original SessionEvents
-    confidence: float = 1.0 # Confidence in accuracy/relevance
-    freshness_score: float = 1.0 # How recently it was relevant/updated
+    source_event_ids: List[str] = field(
+        default_factory=list
+    )  # IDs of original SessionEvents
+    confidence: float = 1.0  # Confidence in accuracy/relevance
+    freshness_score: float = 1.0  # How recently it was relevant/updated
     is_pinned: bool = False
     metadata: Dict[str, Any] = field(default_factory=dict)
+
 
 @dataclass(frozen=True)
 class SessionFact:
     """A structured fact or decision extracted from session events."""
+
     id: str
     session_id: str
     timestamp: datetime
-    fact_type: str # e.g., "decision", "constraint", "entity"
-    content: Dict[str, Any] # Structured data, e.g., {"action": "create_report", "status": "pending"}
+    fact_type: str  # e.g., "decision", "constraint", "entity"
+    content: Dict[
+        str, Any
+    ]  # Structured data, e.g., {"action": "create_report", "status": "pending"}
     source_snippet_ids: List[str] = field(default_factory=list)
     confidence: float = 1.0
     is_pinned: bool = False
     metadata: Dict[str, Any] = field(default_factory=dict)
 
+
 @dataclass(frozen=True)
 class SessionMemoryConfig:
     """Configuration for session memory behavior, compaction, and retrieval."""
+
     max_recent_events: int = 20
     max_summary_tokens: int = 1000
     compaction_interval_minutes: int = 60
-    retrieval_strategy: str = "hybrid_recency_keyword" # e.g., "recency", "semantic", "hybrid"
+    retrieval_strategy: str = (
+        "hybrid_recency_keyword"  # e.g., "recency", "semantic", "hybrid"
+    )
     max_retrieved_tokens: int = 2000
     min_confidence_threshold: float = 0.7
+
 
 @dataclass(frozen=True)
 class SessionState:
     """Represents the complete serializable state of a session's memory."""
+
     session_id: str
     events: List[SessionEvent]
     snippets: List[SessionContextSnippet]
@@ -185,11 +210,13 @@ class SessionState:
     pinned_ids: List[str]
     last_compaction_timestamp: Optional[datetime] = None
 
+
 @dataclass(frozen=True)
 class KnowledgeGraduationRequest:
     """Request to graduate session knowledge to a broader knowledge store."""
+
     session_id: str
-    knowledge_ids: List[str] # IDs of SessionFact or SessionContextSnippet to graduate
+    knowledge_ids: List[str]  # IDs of SessionFact or SessionContextSnippet to graduate
     target_store_id: str
     reason: str
 ```

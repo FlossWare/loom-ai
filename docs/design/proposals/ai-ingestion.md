@@ -58,11 +58,12 @@ The architecture relies on decoupled, runtime-checkable contracts. All methods a
 from typing import Protocol, runtime_checkable, AsyncIterator, List, Optional, Dict, Any
 import uuid
 from .models import (
-    CanonicalInteraction, 
-    ExtractedKnowledge, 
-    ImportJob, 
-    ExternalProvenance
+    CanonicalInteraction,
+    ExtractedKnowledge,
+    ImportJob,
+    ExternalProvenance,
 )
+
 
 @runtime_checkable
 class IngestionAdapter(Protocol):
@@ -71,6 +72,7 @@ class IngestionAdapter(Protocol):
     Implementations handle parsing specific file formats (JSON, SQLite, Markdown)
     or syncing via external APIs.
     """
+
     @property
     def provider_name(self) -> str:
         """Returns the unique identifier of the target provider (e.g., 'aider', 'claude-code')."""
@@ -80,11 +82,15 @@ class IngestionAdapter(Protocol):
         """Determines if this adapter can parse the given raw payload."""
         ...
 
-    async def parse(self, source_data: bytes, metadata: Dict[str, Any]) -> AsyncIterator[CanonicalInteraction]:
+    async def parse(
+        self, source_data: bytes, metadata: Dict[str, Any]
+    ) -> AsyncIterator[CanonicalInteraction]:
         """Parses raw payload into a stream of CanonicalInteractions."""
         ...
 
-    async def get_latest_interactions(self, last_import_time: Optional[str]) -> AsyncIterator[CanonicalInteraction]:
+    async def get_latest_interactions(
+        self, last_import_time: Optional[str]
+    ) -> AsyncIterator[CanonicalInteraction]:
         """
         Retrieves new or updated interactions since the last successful import.
         Intended for incremental imports from sources that support querying changes.
@@ -98,19 +104,26 @@ class InteractionStore(Protocol):
     Durable storage for raw, normalized external interactions.
     Maintains a historical ledger for auditability and re-extraction.
     """
+
     async def save_interaction(self, interaction: CanonicalInteraction) -> None:
         """Persists a single canonical interaction."""
         ...
 
-    async def store_interactions(self, interactions: List[CanonicalInteraction]) -> List[uuid.UUID]:
+    async def store_interactions(
+        self, interactions: List[CanonicalInteraction]
+    ) -> List[uuid.UUID]:
         """Persists a batch of canonical interactions."""
         ...
 
-    async def get_interaction(self, interaction_id: uuid.UUID) -> Optional[CanonicalInteraction]:
+    async def get_interaction(
+        self, interaction_id: uuid.UUID
+    ) -> Optional[CanonicalInteraction]:
         """Retrieves a single canonical interaction by its ID."""
         ...
 
-    async def get_interactions_by_session(self, session_ref_id: str) -> List[CanonicalInteraction]:
+    async def get_interactions_by_session(
+        self, session_ref_id: str
+    ) -> List[CanonicalInteraction]:
         """Retrieves all canonical interactions belonging to a specific external session."""
         ...
 
@@ -124,17 +137,22 @@ class InteractionStore(Protocol):
 @runtime_checkable
 class KnowledgeExtractor(Protocol):
     """
-    Analyzes canonical interactions to extract discrete facts, decisions, 
+    Analyzes canonical interactions to extract discrete facts, decisions,
     discovered issues, and architectural patterns.
     """
-    async def extract_knowledge(self, interaction: CanonicalInteraction) -> List[ExtractedKnowledge]:
+
+    async def extract_knowledge(
+        self, interaction: CanonicalInteraction
+    ) -> List[ExtractedKnowledge]:
         """
         Processes an interaction and extracts structured facts and decisions.
         Typically powered by an LLM parsing step.
         """
         ...
 
-    async def bulk_extract_knowledge(self, interactions: List[CanonicalInteraction]) -> List[ExtractedKnowledge]:
+    async def bulk_extract_knowledge(
+        self, interactions: List[CanonicalInteraction]
+    ) -> List[ExtractedKnowledge]:
         """Processes multiple interactions in bulk for high-throughput extractions."""
         ...
 
@@ -144,6 +162,7 @@ class ImportOrchestrator(Protocol):
     """
     Coordinates the ingestion, storage, extraction, and indexing lifecycle.
     """
+
     async def register_adapter(self, adapter: IngestionAdapter) -> None:
         """Registers an IngestionAdapter with the orchestrator."""
         ...
@@ -179,36 +198,48 @@ from datetime import datetime
 from typing import List, Dict, Any, Optional
 import uuid
 
+
 class TrustLevel(str, Enum):
     """
     Represents the reliability of an imported fact or claim.
     """
-    UNTRUSTED = "untrusted"                  # Claim conflicts with known facts or has low confidence
-    UNVERIFIED_AI_CLAIM = "unverified_ai"    # Freshly imported claim from external AI sources
-    USER_ASSERTED = "user_asserted"          # Claim explicitly asserted by the user in dialogue
-    SYSTEM_CORROBORATED = "corroborated"      # Supported by multiple sources or local build/compiler runs
-    VERIFIED = "verified"                    # Explicitly marked as true by human developer review
-    OFFICIAL_DOCS = "official_docs"          # Knowledge derived directly from verified official docs
+
+    UNTRUSTED = "untrusted"  # Claim conflicts with known facts or has low confidence
+    UNVERIFIED_AI_CLAIM = (
+        "unverified_ai"  # Freshly imported claim from external AI sources
+    )
+    USER_ASSERTED = "user_asserted"  # Claim explicitly asserted by the user in dialogue
+    SYSTEM_CORROBORATED = (
+        "corroborated"  # Supported by multiple sources or local build/compiler runs
+    )
+    VERIFIED = "verified"  # Explicitly marked as true by human developer review
+    OFFICIAL_DOCS = (
+        "official_docs"  # Knowledge derived directly from verified official docs
+    )
 
 
 class KnowledgeCategory(str, Enum):
     """
     Defines the structural categories of knowledge that can be extracted.
     """
-    DECISION = "decision"                    # A specific choice, architecture path, or resolution made
-    FACT = "fact"                            # A verifiable static piece of information
-    DISCOVERY = "discovery"                  # A new insight or code understanding gained
-    FAILURE = "failure"                      # An identified bug, failure pattern, or unsuccessful attempt
-    PATTERN = "pattern"                      # A recurring approach, solution design, or code anti-pattern
-    UNRESOLVED_QUESTION = "unresolved"       # A critical question that was asked but not answered
-    CONTEXT = "context"                      # General environmental background information
-    CODE_SNIPPET = "code_snippet"            # A reuseable code snippet associated with structural workarounds
+
+    DECISION = "decision"  # A specific choice, architecture path, or resolution made
+    FACT = "fact"  # A verifiable static piece of information
+    DISCOVERY = "discovery"  # A new insight or code understanding gained
+    FAILURE = "failure"  # An identified bug, failure pattern, or unsuccessful attempt
+    PATTERN = "pattern"  # A recurring approach, solution design, or code anti-pattern
+    UNRESOLVED_QUESTION = (
+        "unresolved"  # A critical question that was asked but not answered
+    )
+    CONTEXT = "context"  # General environmental background information
+    CODE_SNIPPET = "code_snippet"  # A reuseable code snippet associated with structural workarounds
 
 
 class InteractionEventType(str, Enum):
     """
     Defines the role or action category of an event within a canonical interaction.
     """
+
     USER_PROMPT = "user_prompt"
     AI_RESPONSE = "ai_response"
     TOOL_EXECUTION = "tool_execution"
@@ -223,14 +254,19 @@ class ExternalProvenance:
     """
     Encapsulates metadata describing the exact origin of imported information.
     """
-    provider_name: str                        # e.g., "claude-code", "cursor", "aider"
-    provider_interaction_id: str             # Unique ID within the provider's system for this transaction
-    provider_session_id: str                 # Unique ID within the provider's system for the session
-    original_timestamp: datetime             # When the interaction occurred externally
-    project_id: Optional[str] = None         # External project/workspace ID if available
-    artifact_id: Optional[str] = None        # Specific file path or target artifact impacted
-    source_uri: Optional[str] = None         # Link or reference to raw backup source (e.g., local file path)
-    raw_payload_checksum: str = ""           # SHA-256 hash of raw input data for deduplication
+
+    provider_name: str  # e.g., "claude-code", "cursor", "aider"
+    provider_interaction_id: (
+        str  # Unique ID within the provider's system for this transaction
+    )
+    provider_session_id: str  # Unique ID within the provider's system for the session
+    original_timestamp: datetime  # When the interaction occurred externally
+    project_id: Optional[str] = None  # External project/workspace ID if available
+    artifact_id: Optional[str] = None  # Specific file path or target artifact impacted
+    source_uri: Optional[str] = (
+        None  # Link or reference to raw backup source (e.g., local file path)
+    )
+    raw_payload_checksum: str = ""  # SHA-256 hash of raw input data for deduplication
 
 
 @dataclass(frozen=True)
@@ -238,11 +274,14 @@ class InteractionEvent:
     """
     A single discrete turn or action inside a canonical interaction sequence.
     """
+
     event_type: InteractionEventType
-    content: str                             # Message text, prompt text, or code block contents
+    content: str  # Message text, prompt text, or code block contents
     timestamp: datetime
-    sequence_number: int                     # Index to maintain chronological conversational ordering
-    artifacts: Dict[str, Any] = field(default_factory=dict) # Metadata detailing tool runs, outputs or edits
+    sequence_number: int  # Index to maintain chronological conversational ordering
+    artifacts: Dict[str, Any] = field(
+        default_factory=dict
+    )  # Metadata detailing tool runs, outputs or edits
 
 
 @dataclass(frozen=True)
@@ -250,10 +289,13 @@ class CanonicalInteraction:
     """
     The standardized internal structure for any external AI conversation.
     """
+
     id: uuid.UUID = field(default_factory=uuid.uuid4)
     provenance: ExternalProvenance
     events: List[InteractionEvent] = field(default_factory=list)
-    raw_data_ref: Optional[str] = None       # Reference path of the stored raw transaction file (e.g., S3 or local storage)
+    raw_data_ref: Optional[str] = (
+        None  # Reference path of the stored raw transaction file (e.g., S3 or local storage)
+    )
     metadata: Dict[str, Any] = field(default_factory=dict)
 
 
@@ -262,16 +304,21 @@ class ExtractedKnowledge:
     """
     A discrete piece of semantic information derived from an interaction.
     """
+
     id: uuid.UUID = field(default_factory=uuid.uuid4)
-    source_interaction_id: uuid.UUID         # Link back to the CanonicalInteraction
+    source_interaction_id: uuid.UUID  # Link back to the CanonicalInteraction
     category: KnowledgeCategory
-    summary: str                             # Concise heading of the extracted knowledge
-    content: Dict[str, Any]                  # Detailed semantic contents (e.g. {"fact": "...", "context": "..."})
-    confidence: float                        # Extraction confidence score (0.0 - 1.0)
+    summary: str  # Concise heading of the extracted knowledge
+    content: Dict[
+        str, Any
+    ]  # Detailed semantic contents (e.g. {"fact": "...", "context": "..."})
+    confidence: float  # Extraction confidence score (0.0 - 1.0)
     trust_level: TrustLevel
     tags: List[str] = field(default_factory=list)
     timestamp: datetime = field(default_factory=datetime.utcnow)
-    scope_project_id: Optional[uuid.UUID] = None  # Bound to a specific workspace; global if None
+    scope_project_id: Optional[uuid.UUID] = (
+        None  # Bound to a specific workspace; global if None
+    )
 
 
 class ImportJobStatus(str, Enum):
@@ -288,6 +335,7 @@ class ImportJob:
     """
     Tracks the processing status, diagnostics, and metrics of an import pipeline run.
     """
+
     id: uuid.UUID = field(default_factory=uuid.uuid4)
     provider_name: str
     status: ImportJobStatus = ImportJobStatus.PENDING
@@ -316,6 +364,7 @@ import uuid
 from dataclasses import dataclass, field, replace
 from typing import Dict, List, AsyncIterator, Optional, Any
 
+
 # ==========================================
 # In-Memory Implementation of InteractionStore
 # ==========================================
@@ -339,22 +388,30 @@ class InMemoryInteractionStore:
             self._interactions[interaction.id] = interaction
             if checksum:
                 self._checksum_registry[checksum] = interaction.id
-            
-            session_ref = interaction.provenance.provider_session_id
-            self._session_to_interactions.setdefault(session_ref, []).append(interaction)
 
-    async def store_interactions(self, interactions: List[CanonicalInteraction]) -> List[uuid.UUID]:
+            session_ref = interaction.provenance.provider_session_id
+            self._session_to_interactions.setdefault(session_ref, []).append(
+                interaction
+            )
+
+    async def store_interactions(
+        self, interactions: List[CanonicalInteraction]
+    ) -> List[uuid.UUID]:
         stored_ids = []
         for interaction in interactions:
             await self.save_interaction(interaction)
             stored_ids.append(interaction.id)
         return stored_ids
 
-    async def get_interaction(self, interaction_id: uuid.UUID) -> Optional[CanonicalInteraction]:
+    async def get_interaction(
+        self, interaction_id: uuid.UUID
+    ) -> Optional[CanonicalInteraction]:
         async with self._lock:
             return self._interactions.get(interaction_id)
 
-    async def get_interactions_by_session(self, session_ref_id: str) -> List[CanonicalInteraction]:
+    async def get_interactions_by_session(
+        self, session_ref_id: str
+    ) -> List[CanonicalInteraction]:
         async with self._lock:
             events = self._session_to_interactions.get(session_ref_id, [])
             return sorted(events, key=lambda i: i.provenance.original_timestamp)
@@ -366,9 +423,12 @@ class InMemoryInteractionStore:
             matched = []
             for interaction in self._interactions.values():
                 if interaction.provenance.project_id == project_id:
-                    if provider is None or interaction.provenance.provider_name == provider:
+                    if (
+                        provider is None
+                        or interaction.provenance.provider_name == provider
+                    ):
                         matched.append(interaction)
-        
+
         for item in matched:
             yield item
 
@@ -392,10 +452,14 @@ class InMemoryKnowledgeBase:
             else:
                 self._knowledge_pool[knowledge.id] = knowledge
 
-    def _find_existing_knowledge_id(self, target: ExtractedKnowledge) -> Optional[uuid.UUID]:
+    def _find_existing_knowledge_id(
+        self, target: ExtractedKnowledge
+    ) -> Optional[uuid.UUID]:
         for k_id, k in self._knowledge_pool.items():
-            if (k.source_interaction_id == target.source_interaction_id and 
-                k.summary.strip().lower() == target.summary.strip().lower()):
+            if (
+                k.source_interaction_id == target.source_interaction_id
+                and k.summary.strip().lower() == target.summary.strip().lower()
+            ):
                 return k_id
         return None
 
@@ -406,9 +470,11 @@ class InMemoryKnowledgeBase:
             for k in self._knowledge_pool.values():
                 content_str = str(k.content).lower()
                 summary_str = k.summary.lower()
-                if (query.lower() in content_str or 
-                    query.lower() in summary_str or 
-                    any(query.lower() in tag.lower() for tag in k.tags)):
+                if (
+                    query.lower() in content_str
+                    or query.lower() in summary_str
+                    or any(query.lower() in tag.lower() for tag in k.tags)
+                ):
                     results.append(k)
             return results
 
@@ -417,12 +483,14 @@ class InMemoryKnowledgeBase:
 # Rule-Based Semantic Extractor Implementation
 # ==========================================
 class RuleBasedKnowledgeExtractor:
-    async def extract_knowledge(self, interaction: CanonicalInteraction) -> List[ExtractedKnowledge]:
+    async def extract_knowledge(
+        self, interaction: CanonicalInteraction
+    ) -> List[ExtractedKnowledge]:
         extracted = []
         for event in interaction.events:
             if event.event_type != InteractionEventType.AI_RESPONSE:
                 continue
-            
+
             content = event.content
             # Heuristic 1: Detect explicit architectural or design decisions
             if "we decided to" in content.lower() or "decision:" in content.lower():
@@ -433,19 +501,24 @@ class RuleBasedKnowledgeExtractor:
                         category=KnowledgeCategory.DECISION,
                         summary="Architectural Decision Identified",
                         content={
-                            "snippet": self._clean_snippet(content, ["decision:", "we decided to"]),
-                            "full_event_context": content
+                            "snippet": self._clean_snippet(
+                                content, ["decision:", "we decided to"]
+                            ),
+                            "full_event_context": content,
                         },
                         confidence=0.85,
                         trust_level=TrustLevel.UNVERIFIED_AI_CLAIM,
                         tags=["decision", interaction.provenance.provider_name],
                         timestamp=datetime.datetime.utcnow(),
-                        scope_project_id=None
+                        scope_project_id=None,
                     )
                 )
-            
+
             # Heuristic 2: Detect failure modes, bugs, and errors
-            if "failed because" in content.lower() or "error occurred" in content.lower():
+            if (
+                "failed because" in content.lower()
+                or "error occurred" in content.lower()
+            ):
                 extracted.append(
                     ExtractedKnowledge(
                         id=uuid.uuid4(),
@@ -453,19 +526,27 @@ class RuleBasedKnowledgeExtractor:
                         category=KnowledgeCategory.FAILURE,
                         summary="Bug or Failure Encountered",
                         content={
-                            "snippet": self._clean_snippet(content, ["failed because", "error occurred"]),
-                            "full_event_context": content
+                            "snippet": self._clean_snippet(
+                                content, ["failed because", "error occurred"]
+                            ),
+                            "full_event_context": content,
                         },
                         confidence=0.90,
                         trust_level=TrustLevel.UNVERIFIED_AI_CLAIM,
-                        tags=["failure-mode", "bug", interaction.provenance.provider_name],
+                        tags=[
+                            "failure-mode",
+                            "bug",
+                            interaction.provenance.provider_name,
+                        ],
                         timestamp=datetime.datetime.utcnow(),
-                        scope_project_id=None
+                        scope_project_id=None,
                     )
                 )
         return extracted
 
-    async def bulk_extract_knowledge(self, interactions: List[CanonicalInteraction]) -> List[ExtractedKnowledge]:
+    async def bulk_extract_knowledge(
+        self, interactions: List[CanonicalInteraction]
+    ) -> List[ExtractedKnowledge]:
         all_extracted = []
         for interaction in interactions:
             all_extracted.extend(await self.extract_knowledge(interaction))
@@ -475,7 +556,7 @@ class RuleBasedKnowledgeExtractor:
         for trigger in triggers:
             idx = text.lower().find(trigger)
             if idx != -1:
-                return text[idx:idx+250].strip() + "..."
+                return text[idx : idx + 250].strip() + "..."
         return text[:250].strip() + "..."
 
 
@@ -484,10 +565,10 @@ class RuleBasedKnowledgeExtractor:
 # ==========================================
 class DefaultImportOrchestrator:
     def __init__(
-        self, 
-        store: InteractionStore, 
+        self,
+        store: InteractionStore,
         extractor: KnowledgeExtractor,
-        kb: InMemoryKnowledgeBase
+        kb: InMemoryKnowledgeBase,
     ) -> None:
         self.adapters: Dict[str, IngestionAdapter] = {}
         self.store = store
@@ -505,13 +586,13 @@ class DefaultImportOrchestrator:
     ) -> ImportJob:
         if provider_name not in self.adapters:
             raise ValueError(f"No adapter registered for provider: {provider_name}")
-        
+
         job = ImportJob(
             id=uuid.uuid4(),
             provider_name=provider_name,
             status=ImportJobStatus.PENDING,
             created_at=datetime.datetime.utcnow(),
-            project_id=metadata.get("project_id")
+            project_id=metadata.get("project_id"),
         )
         async with self._lock:
             self._jobs[job.id] = job
@@ -522,16 +603,16 @@ class DefaultImportOrchestrator:
             job = self._jobs.get(job_id)
             if not job:
                 raise ValueError(f"Import job with ID {job_id} not found.")
-            
+
             # Progress to running state
             job = replace(job, status=ImportJobStatus.RUNNING)
             self._jobs[job_id] = job
 
         adapter = self.adapters[job.provider_name]
-        
+
         # In this simplistic design, metadata and raw payload are passed to run
         # simulated payload retrieval. In production this points to DB references or files.
-        mock_raw_payload = b"[]" 
+        mock_raw_payload = b"[]"
         mock_metadata = {"project_id": str(job.project_id or "default-workspace")}
 
         errors = []
@@ -547,8 +628,10 @@ class DefaultImportOrchestrator:
                     imported_ids.append(interaction.id)
 
                     # 3. Process with extraction engine
-                    extracted_items = await self.extractor.extract_knowledge(interaction)
-                    
+                    extracted_items = await self.extractor.extract_knowledge(
+                        interaction
+                    )
+
                     # 4. Upsert into final index
                     for knowledge in extracted_items:
                         await self.kb.upsert_knowledge(knowledge)
@@ -564,8 +647,8 @@ class DefaultImportOrchestrator:
         status = ImportJobStatus.COMPLETED_SUCCESS
         if errors:
             status = (
-                ImportJobStatus.COMPLETED_PARTIAL_FAIL 
-                if len(imported_ids) > 0 
+                ImportJobStatus.COMPLETED_PARTIAL_FAIL
+                if len(imported_ids) > 0
                 else ImportJobStatus.FAILED
             )
 
@@ -578,7 +661,9 @@ class DefaultImportOrchestrator:
                 extracted_knowledge_ids=extracted_ids,
                 errors=errors,
                 records_processed=len(imported_ids),
-                last_successful_import_time=datetime.datetime.utcnow() if status != ImportJobStatus.FAILED else None
+                last_successful_import_time=datetime.datetime.utcnow()
+                if status != ImportJobStatus.FAILED
+                else None,
             )
             self._jobs[job_id] = updated_job
             return updated_job
@@ -603,22 +688,24 @@ class AiderHistoryAdapter:
         except (json.JSONDecodeError, UnicodeDecodeError):
             return False
 
-    async def parse(self, source_data: bytes, metadata: Dict[str, Any]) -> AsyncIterator[CanonicalInteraction]:
+    async def parse(
+        self, source_data: bytes, metadata: Dict[str, Any]
+    ) -> AsyncIterator[CanonicalInteraction]:
         raw_list = json.loads(source_data.decode("utf-8"))
         checksum = hashlib.sha256(source_data).hexdigest()
-        
+
         project_id = metadata.get("project_id", "default-workspace")
         session_id = metadata.get("session_id", str(uuid.uuid4()))
-        
+
         events = []
         for index, item in enumerate(raw_list):
             role_str = item.get("role", "user")
             event_type = (
-                InteractionEventType.USER_PROMPT 
-                if role_str == "user" 
+                InteractionEventType.USER_PROMPT
+                if role_str == "user"
                 else InteractionEventType.AI_RESPONSE
             )
-            
+
             timestamp_str = item.get("timestamp")
             if timestamp_str:
                 timestamp = datetime.datetime.fromisoformat(timestamp_str)
@@ -630,7 +717,7 @@ class AiderHistoryAdapter:
                 content=item.get("content", ""),
                 timestamp=timestamp,
                 sequence_number=index,
-                artifacts=item.get("metadata", {})
+                artifacts=item.get("metadata", {}),
             )
             events.append(event)
 
@@ -643,14 +730,16 @@ class AiderHistoryAdapter:
                     provider_session_id=session_id,
                     original_timestamp=events[0].timestamp,
                     project_id=project_id,
-                    raw_payload_checksum=checksum
+                    raw_payload_checksum=checksum,
                 ),
                 events=events,
-                raw_data_ref=f"local://raw_history_checksum_{checksum}.json"
+                raw_data_ref=f"local://raw_history_checksum_{checksum}.json",
             )
             yield interaction
 
-    async def get_latest_interactions(self, last_import_time: Optional[str]) -> AsyncIterator[CanonicalInteraction]:
+    async def get_latest_interactions(
+        self, last_import_time: Optional[str]
+    ) -> AsyncIterator[CanonicalInteraction]:
         # Implementation returns incremental logs based on state files.
         # Implemented for protocol conformance.
         yield from []

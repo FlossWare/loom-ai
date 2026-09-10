@@ -82,7 +82,9 @@ class InteractiveSession(Protocol):
 class SessionManager(Protocol):
     """Manages the creation, retrieval, and listing of Loom interactive sessions."""
 
-    async def create_session(self, initial_context: dict[str, Any] | None = None) -> InteractiveSession:
+    async def create_session(
+        self, initial_context: dict[str, Any] | None = None
+    ) -> InteractiveSession:
         """Creates and returns a new interactive coding session.
 
         Args:
@@ -101,7 +103,6 @@ class SessionManager(Protocol):
     async def delete_session(self, session_id: str) -> None:
         """Deletes a session and its associated data."""
         ...
-
 ```
 
 ## Data Models
@@ -119,15 +120,17 @@ from typing import Any, Literal
 @dataclass(frozen=True)
 class UserInput:
     """Represents various forms of user input to the interactive session."""
+
     type: Literal["text", "command", "approval", "code"]
     content: str
     command_name: str | None = None  # For type="command"
-    approved: bool | None = None     # For type="approval"
+    approved: bool | None = None  # For type="approval"
 
 
 @dataclass(frozen=True)
 class ToolCallDisplay:
     """Details for displaying an agent's tool call."""
+
     tool_name: str
     arguments: dict[str, Any]
     status: Literal["pending", "executing", "success", "failure"]
@@ -138,18 +141,24 @@ class ToolCallDisplay:
 @dataclass(frozen=True)
 class AgentOutput:
     """Represents various forms of output from the agent to the user."""
-    type: Literal["text", "tool_call", "progress", "status", "error", "request_approval"]
+
+    type: Literal[
+        "text", "tool_call", "progress", "status", "error", "request_approval"
+    ]
     content: str | None = None
     tool_call: ToolCallDisplay | None = None  # For type="tool_call"
-    progress_percent: int | None = None       # For type="progress"
-    status_key: str | None = None             # For type="status" (e.g., "editing_file", "running_tests")
-    error_details: str | None = None          # For type="error"
-    approval_prompt: str | None = None        # For type="request_approval"
+    progress_percent: int | None = None  # For type="progress"
+    status_key: str | None = (
+        None  # For type="status" (e.g., "editing_file", "running_tests")
+    )
+    error_details: str | None = None  # For type="error"
+    approval_prompt: str | None = None  # For type="request_approval"
 
 
 @dataclass(frozen=True)
 class SessionHistoryEntry:
     """A single turn in the session's conversation history."""
+
     timestamp: datetime
     actor: Literal["user", "agent"]
     data: UserInput | AgentOutput
@@ -158,12 +167,14 @@ class SessionHistoryEntry:
 @dataclass(frozen=True)
 class SessionHistory:
     """A collection of interaction history entries."""
+
     entries: list[SessionHistoryEntry] = field(default_factory=list)
 
 
 @dataclass(frozen=True)
 class SessionContext:
     """The current operational context and status of an interactive session."""
+
     session_id: str
     status: Literal["idle", "running", "paused", "cancelling", "shutting_down", "error"]
     active_files: list[str] = field(default_factory=list)
@@ -175,12 +186,12 @@ class SessionContext:
 @dataclass(frozen=True)
 class SessionMetadata:
     """Basic metadata for an interactive session."""
+
     session_id: str
     created_at: datetime
     last_active_at: datetime
     description: str = "Loom interactive coding session"
     status: Literal["active", "paused", "completed", "error"] = "active"
-
 ```
 
 ## In-Memory Implementation Strategy

@@ -40,24 +40,36 @@ from datetime import datetime
 
 # --- Identifiers ---
 
+
 @dataclass(frozen=True)
 class SessionId:
     id: uuid.UUID
-    def __str__(self): return str(self.id)
+
+    def __str__(self):
+        return str(self.id)
+
 
 @dataclass(frozen=True)
 class ClientId:
     id: uuid.UUID
-    def __str__(self): return str(self.id)
+
+    def __str__(self):
+        return str(self.id)
+
 
 @dataclass(frozen=True)
 class EntityId:
     """Generic ID for facts, decisions, or context blocks."""
+
     id: uuid.UUID
     session: SessionId
-    def __str__(self): return f"{self.session}:{self.id}"
+
+    def __str__(self):
+        return f"{self.session}:{self.id}"
+
 
 # --- Concurrency & Ordering ---
+
 
 @dataclass(frozen=True)
 class VectorClock:
@@ -65,54 +77,71 @@ class VectorClock:
     Logical clock for causal ordering and conflict detection.
     Maps node IDs (e.g., ClientId or ServerId) to monotonically increasing counts.
     """
+
     nodes: Dict[str, int] = field(default_factory=dict)
 
-    def increment(self, node_id: str) -> 'VectorClock':
+    def increment(self, node_id: str) -> "VectorClock":
         nodes = dict(self.nodes)
         nodes[node_id] = nodes.get(node_id, 0) + 1
         return VectorClock(nodes)
 
-    def is_concurrent_with(self, other: 'VectorClock') -> bool:
+    def is_concurrent_with(self, other: "VectorClock") -> bool:
         """Returns True if neither clock causally dominates the other."""
-        this_gez = all(self.nodes.get(n, 0) >= other.nodes.get(n, 0) for n in set(self.nodes) | set(other.nodes))
-        other_gez = all(other.nodes.get(n, 0) >= self.nodes.get(n, 0) for n in set(self.nodes) | set(other.nodes))
+        this_gez = all(
+            self.nodes.get(n, 0) >= other.nodes.get(n, 0)
+            for n in set(self.nodes) | set(other.nodes)
+        )
+        other_gez = all(
+            other.nodes.get(n, 0) >= self.nodes.get(n, 0)
+            for n in set(self.nodes) | set(other.nodes)
+        )
         return not (this_gez or other_gez)
+
 
 # --- State Models ---
 
+
 class SessionStatus(Enum):
-    DRAFT = "draft"          # Private context only
-    ACTIVE = "active"        # Shared state committed
+    DRAFT = "draft"  # Private context only
+    ACTIVE = "active"  # Shared state committed
     ARCHIVED = "archived"
     CLOSED = "closed"
+
 
 @dataclass(frozen=True)
 class SessionConfig:
     """Configuration passed during session creation."""
+
     session_type: str
     max_participants: int
-    conflict_strategy: 'ConflictResolutionStrategy'
+    conflict_strategy: "ConflictResolutionStrategy"
     metadata: Dict[str, Any] = field(default_factory=dict)
+
 
 @dataclass(frozen=True)
 class Checkpoint:
     """Immutable snapshot of session state."""
+
     id: uuid.UUID
     session: SessionId
     vector_clock: VectorClock
     timestamp: datetime
     description: Optional[str] = None
 
+
 @dataclass(frozen=True)
 class MemoryEntry:
     """Base record for memory storage."""
+
     id: EntityId
     content: Any
     vector_clock: VectorClock
     created_at: datetime
     origin: ClientId
 
-    def __repr__(self): return f"Memory({self.id})[{self.vector_clock}]"
+    def __repr__(self):
+        return f"Memory({self.id})[{self.vector_clock}]"
+
 
 @dataclass(frozen=True)
 class SharedFact(MemoryEntry):
@@ -120,24 +149,30 @@ class SharedFact(MemoryEntry):
     Promoted state. Visible to all participants.
     Subject to conflict detection and ordering.
     """
+
     type: str = "fact"
-    
+
+
 @dataclass(frozen=True)
 class Decision(MemoryEntry):
     """
     A structured decision derived from context or facts.
     Implies consensus or authoritative server action.
     """
+
     justification: str
 
+
 # --- Result Models ---
+
 
 @dataclass(frozen=True)
 class MutationResult:
     accepted: bool
     new_vector_clock: VectorClock
-    conflict: Optional['ConflictInfo'] = None
+    conflict: Optional["ConflictInfo"] = None
     applied_ids: List[EntityId] = field(default_factory=list)
+
 
 @dataclass(frozen=True)
 class ConflictInfo:
@@ -159,11 +194,8 @@ Manages session identity, creation, access, and reconnection.
 ```python
 @runtime_checkable
 class SessionLifecycleProtocol(Protocol):
-    
     async def create_session(
-        self, 
-        owner: ClientId, 
-        config: SessionConfig
+        self, owner: ClientId, config: SessionConfig
     ) -> SessionHandle:
         """
         Creates a new server-owned session.
@@ -171,11 +203,7 @@ class SessionLifecycleProtocol(Protocol):
         """
         ...
 
-    async def join_session(
-        self, 
-        session: SessionId, 
-        client: ClientId
-    ) -> SessionHandle:
+    async def join_session(self, session: SessionId, client: ClientId) -> SessionHandle:
         """
         Joins an existing active session.
         Validates client permissions and returns a handle.
@@ -189,34 +217,31 @@ class SessionLifecycleProtocol(Protocol):
         """
         ...
 
-    async def reconnect(
-        self, 
-        handle: SessionHandle
-    ) -> ReconnectResult:
+    async def reconnect(self, handle: SessionHandle) -> ReconnectResult:
         """
         Re-establishes connection after drop.
         Returns delta since last known vector clock and updates handle state.
         """
         ...
 
-    async def get_session_state(
-        self, 
-        session: SessionId
-    ) -> SessionSnapshot:
+    async def get_session_state(self, session: SessionId) -> SessionSnapshot:
         """
         Retrieves full state snapshot for UI hydration or audit.
         Requires appropriate scope.
         """
         ...
 
+
 @dataclass(frozen=True)
 class SessionHandle:
     """Ephemeral client reference to a server session."""
+
     session: SessionId
     client: ClientId
     current_clock: VectorClock
     is_connected: bool = True
     private_burst_limit: int = 10
+
 
 @dataclass(frozen=True)
 class ReconnectResult:
@@ -232,11 +257,8 @@ Enforces the **Key Constraint**: *Conversation context is private; promoted fact
 ```python
 @runtime_checkable
 class MemoryAccessProtocol(Protocol):
-
     async def append_context(
-        self, 
-        handle: SessionHandle, 
-        blocks: List[Dict[str, Any]]
+        self, handle: SessionHandle, blocks: List[Dict[str, Any]]
     ) -> MutationResult:
         """
         Appends private conversation context.
@@ -246,9 +268,7 @@ class MemoryAccessProtocol(Protocol):
         ...
 
     async def read_private_context(
-        self, 
-        handle: SessionHandle, 
-        since_clock: Optional[VectorClock] = None
+        self, handle: SessionHandle, since_clock: Optional[VectorClock] = None
     ) -> List[MemoryEntry]:
         """
         Retrieves private context for the client associated with the handle.
@@ -256,10 +276,10 @@ class MemoryAccessProtocol(Protocol):
         ...
 
     async def promote_to_shared(
-        self, 
-        handle: SessionHandle, 
+        self,
+        handle: SessionHandle,
         context_ids: List[EntityId],
-        promotion_type: str = "fact"
+        promotion_type: str = "fact",
     ) -> MutationResult:
         """
         Converts private context to SharedFact or Decision.
@@ -270,10 +290,10 @@ class MemoryAccessProtocol(Protocol):
         ...
 
     async def read_shared_state(
-        self, 
-        handle: SessionHandle, 
+        self,
+        handle: SessionHandle,
         filter_type: Optional[str] = None,
-        since_clock: Optional[VectorClock] = None
+        since_clock: Optional[VectorClock] = None,
     ) -> List[Union[SharedFact, Decision]]:
         """
         Reads shared facts/decisions visible to the session.
@@ -282,16 +302,14 @@ class MemoryAccessProtocol(Protocol):
         ...
 
     async def propose_decision(
-        self, 
-        handle: SessionHandle, 
-        decision: Decision,
-        metadata: Optional[Dict] = None
+        self, handle: SessionHandle, decision: Decision, metadata: Optional[Dict] = None
     ) -> MutationResult:
         """
-        Proposes a new decision. 
+        Proposes a new decision.
         Subject to conflict detection and policy validation.
         """
         ...
+
 
 @dataclass(frozen=True)
 class SessionSnapshot:
@@ -313,14 +331,14 @@ class ConflictResolutionStrategy(Enum):
     KEEP_BOTH = "keep_both"
     REQUIRE_HUMAN = "require_human"
 
+
 @runtime_checkable
 class ConflictDetectionProtocol(Protocol):
-
     async def check_mutation_conflict(
-        self, 
-        session: SessionId, 
+        self,
+        session: SessionId,
         proposed_clock: VectorClock,
-        target_ids: List[EntityId]
+        target_ids: List[EntityId],
     ) -> ConflictInfo:
         """
         Pre-write validation.
@@ -329,11 +347,11 @@ class ConflictDetectionProtocol(Protocol):
         ...
 
     async def resolve_conflict(
-        self, 
-        handle: SessionHandle, 
+        self,
+        handle: SessionHandle,
         conflict_id: uuid.UUID,
         strategy: ConflictResolutionStrategy,
-        merge_data: Optional[Dict] = None
+        merge_data: Optional[Dict] = None,
     ) -> MutationResult:
         """
         Resolves a detected conflict using the specified strategy.
@@ -418,23 +436,27 @@ class ConflictDetectionProtocol(Protocol):
 ## 7. Example Usage Flow
 
 ```python
-async def run_workflow(session_mgr: SessionLifecycleProtocol, mem_mgr: MemoryAccessProtocol):
+async def run_workflow(
+    session_mgr: SessionLifecycleProtocol, mem_mgr: MemoryAccessProtocol
+):
     # 1. Create
     config = SessionConfig(
-        session_type="analysis", 
-        max_participants=5, 
-        conflict_strategy=ConflictResolutionStrategy.REQUIRE_HUMAN
+        session_type="analysis",
+        max_participants=5,
+        conflict_strategy=ConflictResolutionStrategy.REQUIRE_HUMAN,
     )
     owner_handle = await session_mgr.create_session(ClientId(id=uuid.uuid4()), config)
 
     # 2. Add Private Context
-    ctx_result = await mem_mgr.append_context(owner_handle, [{"text": "User thought: A implies B"}])
+    ctx_result = await mem_mgr.append_context(
+        owner_handle, [{"text": "User thought: A implies B"}]
+    )
     context_id = ctx_result.applied_ids[0]
 
     # 3. Promote to Shared
     # This triggers conflict check against server state
     promo_result = await mem_mgr.promote_to_shared(owner_handle, [context_id], "fact")
-    
+
     if promo_result.conflict:
         # Handle conflict resolution...
         pass
@@ -448,16 +470,18 @@ async def run_workflow(session_mgr: SessionLifecycleProtocol, mem_mgr: MemoryAcc
 **Appendix A: Vector Clock Comparison Logic**
 
 ```python
-def apply_strategy(conflict: ConflictInfo, strategy: ConflictResolutionStrategy) -> MutationResult:
+def apply_strategy(
+    conflict: ConflictInfo, strategy: ConflictResolutionStrategy
+) -> MutationResult:
     if strategy == ConflictResolutionStrategy.LAST_WRITER_WINS:
         # Server applies latest timestamp among concurrent nodes
         # Merges clocks
         pass
     elif strategy == ConflictResolutionStrategy.REQUIRE_HUMAN:
         return MutationResult(
-            accepted=False, 
-            new_vector_clock=conflict.competing_clocks[-1], # Refuse advancement
-            conflict=conflict
+            accepted=False,
+            new_vector_clock=conflict.competing_clocks[-1],  # Refuse advancement
+            conflict=conflict,
         )
     # ...
 ```

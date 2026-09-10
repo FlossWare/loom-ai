@@ -47,11 +47,16 @@ OpenAI Python SDK:
 
 ```python
 from openai import OpenAI
+
 client = OpenAI(base_url="http://127.0.0.1:8080/v1", api_key="not-needed")
-print(client.chat.completions.create(
-    model="meta-llama/llama-3.3-70b-instruct:free",
-    messages=[{"role":"user","content":"Hello"}],
-).choices[0].message.content)
+print(
+    client.chat.completions.create(
+        model="meta-llama/llama-3.3-70b-instruct:free",
+        messages=[{"role": "user", "content": "Hello"}],
+    )
+    .choices[0]
+    .message.content
+)
 ```
 
 ## Surfaces

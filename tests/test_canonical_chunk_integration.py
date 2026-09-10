@@ -7,6 +7,9 @@ FlossWare/loom-ai across model, storage, REST API, and retrieval boundaries.
 from __future__ import annotations
 
 import pytest
+
+pytest.importorskip("fastapi", reason="fastapi not installed (server extra)")
+
 from fastapi.testclient import TestClient
 
 from loom_ai.backends.memory import MemoryStorageBackend

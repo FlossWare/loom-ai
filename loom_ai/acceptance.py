@@ -162,7 +162,6 @@ def main() -> int:
     import argparse
     import os
     import platform
-    import sys
 
     parser = argparse.ArgumentParser(description="Run Loom dogfood acceptance checks")
     parser.add_argument("--workspace", default=os.getcwd())

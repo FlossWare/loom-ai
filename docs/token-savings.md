@@ -53,7 +53,7 @@ Result: the client sees **premium-grade assistance** while paying **only for the
 1. **Client call** – The MCP client invokes the loom-ai tool:  
 
    ```python
-   loom_resolve_issue(issue_number=123)   # ≈ 200 tokens
+   loom_resolve_issue(issue_number=123)  # ≈ 200 tokens
    ```  
 
 2. **FreeModelRouter** – `DemoAgent` orchestrates the full resolution pipeline (retrieval, analysis, code generation, review) **exclusively on free models**. The internal token usage (70 k–120 k) is **$0** because the APIs are free.  

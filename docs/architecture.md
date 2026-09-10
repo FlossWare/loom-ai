@@ -78,6 +78,7 @@ Contracts use `typing.Protocol` with `@runtime_checkable`:
 ```python
 from typing import Protocol, runtime_checkable
 
+
 @runtime_checkable
 class LLMBackend(Protocol):
     async def chat(
@@ -146,8 +147,8 @@ cfg = LoomConfig(
     secrets=my_secrets,
     embedding=my_embedding,
     search=my_search,
-    graph=my_graph,          # optional, None to disable
-    llm=my_llm,              # optional, None if no LLM configured
+    graph=my_graph,  # optional, None to disable
+    llm=my_llm,  # optional, None if no LLM configured
 )
 ```
 
@@ -310,6 +311,7 @@ class ChatMessage:
     role: str
     content: str
 
+
 @dataclass
 class ChatResponse:
     content: str
@@ -389,14 +391,20 @@ class Neo4jGraph:
 
     async def add_entity(self, entity) -> str: ...
     async def get_entity(self, entity_id: str): ...
-    async def update_entity(self, entity_id: str, *, properties=None, metadata=None) -> None: ...
+    async def update_entity(
+        self, entity_id: str, *, properties=None, metadata=None
+    ) -> None: ...
     async def delete_entity(self, entity_id: str) -> bool: ...
     async def add_relationship(self, relationship) -> str: ...
-    async def get_relationships(self, entity_id: str, *, relation_type=None, direction="outgoing") -> list: ...
+    async def get_relationships(
+        self, entity_id: str, *, relation_type=None, direction="outgoing"
+    ) -> list: ...
     async def delete_relationship(self, relationship_id: str) -> bool: ...
     async def add_claim(self, claim) -> str: ...
     async def get_claims(self, entity_id: str, *, predicate=None) -> list: ...
-    async def search_entities(self, query: str, *, entity_type=None, limit=10) -> list: ...
+    async def search_entities(
+        self, query: str, *, entity_type=None, limit=10
+    ) -> list: ...
 ```
 
 **Custom SecretsBackend (e.g. HashiCorp Vault):**
@@ -478,6 +486,7 @@ MCP-shaped but transport-neutral.
 class ToolProvider(Protocol):
     async def list_tools(self) -> list[ToolDefinition]: ...
     async def call_tool(self, name: str, arguments: dict) -> ToolResult: ...
+
 
 @runtime_checkable
 class ResourceProvider(Protocol):

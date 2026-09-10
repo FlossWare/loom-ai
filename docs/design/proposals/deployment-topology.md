@@ -656,7 +656,7 @@ async def reconnect_with_backoff(
     attempt = 0
     while attempt < config.max_reconnect_attempts:
         delay = min(
-            config.backoff_base_seconds * (2 ** attempt),
+            config.backoff_base_seconds * (2**attempt),
             config.backoff_max_seconds,
         )
         jitter = random.uniform(0, delay * 0.1)
@@ -886,19 +886,15 @@ class InMemorySession:
         server_caps = ServerCapabilities()
         agreed_version = (
             client_capabilities.protocol_version
-            if client_capabilities.protocol_version
-            in server_caps.protocol_versions
+            if client_capabilities.protocol_version in server_caps.protocol_versions
             else server_caps.protocol_versions[-1]
         )
         negotiation = NegotiationResult(
             agreed_version=agreed_version,
             transport=client_capabilities.preferred_transport,
-            streaming_enabled=(
-                client_capabilities.streaming and server_caps.streaming
-            ),
+            streaming_enabled=(client_capabilities.streaming and server_caps.streaming),
             cancellation_enabled=(
-                client_capabilities.cancellation
-                and server_caps.cancellation
+                client_capabilities.cancellation and server_caps.cancellation
             ),
             shared_memory_enabled=server_caps.shared_memory,
             server_capabilities=server_caps,
@@ -988,22 +984,14 @@ class InMemoryDeploymentTopology:
     async def health_check(self) -> HealthStatus:
         return HealthStatus(
             healthy=self._running,
-            mode=(
-                self._config.mode
-                if self._config
-                else DeploymentMode.LOCAL
-            ),
-            active_sessions=len(
-                self._session_manager._sessions
-            ),
+            mode=(self._config.mode if self._config else DeploymentMode.LOCAL),
+            active_sessions=len(self._session_manager._sessions),
         )
 
     async def list_sessions(self) -> Sequence[SessionHandle]:
         return list(self._session_manager._sessions.values())
 
-    async def get_session(
-        self, session_id: str
-    ) -> SessionHandle | None:
+    async def get_session(self, session_id: str) -> SessionHandle | None:
         return self._session_manager._sessions.get(session_id)
 ```
 

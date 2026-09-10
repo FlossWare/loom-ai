@@ -72,15 +72,21 @@ class AgentSession(Protocol):
         """Retrieves the current durable state of a session."""
         ...
 
-    async def update_session_state(self, session_id: str, new_state: AgentSessionState) -> None:
+    async def update_session_state(
+        self, session_id: str, new_state: AgentSessionState
+    ) -> None:
         """Updates the durable state of an existing session."""
         ...
 
-    async def end_session(self, session_id: str, status: Literal["completed", "failed", "cancelled"]) -> None:
+    async def end_session(
+        self, session_id: str, status: Literal["completed", "failed", "cancelled"]
+    ) -> None:
         """Terminates an agent session with a final status."""
         ...
 
-    async def get_session_history(self, session_id: str, limit: int | None = None) -> list[AgentTurn]:
+    async def get_session_history(
+        self, session_id: str, limit: int | None = None
+    ) -> list[AgentTurn]:
         """Retrieves the history of agent turns for a session."""
         ...
 
@@ -89,7 +95,9 @@ class AgentSession(Protocol):
 class ToolExecutor(Protocol):
     """Orchestrates tool selection, execution, and result handling, including delegation."""
 
-    async def select_tool(self, agent_state: AgentState, available_tools: list[str]) -> ToolInvocation:
+    async def select_tool(
+        self, agent_state: AgentState, available_tools: list[str]
+    ) -> ToolInvocation:
         """Selects the appropriate tool and generates its invocation parameters."""
         ...
 
@@ -110,11 +118,15 @@ class ToolExecutor(Protocol):
 class PolicyEnforcer(Protocol):
     """Enforces security, permissions, and approval policies for sensitive operations."""
 
-    async def check_permission(self, operation: AgentOperation, context: dict[str, Any]) -> PolicyDecision:
+    async def check_permission(
+        self, operation: AgentOperation, context: dict[str, Any]
+    ) -> PolicyDecision:
         """Checks if an operation is permitted based on current policies."""
         ...
 
-    async def request_approval(self, operation: AgentOperation, prompt: str) -> PolicyDecision:
+    async def request_approval(
+        self, operation: AgentOperation, prompt: str
+    ) -> PolicyDecision:
         """Requests human approval for a sensitive operation."""
         ...
 
@@ -123,11 +135,15 @@ class PolicyEnforcer(Protocol):
 class VerificationLoop(Protocol):
     """Manages automated verification, self-correction, and retry mechanisms."""
 
-    async def verify_output(self, operation: AgentOperation, output: Any) -> VerificationResult:
+    async def verify_output(
+        self, operation: AgentOperation, output: Any
+    ) -> VerificationResult:
         """Verifies the output of an operation against expected criteria."""
         ...
 
-    async def suggest_correction(self, operation: AgentOperation, feedback: str) -> AgentOperation:
+    async def suggest_correction(
+        self, operation: AgentOperation, feedback: str
+    ) -> AgentOperation:
         """Generates a suggested correction for a failed operation."""
         ...
 
@@ -136,7 +152,9 @@ class VerificationLoop(Protocol):
 class HumanInteraction(Protocol):
     """Facilitates human-readable CLI interaction, prompts, and approvals."""
 
-    async def display_message(self, message: str, level: Literal["info", "warning", "error"] = "info") -> None:
+    async def display_message(
+        self, message: str, level: Literal["info", "warning", "error"] = "info"
+    ) -> None:
         """Displays a message to the user."""
         ...
 
@@ -161,6 +179,7 @@ if TYPE_CHECKING:
 @dataclass(frozen=True)
 class AgentSessionState:
     """Represents the durable state of an agent session."""
+
     session_id: str
     agent_state: AgentState  # Reuses existing AgentState
     history: list[AgentTurn] = field(default_factory=list)  # Reuses existing AgentTurn
@@ -172,16 +191,18 @@ class AgentSessionState:
 @dataclass(frozen=True)
 class ToolInvocation:
     """Represents a request to execute a specific tool."""
+
     tool_name: str
     args: dict[str, Any]
     invocation_id: str
     context: dict[str, Any] = field(default_factory=dict)
-    delegated_to: str | None = None # For external agent/adapter delegation
+    delegated_to: str | None = None  # For external agent/adapter delegation
 
 
 @dataclass(frozen=True)
 class ToolResult:
     """Represents the outcome of a tool execution."""
+
     invocation_id: str
     status: Literal["success", "failure", "timeout", "pending_approval"]
     output: Any | None = None
@@ -192,6 +213,7 @@ class ToolResult:
 @dataclass(frozen=True)
 class PolicyDecision:
     """Represents a decision made by the PolicyEnforcer."""
+
     approved: bool
     reason: str = "Approved by policy."
     requires_human_approval: bool = False
@@ -200,6 +222,7 @@ class PolicyDecision:
 @dataclass(frozen=True)
 class VerificationResult:
     """Represents the outcome of a verification step."""
+
     success: bool
     feedback: str = ""
     suggested_changes: list[AgentOperation] = field(default_factory=list)
@@ -208,6 +231,7 @@ class VerificationResult:
 @dataclass(frozen=True)
 class HumanInput:
     """Represents a prompt for human interaction."""
+
     prompt_text: str
     input_type: Literal["text", "boolean", "choice", "approval"] = "text"
     options: list[str] | None = None
@@ -217,6 +241,7 @@ class HumanInput:
 @dataclass(frozen=True)
 class HumanResponse:
     """Represents a response received from human interaction."""
+
     response_value: str | bool
     timestamp: float
 ```

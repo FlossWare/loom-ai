@@ -72,7 +72,7 @@ from models import (
     SharedDiscovery,
     ConflictRecord,
     LockRecord,
-    ProvenanceInfo
+    ProvenanceInfo,
 )
 
 
@@ -82,7 +82,9 @@ class SharedMemoryStore(Protocol):
     Handles storage, retrieval, and version tracking of project-level shared facts.
     """
 
-    async def read_fact(self, key: str, project_scope: str) -> Optional[SharedKnowledge]:
+    async def read_fact(
+        self, key: str, project_scope: str
+    ) -> Optional[SharedKnowledge]:
         """
         Retrieves the latest active version of a shared knowledge point.
         Returns None if it does not exist or has been superseded/deprecated.
@@ -90,9 +92,7 @@ class SharedMemoryStore(Protocol):
         ...
 
     async def read_all_facts(
-        self, 
-        project_scope: str, 
-        include_superseded: bool = False
+        self, project_scope: str, include_superseded: bool = False
     ) -> List[SharedKnowledge]:
         """
         Lists all knowledge within a project scope. Optionally filters out inactive or superseded entries.
@@ -100,10 +100,7 @@ class SharedMemoryStore(Protocol):
         ...
 
     async def get_relevant_facts(
-        self, 
-        project_scope: str, 
-        query: str, 
-        limit: int = 5
+        self, project_scope: str, query: str, limit: int = 5
     ) -> List[SharedKnowledge]:
         """
         Retrieves facts relevant to a specific query using semantic or keyword search.
@@ -111,8 +108,7 @@ class SharedMemoryStore(Protocol):
         ...
 
     async def write_fact(
-        self, 
-        fact: SharedKnowledge
+        self, fact: SharedKnowledge
     ) -> Tuple[SharedKnowledge, Optional[ConflictRecord]]:
         """
         Persists a knowledge point. Evaluates if the key already exists and performs
@@ -122,9 +118,7 @@ class SharedMemoryStore(Protocol):
         ...
 
     async def supersede_fact(
-        self, 
-        old_fact_id: str, 
-        new_fact: SharedKnowledge
+        self, old_fact_id: str, new_fact: SharedKnowledge
     ) -> SharedKnowledge:
         """
         Explicitly marks an older knowledge point as superseded by a newer one,
@@ -140,9 +134,7 @@ class ConflictResolver(Protocol):
     """
 
     async def detect_conflict(
-        self, 
-        existing: SharedKnowledge, 
-        proposed: SharedKnowledge
+        self, existing: SharedKnowledge, proposed: SharedKnowledge
     ) -> Optional[ConflictRecord]:
         """
         Evaluates semantic or version conflicts between an existing fact and a proposed fact.
@@ -150,12 +142,10 @@ class ConflictResolver(Protocol):
         ...
 
     async def resolve_conflict(
-        self, 
-        conflict_id: str, 
-        resolution_fact: SharedKnowledge
+        self, conflict_id: str, resolution_fact: SharedKnowledge
     ) -> SharedKnowledge:
         """
-        Applies a chosen resolution to a registered conflict, archiving 
+        Applies a chosen resolution to a registered conflict, archiving
         or deprecating conflicting facts.
         """
         ...
@@ -180,13 +170,10 @@ class KnowledgePublisher(Protocol):
         ...
 
     async def extract_from_event(
-        self, 
-        session_id: str, 
-        event_data: Dict[str, Any], 
-        project_scope: str
+        self, session_id: str, event_data: Dict[str, Any], project_scope: str
     ) -> Optional[SharedKnowledge]:
         """
-        Analyzes a session-specific event to auto-extract structured facts 
+        Analyzes a session-specific event to auto-extract structured facts
         if confidence exceeds standard thresholds.
         """
         ...
@@ -195,19 +182,15 @@ class KnowledgePublisher(Protocol):
 @runtime_checkable
 class SessionCoordinator(Protocol):
     """
-    Provides lock management, resource allocation, and synchronization tools 
+    Provides lock management, resource allocation, and synchronization tools
     for concurrent agent sessions.
     """
 
     async def acquire_lock(
-        self, 
-        resource_key: str, 
-        session_id: str, 
-        duration_seconds: float, 
-        purpose: str
+        self, resource_key: str, session_id: str, duration_seconds: float, purpose: str
     ) -> Optional[LockRecord]:
         """
-        Attempts to acquire a non-blocking lock on a specific resource 
+        Attempts to acquire a non-blocking lock on a specific resource
         (e.g., file path, sub-task key) for a set duration.
         Returns a LockRecord if successful, or None if already locked.
         """
@@ -220,10 +203,7 @@ class SessionCoordinator(Protocol):
         ...
 
     async def renew_lock(
-        self, 
-        resource_key: str, 
-        session_id: str, 
-        additional_duration: float
+        self, resource_key: str, session_id: str, additional_duration: float
     ) -> Optional[LockRecord]:
         """
         Renews an existing lock before expiration (heartbeat). Returns updated LockRecord.
@@ -269,6 +249,7 @@ class ProvenanceInfo:
     """
     Tracks origin and context of structural knowledge points.
     """
+
     session_id: str
     timestamp: datetime = field(default_factory=datetime.utcnow)
     tool_action: Optional[str] = None
@@ -282,6 +263,7 @@ class SharedKnowledge:
     """
     Base structural model for all shared memory entries.
     """
+
     id: str
     key: str
     value: Any
@@ -297,6 +279,7 @@ class SharedFact(SharedKnowledge):
     """
     A discrete chunk of validated knowledge, managed under version control.
     """
+
     confidence_score: float = 1.0
     category: str = "general"  # e.g., "environment", "syntax", "requirement"
 
@@ -304,9 +287,10 @@ class SharedFact(SharedKnowledge):
 @dataclass(frozen=True)
 class SharedDecision(SharedKnowledge):
     """
-    An architectural commitment, constraint, or instruction explicitly 
+    An architectural commitment, constraint, or instruction explicitly
     agreed upon within a session.
     """
+
     rationale: str = ""
     alternatives_considered: List[str] = field(default_factory=list)
 
@@ -316,15 +300,17 @@ class SharedDiscovery(SharedKnowledge):
     """
     An observed pattern, bug discovery, or runtime behavior that may impact execution.
     """
+
     severity: str = "info"  # "info", "warning", "critical"
 
 
 @dataclass(frozen=True)
 class ConflictRecord:
     """
-    Maintains record of a write-write collision or semantic contradiction 
+    Maintains record of a write-write collision or semantic contradiction
     requiring resolution.
     """
+
     id: str
     key: str
     existing_fact_id: str
@@ -340,6 +326,7 @@ class LockRecord:
     """
     Details of a critical lock held on a file or process to align concurrent execution.
     """
+
     lock_id: str
     resource_key: str
     held_by_session: str
@@ -371,27 +358,30 @@ from uuid import uuid4
 
 class InMemorySharedMemoryEngine:
     """
-    A fully thread-and-coroutine-safe store implementing SharedMemoryStore, 
+    A fully thread-and-coroutine-safe store implementing SharedMemoryStore,
     ConflictResolver, and SessionCoordinator entirely in-memory.
     """
+
     def __init__(self):
         self._lock = asyncio.Lock()
-        
+
         # Primary Storage: map project_scope -> (map key -> SharedKnowledge)
         self._facts: Dict[str, Dict[str, SharedKnowledge]] = {}
-        
+
         # Flat history: map fact_id -> SharedKnowledge
         self._fact_history: Dict[str, SharedKnowledge] = {}
-        
+
         # Conflict Records: map conflict_id -> ConflictRecord
         self._conflicts: Dict[str, ConflictRecord] = {}
-        
+
         # Active Locks: map resource_key -> LockRecord
         self._locks: Dict[str, LockRecord] = {}
 
     # --- SharedMemoryStore Implementation ---
 
-    async def read_fact(self, key: str, project_scope: str) -> Optional[SharedKnowledge]:
+    async def read_fact(
+        self, key: str, project_scope: str
+    ) -> Optional[SharedKnowledge]:
         async with self._lock:
             scope_map = self._facts.get(project_scope, {})
             fact = scope_map.get(key)
@@ -400,9 +390,7 @@ class InMemorySharedMemoryEngine:
             return None
 
     async def read_all_facts(
-        self, 
-        project_scope: str, 
-        include_superseded: bool = False
+        self, project_scope: str, include_superseded: bool = False
     ) -> List[SharedKnowledge]:
         async with self._lock:
             scope_map = self._facts.get(project_scope, {})
@@ -413,30 +401,29 @@ class InMemorySharedMemoryEngine:
             return results
 
     async def get_relevant_facts(
-        self, 
-        project_scope: str, 
-        query: str, 
-        limit: int = 5
+        self, project_scope: str, query: str, limit: int = 5
     ) -> List[SharedKnowledge]:
         """
-        Performs basic substring and metadata filter matching over keys, values, and 
+        Performs basic substring and metadata filter matching over keys, values, and
         descriptions to retrieve relevant facts in the in-memory engine.
         """
         async with self._lock:
             scope_map = self._facts.get(project_scope, {})
-            active_facts = [f for f in scope_map.values() if f.status == FactStatus.ACTIVE]
-            
+            active_facts = [
+                f for f in scope_map.values() if f.status == FactStatus.ACTIVE
+            ]
+
             query_lower = query.lower()
             matched = []
-            
+
             for fact in active_facts:
                 # Textual check of key and value content
                 key_match = query_lower in fact.key.lower()
                 val_match = False
-                
+
                 if isinstance(fact.value, str):
                     val_match = query_lower in fact.value.lower()
-                
+
                 # Check subclass properties (e.g., SharedDecision rationale)
                 extra_match = False
                 if isinstance(fact, SharedDecision):
@@ -446,15 +433,14 @@ class InMemorySharedMemoryEngine:
 
                 if key_match or val_match or extra_match:
                     matched.append(deepcopy(fact))
-                
+
                 if len(matched) >= limit:
                     break
-                    
+
             return matched
 
     async def write_fact(
-        self, 
-        fact: SharedKnowledge
+        self, fact: SharedKnowledge
     ) -> Tuple[SharedKnowledge, Optional[ConflictRecord]]:
         async with self._lock:
             scope = fact.provenance.project_scope
@@ -473,7 +459,7 @@ class InMemorySharedMemoryEngine:
                         existing_fact_id=existing.id,
                         proposed_fact_id=fact.id,
                         conflict_type="VERSION_MISMATCH",
-                        timestamp=datetime.utcnow()
+                        timestamp=datetime.utcnow(),
                     )
                     self._conflicts[conflict_id] = conflict
                     return deepcopy(existing), deepcopy(conflict)
@@ -487,10 +473,10 @@ class InMemorySharedMemoryEngine:
                         existing_fact_id=existing.id,
                         proposed_fact_id=fact.id,
                         conflict_type="SEMANTIC_CONTRADICTION",
-                        timestamp=datetime.utcnow()
+                        timestamp=datetime.utcnow(),
                     )
                     self._conflicts[conflict_id] = conflict
-                    
+
                     # Mark existing object status as CONFLICT in the primary map
                     conflicting_fact = SharedKnowledge(
                         id=existing.id,
@@ -500,7 +486,7 @@ class InMemorySharedMemoryEngine:
                         version=existing.version,
                         status=FactStatus.CONFLICT,
                         supersedes_id=existing.supersedes_id,
-                        metadata=existing.metadata
+                        metadata=existing.metadata,
                     )
                     self._facts[scope][fact.key] = conflicting_fact
                     return deepcopy(conflicting_fact), deepcopy(conflict)
@@ -509,11 +495,11 @@ class InMemorySharedMemoryEngine:
             copied_fact = deepcopy(fact)
             self._facts[scope][fact.key] = copied_fact
             self._fact_history[fact.id] = copied_fact
-            
+
             # Update old record's state on supersession
             if fact.supersedes_id and fact.supersedes_id in self._fact_history:
                 old_fact = self._fact_history[fact.supersedes_id]
-                
+
                 # Replace with status-updated replica
                 updated_old_fact = SharedKnowledge(
                     id=old_fact.id,
@@ -523,12 +509,12 @@ class InMemorySharedMemoryEngine:
                     version=old_fact.version,
                     status=FactStatus.SUPERSEDED,
                     supersedes_id=old_fact.supersedes_id,
-                    metadata=old_fact.metadata
+                    metadata=old_fact.metadata,
                 )
                 self._fact_history[fact.supersedes_id] = updated_old_fact
-                
+
                 if (
-                    self._facts[scope].get(old_fact.key) 
+                    self._facts[scope].get(old_fact.key)
                     and self._facts[scope][old_fact.key].id == old_fact.id
                 ):
                     self._facts[scope].pop(old_fact.key, None)
@@ -536,9 +522,7 @@ class InMemorySharedMemoryEngine:
             return copied_fact, None
 
     async def supersede_fact(
-        self, 
-        old_fact_id: str, 
-        new_fact: SharedKnowledge
+        self, old_fact_id: str, new_fact: SharedKnowledge
     ) -> SharedKnowledge:
         # Re-initialize the new knowledge point explicitly referencing the target ID
         updated_new_fact = SharedKnowledge(
@@ -549,37 +533,35 @@ class InMemorySharedMemoryEngine:
             version=new_fact.version,
             status=new_fact.status,
             supersedes_id=old_fact_id,
-            metadata=new_fact.metadata
+            metadata=new_fact.metadata,
         )
         saved_fact, conflict = await self.write_fact(updated_new_fact)
         if conflict:
-            raise ValueError(f"Supersession failed due to write conflict: {conflict.conflict_type}")
+            raise ValueError(
+                f"Supersession failed due to write conflict: {conflict.conflict_type}"
+            )
         return saved_fact
 
     # --- ConflictResolver Implementation ---
 
     async def detect_conflict(
-        self, 
-        existing: SharedKnowledge, 
-        proposed: SharedKnowledge
+        self, existing: SharedKnowledge, proposed: SharedKnowledge
     ) -> Optional[ConflictRecord]:
         if existing.key != proposed.key:
             return None
-        
+
         if existing.value != proposed.value and proposed.supersedes_id != existing.id:
             return ConflictRecord(
                 id=f"conf_{uuid4().hex[:8]}",
                 key=existing.key,
                 existing_fact_id=existing.id,
                 proposed_fact_id=proposed.id,
-                conflict_type="SEMANTIC_CONTRADICTION"
+                conflict_type="SEMANTIC_CONTRADICTION",
             )
         return None
 
     async def resolve_conflict(
-        self, 
-        conflict_id: str, 
-        resolution_fact: SharedKnowledge
+        self, conflict_id: str, resolution_fact: SharedKnowledge
     ) -> SharedKnowledge:
         async with self._lock:
             conflict = self._conflicts.get(conflict_id)
@@ -587,7 +569,7 @@ class InMemorySharedMemoryEngine:
                 raise KeyError(f"Conflict with ID {conflict_id} not found.")
 
             scope = resolution_fact.provenance.project_scope
-            
+
             # Resolve conflict record status
             resolved_conflict = ConflictRecord(
                 id=conflict.id,
@@ -597,7 +579,7 @@ class InMemorySharedMemoryEngine:
                 conflict_type=conflict.conflict_type,
                 timestamp=conflict.timestamp,
                 resolution=ConflictResolutionType.MERGE,
-                resolved_fact_id=resolution_fact.id
+                resolved_fact_id=resolution_fact.id,
             )
             self._conflicts[conflict_id] = resolved_conflict
 
@@ -613,7 +595,7 @@ class InMemorySharedMemoryEngine:
                         version=old.version,
                         status=FactStatus.SUPERSEDED,
                         supersedes_id=old.supersedes_id,
-                        metadata=old.metadata
+                        metadata=old.metadata,
                     )
 
             # Persist resolved fact directly
@@ -624,11 +606,7 @@ class InMemorySharedMemoryEngine:
     # --- SessionCoordinator Lock Implementation ---
 
     async def acquire_lock(
-        self, 
-        resource_key: str, 
-        session_id: str, 
-        duration_seconds: float, 
-        purpose: str
+        self, resource_key: str, session_id: str, duration_seconds: float, purpose: str
     ) -> Optional[LockRecord]:
         async with self._lock:
             now = datetime.utcnow()
@@ -647,7 +625,7 @@ class InMemorySharedMemoryEngine:
                 held_by_session=session_id,
                 acquired_at=now,
                 expires_at=expires_at,
-                purpose=purpose
+                purpose=purpose,
             )
             self._locks[resource_key] = lock_rec
             return deepcopy(lock_rec)
@@ -659,24 +637,22 @@ class InMemorySharedMemoryEngine:
                 return False
             if active_lock.held_by_session != session_id:
                 return False
-            
+
             self._locks.pop(resource_key, None)
             return True
 
     async def renew_lock(
-        self, 
-        resource_key: str, 
-        session_id: str, 
-        additional_duration: float
+        self, resource_key: str, session_id: str, additional_duration: float
     ) -> Optional[LockRecord]:
         async with self._lock:
             active_lock = self._locks.get(resource_key)
             if not active_lock or active_lock.held_by_session != session_id:
                 return None
-            
+
             now = datetime.utcnow()
             new_expiry = datetime.fromtimestamp(
-                max(active_lock.expires_at.timestamp(), now.timestamp()) + additional_duration
+                max(active_lock.expires_at.timestamp(), now.timestamp())
+                + additional_duration
             )
             updated_lock = LockRecord(
                 lock_id=active_lock.lock_id,
@@ -684,7 +660,7 @@ class InMemorySharedMemoryEngine:
                 held_by_session=active_lock.held_by_session,
                 acquired_at=active_lock.acquired_at,
                 expires_at=new_expiry,
-                purpose=active_lock.purpose
+                purpose=active_lock.purpose,
             )
             self._locks[resource_key] = updated_lock
             return deepcopy(updated_lock)

@@ -16,6 +16,7 @@ import hashlib
 import os
 import re
 import shutil
+import sys
 from pathlib import Path
 from typing import Any
 
@@ -25,6 +26,21 @@ from loom_ai.models import ToolDefinition
 _ALLOWED_WORKSPACES = [
     p for p in os.environ.get("LOOM_ALLOWED_WORKSPACES", "").split(":") if p
 ]
+
+
+def _find_tool(tool_name: str) -> str | None:
+    """Find a tool in PATH or in the current venv's bin directory."""
+    # First check system PATH
+    if shutil.which(tool_name):
+        return tool_name
+
+    # Check in current venv's bin directory
+    if hasattr(sys, "base_prefix") and sys.prefix != sys.base_prefix:
+        venv_bin = Path(sys.prefix) / "bin" / tool_name
+        if venv_bin.exists():
+            return str(venv_bin)
+
+    return None
 
 
 def validate_workspace(workspace_path: str) -> Path:
@@ -133,16 +149,22 @@ async def run_linter(
     target = _resolve_safe(ws, path)
 
     if tool == "ruff":
-        cmd = ["ruff", "check", str(target)]
+        cmd_tool = _find_tool("ruff")
+        if not cmd_tool:
+            return {"error": "ruff not found in PATH or venv"}
+        cmd = [cmd_tool, "check", str(target)]
     elif tool == "mypy":
-        cmd = ["mypy", str(target)]
+        cmd_tool = _find_tool("mypy")
+        if not cmd_tool:
+            return {"error": "mypy not found in PATH or venv"}
+        cmd = [cmd_tool, str(target)]
     elif tool == "flake8":
-        cmd = ["flake8", str(target)]
+        cmd_tool = _find_tool("flake8")
+        if not cmd_tool:
+            return {"error": "flake8 not found in PATH or venv"}
+        cmd = [cmd_tool, str(target)]
     else:
         return {"error": f"Unknown linter: {tool}"}
-
-    if not shutil.which(cmd[0]):
-        return {"error": f"{cmd[0]} not found in PATH"}
 
     result = await _run(cmd, ws)
     findings = []
@@ -178,14 +200,17 @@ async def format_code(
     target = _resolve_safe(ws, path)
 
     if tool == "ruff":
-        cmd = ["ruff", "format", str(target)]
+        cmd_tool = _find_tool("ruff")
+        if not cmd_tool:
+            return {"error": "ruff not found in PATH or venv"}
+        cmd = [cmd_tool, "format", str(target)]
     elif tool == "black":
-        cmd = ["black", str(target)]
+        cmd_tool = _find_tool("black")
+        if not cmd_tool:
+            return {"error": "black not found in PATH or venv"}
+        cmd = [cmd_tool, str(target)]
     else:
         return {"error": f"Unknown formatter: {tool}"}
-
-    if not shutil.which(cmd[0]):
-        return {"error": f"{cmd[0]} not found in PATH"}
 
     result = await _run(cmd, ws)
     return {
@@ -206,12 +231,10 @@ async def run_tests(
     ws = Path(workspace or os.getcwd())
     _resolve_safe(ws, path)
 
-    cmd = ["python", "-m", "pytest", path, "-x", "-q", "--tb=short"]
+    python_exe = sys.executable if sys.executable else "python"
+    cmd = [python_exe, "-m", "pytest", path, "-x", "-q", "--tb=short"]
     if pattern:
         cmd.extend(["-k", pattern])
-
-    if not shutil.which("python"):
-        return {"error": "python not found in PATH"}
 
     result = await _run(cmd, ws, timeout_seconds=timeout_seconds)
     passed = failed = 0

@@ -25,9 +25,21 @@ from datetime import datetime
 
 if TYPE_CHECKING:
     from loom_ai.models_provider import (
-        ToolExecutionConfig, ToolResult, ToolError, FileContent, FileInfo, TextEdit,
-        ShellOutput, GitStatus, GitDiff, GitLog, BuildOutput, TestOutput,
-        EnvironmentInfo, WebContent, SearchResult,
+        ToolExecutionConfig,
+        ToolResult,
+        ToolError,
+        FileContent,
+        FileInfo,
+        TextEdit,
+        ShellOutput,
+        GitStatus,
+        GitDiff,
+        GitLog,
+        BuildOutput,
+        TestOutput,
+        EnvironmentInfo,
+        WebContent,
+        SearchResult,
     )
 
 
@@ -39,19 +51,27 @@ class FileSystemTool(Protocol):
         """Reads the content of a file."""
         ...
 
-    async def write_file(self, path: Path, content: str, config: ToolExecutionConfig) -> ToolResult:
+    async def write_file(
+        self, path: Path, content: str, config: ToolExecutionConfig
+    ) -> ToolResult:
         """Writes content to a file, overwriting if it exists."""
         ...
 
-    async def edit_file(self, path: Path, edits: list[TextEdit], config: ToolExecutionConfig) -> ToolResult:
+    async def edit_file(
+        self, path: Path, edits: list[TextEdit], config: ToolExecutionConfig
+    ) -> ToolResult:
         """Applies a list of text edits to a file."""
         ...
 
-    async def list_directory(self, path: Path, config: ToolExecutionConfig) -> list[FileInfo]:
+    async def list_directory(
+        self, path: Path, config: ToolExecutionConfig
+    ) -> list[FileInfo]:
         """Lists contents of a directory."""
         ...
 
-    async def search_files(self, pattern: str, config: ToolExecutionConfig) -> list[Path]:
+    async def search_files(
+        self, pattern: str, config: ToolExecutionConfig
+    ) -> list[Path]:
         """Searches for files matching a glob pattern."""
         ...
 
@@ -60,7 +80,9 @@ class FileSystemTool(Protocol):
 class ShellTool(Protocol):
     """Provides capabilities for executing shell commands."""
 
-    async def execute_command(self, command: str, args: list[str], config: ToolExecutionConfig) -> ShellOutput:
+    async def execute_command(
+        self, command: str, args: list[str], config: ToolExecutionConfig
+    ) -> ShellOutput:
         """Executes a shell command with arguments."""
         ...
 
@@ -81,7 +103,9 @@ class GitTool(Protocol):
         """Retrieves the Git commit log."""
         ...
 
-    async def create_branch(self, branch_name: str, config: ToolExecutionConfig) -> ToolResult:
+    async def create_branch(
+        self, branch_name: str, config: ToolExecutionConfig
+    ) -> ToolResult:
         """Creates a new Git branch."""
         ...
 
@@ -120,7 +144,9 @@ class WebTool(Protocol):
         """Navigates to a URL and retrieves its content."""
         ...
 
-    async def search_web(self, query: str, config: ToolExecutionConfig) -> list[SearchResult]:
+    async def search_web(
+        self, query: str, config: ToolExecutionConfig
+    ) -> list[SearchResult]:
         """Performs a web search."""
         ...
 
@@ -128,6 +154,7 @@ class WebTool(Protocol):
 @runtime_checkable
 class MCPTool(Protocol):
     """Placeholder for MCP-specific tool capabilities."""
+
     # Specific MCP tool methods would be defined here.
     pass
 ```
@@ -147,6 +174,7 @@ from datetime import datetime
 @dataclass(frozen=True)
 class PermissionPolicy:
     """Defines permissions for tool execution."""
+
     allow_read: bool = False
     allow_write: bool = False
     allow_network: bool = False
@@ -157,24 +185,27 @@ class PermissionPolicy:
 @dataclass(frozen=True)
 class ResourceLimits:
     """Defines resource limits for subprocess execution."""
+
     cpu_time_seconds: Optional[float] = None  # CPU time limit in seconds
-    memory_mb: Optional[int] = None           # Memory limit in MB
-    max_processes: Optional[int] = None       # Maximum number of child processes
+    memory_mb: Optional[int] = None  # Memory limit in MB
+    max_processes: Optional[int] = None  # Maximum number of child processes
 
 
 @dataclass(frozen=True)
 class ToolExecutionConfig:
     """Configuration for a single tool operation."""
+
     timeout_seconds: Optional[float] = None
     working_directory: Optional[Path] = None
     permissions: PermissionPolicy = field(default_factory=PermissionPolicy)
     resource_limits: ResourceLimits = field(default_factory=ResourceLimits)
-    workspace_id: str = "default" # Identifier for the isolated workspace
+    workspace_id: str = "default"  # Identifier for the isolated workspace
 
 
 @dataclass(frozen=True)
 class ToolError(Exception):
     """Structured error for tool failures."""
+
     type: str
     message: str
     details: Optional[dict[str, Any]] = None
@@ -186,6 +217,7 @@ class ToolError(Exception):
 @dataclass(frozen=True)
 class ToolResult:
     """Generic result for operations that primarily report status."""
+
     success: bool
     stdout: str = ""
     stderr: str = ""
@@ -196,6 +228,7 @@ class ToolResult:
 @dataclass(frozen=True)
 class FileContent:
     """Result for file read operations."""
+
     path: Path
     content: str
 
@@ -203,6 +236,7 @@ class FileContent:
 @dataclass(frozen=True)
 class FileInfo:
     """Information about a file or directory."""
+
     path: Path
     is_directory: bool
     size: Optional[int] = None
@@ -212,16 +246,18 @@ class FileInfo:
 @dataclass(frozen=True)
 class TextEdit:
     """Represents a text edit operation."""
-    start_line: int      # 0-indexed
-    start_column: int    # 0-indexed
-    end_line: int        # 0-indexed
-    end_column: int      # 0-indexed
+
+    start_line: int  # 0-indexed
+    start_column: int  # 0-indexed
+    end_line: int  # 0-indexed
+    end_column: int  # 0-indexed
     new_text: str
 
 
 @dataclass(frozen=True)
 class ShellOutput:
     """Result for shell command execution."""
+
     stdout: str
     stderr: str
     exit_code: int
@@ -231,6 +267,7 @@ class ShellOutput:
 @dataclass(frozen=True)
 class GitStatus:
     """Result for Git status operation."""
+
     staged: list[str]
     unstaged: list[str]
     untracked: list[str]
@@ -241,12 +278,14 @@ class GitStatus:
 @dataclass(frozen=True)
 class GitDiff:
     """Result for Git diff operation."""
+
     diff_text: str
 
 
 @dataclass(frozen=True)
 class GitCommit:
     """Represents a single Git commit."""
+
     hash: str
     author: str
     message: str
@@ -256,12 +295,14 @@ class GitCommit:
 @dataclass(frozen=True)
 class GitLog:
     """Result for Git log operation."""
+
     commits: list[GitCommit]
 
 
 @dataclass(frozen=True)
 class BuildOutput:
     """Result for build command execution."""
+
     stdout: str
     stderr: str
     exit_code: int
@@ -272,6 +313,7 @@ class BuildOutput:
 @dataclass(frozen=True)
 class TestResult:
     """Details for a single test case."""
+
     name: str
     status: str  # e.g., "passed", "failed", "skipped"
     duration_seconds: float
@@ -281,6 +323,7 @@ class TestResult:
 @dataclass(frozen=True)
 class TestOutput:
     """Result for test command execution."""
+
     stdout: str
     stderr: str
     exit_code: int
@@ -291,23 +334,26 @@ class TestOutput:
 @dataclass(frozen=True)
 class EnvironmentInfo:
     """Information about the execution environment."""
+
     cwd: Path
     env_vars: dict[str, str]
-    system_info: dict[str, Any] # e.g., OS, Python version
+    system_info: dict[str, Any]  # e.g., OS, Python version
 
 
 @dataclass(frozen=True)
 class WebContent:
     """Result for web browsing operations."""
+
     url: str
     html_content: str
     text_content: Optional[str] = None
-    screenshot_base64: Optional[str] = None # Base64 encoded image
+    screenshot_base64: Optional[str] = None  # Base64 encoded image
 
 
 @dataclass(frozen=True)
 class SearchResult:
     """A single result from a web search."""
+
     title: str
     url: str
     snippet: str
