@@ -37,6 +37,17 @@ from loom_ai.provenance import EventKind, EvidenceLedger
 DOCUMENT_ID = "loom-core-qualification-v1"
 ARTIFACT_NAME = "qualified.txt"
 FOLLOWUP_NAME = "qualified-followup.txt"
+DURABLE_STORAGE = {"sqlite", "postgresql"}
+
+
+def _require_durable_storage() -> None:
+    storage = os.environ.get("LOOM_STORAGE", "memory")
+    if storage not in DURABLE_STORAGE:
+        valid = ", ".join(sorted(DURABLE_STORAGE))
+        raise RuntimeError(
+            f"Core qualification requires durable LOOM_STORAGE={{{valid}}}; "
+            "in-memory storage cannot satisfy the process-boundary gate."
+        )
 
 
 async def _run_initial(workspace: Path) -> dict[str, Any]:
@@ -44,13 +55,7 @@ async def _run_initial(workspace: Path) -> dict[str, Any]:
     workspace.mkdir(parents=True, exist_ok=True)
     ledger = EvidenceLedger(run_id="core-qualification-initial")
     config = await LoomConfig.from_env()
-
-    if os.environ.get("LOOM_STORAGE", "memory") != "postgresql":
-        await config.close()
-        raise RuntimeError(
-            "Core qualification requires durable LOOM_STORAGE=postgresql; "
-            "in-memory storage cannot satisfy the process-boundary gate."
-        )
+    _require_durable_storage()
 
     try:
         # Public-contract agent + MCP-shaped tool path.
@@ -197,10 +202,8 @@ async def _run_initial(workspace: Path) -> dict[str, Any]:
 async def _run_recovery(workspace: Path) -> dict[str, Any]:
     """Start a fresh process context, recover durable state, and follow up."""
     config = await LoomConfig.from_env()
+    _require_durable_storage()
     try:
-        if os.environ.get("LOOM_STORAGE", "memory") != "postgresql":
-            raise RuntimeError("Recovery requires LOOM_STORAGE=postgresql")
-
         document = await config.storage.get_document(DOCUMENT_ID)
         if document is None:
             raise RuntimeError(f"Persisted qualification document {DOCUMENT_ID!r} was not recovered")
