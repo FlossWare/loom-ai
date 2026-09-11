@@ -1,11 +1,12 @@
 """SQLite-backed document storage.
 
 SQLite is part of the Python standard library and provides a durable local
-storage backend without requiring an external database service.  The backend
-implements the document portion of StorageBackend fully and keeps the
-remaining chunk/embedding operations in-process through MemoryStorageBackend.
-This makes it suitable for local applications and process-boundary
-qualification while preserving Loom's public storage contract.
+storage backend without requiring an external database service. The backend
+implements the document portion of StorageBackend durably and keeps chunk,
+embedding, and other secondary operations in-process through
+MemoryStorageBackend. Those secondary data are therefore not durable across a
+process boundary and are intentionally outside this qualification backend's
+guarantee.
 """
 
 from __future__ import annotations
@@ -19,7 +20,7 @@ from loom_ai.models import Document
 
 
 class SQLiteStorageBackend(MemoryStorageBackend):
-    """SQLite-backed storage with durable documents and in-memory secondary data."""
+    """SQLite documents with in-memory secondary data."""
 
     def __init__(self, path: str | Path) -> None:
         super().__init__()
