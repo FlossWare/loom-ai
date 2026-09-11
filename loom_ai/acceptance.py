@@ -122,12 +122,15 @@ class AcceptanceHarness:
         checks = [
             (
                 AcceptanceStep.TASK_SUBMIT,
-                {"passed": True, "task": "Create a verified qualification artifact."},
+                {
+                    "passed": bool(initial.get("task_submitted")),
+                    "task": initial.get("task"),
+                },
             ),
             (
                 AcceptanceStep.INVESTIGATION,
                 {
-                    "passed": True,
+                    "passed": bool(initial.get("investigation_passed")),
                     "agent": initial.get("agent"),
                     "tool": initial.get("tool"),
                 },
@@ -135,7 +138,7 @@ class AcceptanceHarness:
             (
                 AcceptanceStep.MODIFICATION,
                 {
-                    "passed": True,
+                    "passed": bool(initial.get("modification_passed")),
                     "artifact": initial.get("artifact"),
                     "tasks": initial.get("tasks"),
                 },
