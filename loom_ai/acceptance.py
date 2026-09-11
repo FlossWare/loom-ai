@@ -120,13 +120,51 @@ class AcceptanceHarness:
         recovery = result["recovery"]
 
         checks = [
-            (AcceptanceStep.TASK_SUBMIT, {"passed": True, "task": "Create a verified qualification artifact."}),
-            (AcceptanceStep.INVESTIGATION, {"passed": True, "agent": initial.get("agent"), "tool": initial.get("tool")}),
-            (AcceptanceStep.MODIFICATION, {"passed": True, "artifact": initial.get("artifact"), "tasks": initial.get("tasks")}),
-            (AcceptanceStep.VERIFICATION, {"passed": initial.get("verification") == "passed"}),
-            (AcceptanceStep.PERSISTENCE, {"passed": bool(initial.get("document_id")), "document_id": initial.get("document_id")}),
-            (AcceptanceStep.RECOVERY, {"passed": bool(recovery.get("document_id")), "document_id": recovery.get("document_id")}),
-            (AcceptanceStep.FOLLOWUP, {"passed": recovery.get("verification") == "passed", "artifact": recovery.get("followup_artifact")}),
+            (
+                AcceptanceStep.TASK_SUBMIT,
+                {"passed": True, "task": "Create a verified qualification artifact."},
+            ),
+            (
+                AcceptanceStep.INVESTIGATION,
+                {
+                    "passed": True,
+                    "agent": initial.get("agent"),
+                    "tool": initial.get("tool"),
+                },
+            ),
+            (
+                AcceptanceStep.MODIFICATION,
+                {
+                    "passed": True,
+                    "artifact": initial.get("artifact"),
+                    "tasks": initial.get("tasks"),
+                },
+            ),
+            (
+                AcceptanceStep.VERIFICATION,
+                {"passed": initial.get("verification") == "passed"},
+            ),
+            (
+                AcceptanceStep.PERSISTENCE,
+                {
+                    "passed": bool(initial.get("document_id")),
+                    "document_id": initial.get("document_id"),
+                },
+            ),
+            (
+                AcceptanceStep.RECOVERY,
+                {
+                    "passed": bool(recovery.get("document_id")),
+                    "document_id": recovery.get("document_id"),
+                },
+            ),
+            (
+                AcceptanceStep.FOLLOWUP,
+                {
+                    "passed": recovery.get("verification") == "passed",
+                    "artifact": recovery.get("followup_artifact"),
+                },
+            ),
             (
                 AcceptanceStep.PROVENANCE_CHECK,
                 {
@@ -137,7 +175,10 @@ class AcceptanceHarness:
                 },
             ),
         ]
-        return [self.run_step(step, lambda evidence=evidence: evidence) for step, evidence in checks]
+        return [
+            self.run_step(step, lambda evidence=evidence: evidence)
+            for step, evidence in checks
+        ]
 
     @property
     def results(self) -> list[StepResult]:

@@ -35,7 +35,7 @@ DURABLE_STORAGE = {"sqlite", "postgresql"}
 
 
 def _require_durable_storage() -> None:
-    storage = os.environ.get("LOOM_STORAGE", "memory")
+    storage = os.environ.get("LOOM_STORAGE", "sqlite")
     if storage not in DURABLE_STORAGE:
         valid = ", ".join(sorted(DURABLE_STORAGE))
         raise RuntimeError(
@@ -142,9 +142,9 @@ async def _run_initial(workspace: Path) -> dict[str, Any]:
                 "decision": "execute investigate then modify through ExecutionEngine"
             },
         )
-        plan = await ExecutionEngine(
-            config, runner=QualificationRunner()
-        ).execute_plan(plan)
+        plan = await ExecutionEngine(config, runner=QualificationRunner()).execute_plan(
+            plan
+        )
         if any(task.status.value != "completed" for task in plan.tasks):
             raise RuntimeError("Execution plan did not complete successfully")
 
