@@ -22,13 +22,7 @@ import sys
 from pathlib import Path
 from typing import Any
 
-from loom_ai import (
-    ExecutionEngine,
-    ExecutionPlan,
-    LoomConfig,
-    Task,
-    ToolDefinition,
-)
+from loom_ai import ExecutionEngine, ExecutionPlan, LoomConfig, Task, ToolDefinition
 from loom_ai.backends.agent import InMemoryAgentLoop
 from loom_ai.backends.memory_mcp import MemoryToolProvider
 from loom_ai.models_agent import AgentOperation
@@ -56,9 +50,7 @@ async def _run_initial(workspace: Path) -> dict[str, Any]:
     ledger = EvidenceLedger(run_id="core-qualification-initial")
     config = await LoomConfig.from_env()
     _require_durable_storage()
-
     try:
-        # Public-contract agent + MCP-shaped tool path.
         tools = MemoryToolProvider()
 
         async def read_task(path: str) -> str:
@@ -84,7 +76,10 @@ async def _run_initial(workspace: Path) -> dict[str, Any]:
         )
         ledger.record(
             kind=EventKind.TASK_RECEIVED,
-            payload={"task": "Create a verified qualification artifact.", "fixture": str(fixture)},
+            payload={
+                "task": "Create a verified qualification artifact.",
+                "fixture": str(fixture),
+            },
         )
 
         agent = InMemoryAgentLoop(tool_provider=tools)
@@ -104,7 +99,11 @@ async def _run_initial(workspace: Path) -> dict[str, Any]:
             raise RuntimeError(f"Agent tool turn failed: {turn.output_data}")
         ledger.record(
             kind=EventKind.TOOL_INVOCATION,
-            payload={"tool": "read_task", "turn_id": turn.turn_id, "output": turn.output_data},
+            payload={
+                "tool": "read_task",
+                "turn_id": turn.turn_id,
+                "output": turn.output_data,
+            },
             verified=True,
         )
 
@@ -124,7 +123,11 @@ async def _run_initial(workspace: Path) -> dict[str, Any]:
         plan = ExecutionPlan(
             id="core-qualification-plan",
             tasks=[
-                Task(id="investigate", name="investigate", description="Inspect fixture."),
+                Task(
+                    id="investigate",
+                    name="investigate",
+                    description="Inspect fixture.",
+                ),
                 Task(
                     id="modify",
                     name="modify",
@@ -135,9 +138,13 @@ async def _run_initial(workspace: Path) -> dict[str, Any]:
         )
         ledger.record(
             kind=EventKind.DECISION,
-            payload={"decision": "execute investigate then modify through ExecutionEngine"},
+            payload={
+                "decision": "execute investigate then modify through ExecutionEngine"
+            },
         )
-        plan = await ExecutionEngine(config, runner=QualificationRunner()).execute_plan(plan)
+        plan = await ExecutionEngine(
+            config, runner=QualificationRunner()
+        ).execute_plan(plan)
         if any(task.status.value != "completed" for task in plan.tasks):
             raise RuntimeError("Execution plan did not complete successfully")
 
@@ -148,20 +155,26 @@ async def _run_initial(workspace: Path) -> dict[str, Any]:
             verified=True,
         )
 
-        # Verification is deliberately independent of the worker result.
         expected = "Loom core qualification passed.\n"
         actual = artifact.read_text(encoding="utf-8") if artifact.exists() else ""
         verified = actual == expected
         ledger.record(
             kind=EventKind.VERIFICATION_RUN,
-            payload={"path": str(artifact), "expected": expected, "actual": actual, "passed": verified},
+            payload={
+                "path": str(artifact),
+                "expected": expected,
+                "actual": actual,
+                "passed": verified,
+            },
             verified=verified,
         )
         if not verified:
             raise RuntimeError("Artifact verification failed")
 
         evidence = ledger.evidence_chain()
-        document = __import__("loom_ai.models", fromlist=["Document"]).Document(
+        from loom_ai.models import Document
+
+        document = Document(
             id=DOCUMENT_ID,
             title="Loom core qualification evidence",
             content=(
@@ -173,13 +186,18 @@ async def _run_initial(workspace: Path) -> dict[str, Any]:
                 "artifact": ARTIFACT_NAME,
                 "verification": "passed",
                 "run_id": ledger.run_id,
-                "evidence_event_ids": [event.event_id for event in evidence],
+                "evidence_event_ids": [
+                    event["event_id"] for event in evidence["events"]
+                ],
             },
         )
         stored_id = await config.storage.store_document(document)
         ledger.record(
             kind=EventKind.PERSISTENCE_WRITE,
-            payload={"backend": type(config.storage).__name__, "document_id": stored_id},
+            payload={
+                "backend": type(config.storage).__name__,
+                "document_id": stored_id,
+            },
             verified=True,
         )
 
@@ -206,7 +224,9 @@ async def _run_recovery(workspace: Path) -> dict[str, Any]:
     try:
         document = await config.storage.get_document(DOCUMENT_ID)
         if document is None:
-            raise RuntimeError(f"Persisted qualification document {DOCUMENT_ID!r} was not recovered")
+            raise RuntimeError(
+                f"Persisted qualification document {DOCUMENT_ID!r} was not recovered"
+            )
         if document.metadata.get("verification") != "passed":
             raise RuntimeError("Recovered document lacks verified provenance")
         if "evidence_event_ids" not in document.metadata:
@@ -246,8 +266,6 @@ def _run_subprocess(phase: str, workspace: Path) -> dict[str, Any]:
         str(workspace),
     ]
     env = os.environ.copy()
-    # Keep Loom's normal default as memory, but make the standalone core
-    # qualification command useful without requiring external infrastructure.
     env.setdefault("LOOM_STORAGE", "sqlite")
     result = subprocess.run(
         command,
@@ -265,7 +283,9 @@ def _run_subprocess(phase: str, workspace: Path) -> dict[str, Any]:
     try:
         return json.loads(result.stdout)
     except json.JSONDecodeError as exc:
-        raise RuntimeError(f"{phase} phase emitted invalid JSON: {result.stdout!r}") from exc
+        raise RuntimeError(
+            f"{phase} phase emitted invalid JSON: {result.stdout!r}"
+        ) from exc
 
 
 def run(workspace: str) -> dict[str, Any]:
@@ -284,7 +304,9 @@ def run(workspace: str) -> dict[str, Any]:
 
 def main() -> int:
     parser = argparse.ArgumentParser(description="Run Loom core qualification")
-    parser.add_argument("--phase", choices=("initial", "recovery", "all"), default="all")
+    parser.add_argument(
+        "--phase", choices=("initial", "recovery", "all"), default="all"
+    )
     parser.add_argument("--workspace", default=os.getcwd())
     args = parser.parse_args()
 
