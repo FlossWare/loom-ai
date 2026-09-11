@@ -98,7 +98,8 @@ class LoomConfig:
 
         Environment variables and their defaults::
 
-            LOOM_STORAGE        memory | postgresql           (default: memory)
+            LOOM_STORAGE        memory | sqlite | postgresql (default: memory)
+            LOOM_SQLITE_PATH    SQLite database path (default: .loom/loom.sqlite3)
             LOOM_QUEUE          memory | redis                (default: memory)
             LOOM_SECRETS        env | dotenv | postgresql     (default: env)
             LOOM_EMBEDDING      noop | openai | litellm       (default: noop)
@@ -221,6 +222,12 @@ class LoomConfig:
             from loom_ai.backends.memory import MemoryStorageBackend
 
             return MemoryStorageBackend()
+        if kind == "sqlite":
+            from loom_ai.backends.sqlite import SQLiteStorageBackend
+
+            return SQLiteStorageBackend(
+                os.environ.get("LOOM_SQLITE_PATH", ".loom/loom.sqlite3")
+            )
         if kind == "postgresql":
             try:
                 from loom_ai.backends.postgresql import (
@@ -233,7 +240,7 @@ class LoomConfig:
                 ) from exc
             return await PostgresqlStorageBackend.from_env(pool=pool)  # type: ignore[attr-defined]
         raise ValueError(
-            f"Unknown storage backend: {kind!r}.  Valid options: memory, postgresql"
+            f"Unknown storage backend: {kind!r}.  Valid options: memory, sqlite, postgresql"
         )
 
     @staticmethod
@@ -362,8 +369,7 @@ class LoomConfig:
                 ) from exc
             return await OrientDBGraphBackend.from_env()  # type: ignore[attr-defined]
         raise ValueError(
-            f"Unknown graph backend: {kind!r}.  "
-            f"Valid options: disabled, memory, orientdb"
+            f"Unknown graph backend: {kind!r}.  Valid options: disabled, memory, orientdb"
         )
 
     @staticmethod
