@@ -1,4 +1,7 @@
+import pytest
+
 from loom_ai.backends.sqlite import SQLiteStorageBackend
+from loom_ai.core_qualification import run
 from loom_ai.models import Document
 
 
@@ -21,3 +24,18 @@ async def test_sqlite_document_survives_backend_recreation(tmp_path):
     await second.close()
 
     assert recovered == document
+
+
+@pytest.mark.asyncio
+async def test_core_qualification_recovers_across_process_boundary(
+    tmp_path, monkeypatch
+):
+    monkeypatch.setenv("LOOM_STORAGE", "sqlite")
+    monkeypatch.setenv("LOOM_SQLITE_PATH", str(tmp_path / "loom.sqlite3"))
+
+    result = run(str(tmp_path))
+
+    assert result["passed"] is True
+    assert result["initial"]["verification"] == "passed"
+    assert result["recovery"]["verification"] == "passed"
+    assert result["recovery"]["provenance_event_ids"]
