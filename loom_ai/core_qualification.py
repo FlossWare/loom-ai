@@ -45,7 +45,7 @@ def _require_durable_storage() -> None:
     if storage not in DURABLE_STORAGE:
         valid = ", ".join(sorted(DURABLE_STORAGE))
         raise RuntimeError(
-            f"Core qualification requires durable LOOM_STORAGE={{{valid}}}; "
+            f"Core qualification requires durable LOOM_STORAGE=<{valid}>; "
             "in-memory storage cannot satisfy the process-boundary gate."
         )
 
@@ -245,13 +245,17 @@ def _run_subprocess(phase: str, workspace: Path) -> dict[str, Any]:
         "--workspace",
         str(workspace),
     ]
+    env = os.environ.copy()
+    # Keep Loom's normal default as memory, but make the standalone core
+    # qualification command useful without requiring external infrastructure.
+    env.setdefault("LOOM_STORAGE", "sqlite")
     result = subprocess.run(
         command,
         cwd=workspace,
         capture_output=True,
         text=True,
         check=False,
-        env=os.environ.copy(),
+        env=env,
     )
     if result.returncode != 0:
         raise RuntimeError(
@@ -274,6 +278,7 @@ def run(workspace: str) -> dict[str, Any]:
         "initial": initial,
         "recovery": recovery,
         "process_boundary": "separate interpreters",
+        "storage": os.environ.get("LOOM_STORAGE", "sqlite"),
     }
 
 
