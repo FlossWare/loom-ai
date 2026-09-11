@@ -1,14 +1,16 @@
 """Executable consumer used to qualify Loom's core agent workflow.
 
 The qualification deliberately uses Loom's public contracts rather than
-reaching into private implementation details.  It exercises a real
-application-shaped path:
+reaching into private implementation details. It exercises an application-
+shaped path:
 
 agent -> MCP-shaped tool -> DAG execution -> verified artifact -> durable
 storage -> process boundary -> recovery -> follow-up task.
 
-The initial and recovery phases are separate Python processes.  Durable
+The initial and recovery phases are separate Python processes. Durable
 storage is therefore a hard requirement for the session-boundary gate.
+The SQLite backend persists documents only; chunk and embedding data remain
+in-process through its MemoryStorageBackend base.
 """
 
 from __future__ import annotations
@@ -32,6 +34,7 @@ DOCUMENT_ID = "loom-core-qualification-v1"
 ARTIFACT_NAME = "qualified.txt"
 FOLLOWUP_NAME = "qualified-followup.txt"
 DURABLE_STORAGE = {"sqlite", "postgresql"}
+RESULT_MARKER = "__LOOM_QUALIFICATION_RESULT__"
 
 
 def _require_durable_storage() -> None:
@@ -74,12 +77,10 @@ async def _run_initial(workspace: Path) -> dict[str, Any]:
             "Loom qualification fixture. Create the verified artifact.\n",
             encoding="utf-8",
         )
+        task_description = "Create a verified qualification artifact."
         ledger.record(
             kind=EventKind.TASK_RECEIVED,
-            payload={
-                "task": "Create a verified qualification artifact.",
-                "fixture": str(fixture),
-            },
+            payload={"task": task_description, "fixture": str(fixture)},
         )
 
         agent = InMemoryAgentLoop(tool_provider=tools)
@@ -95,7 +96,8 @@ async def _run_initial(workspace: Path) -> dict[str, Any]:
             ),
         )
         turn = await agent.step("qualification-agent")
-        if turn.status != "completed":
+        investigation_passed = turn.status == "completed"
+        if not investigation_passed:
             raise RuntimeError(f"Agent tool turn failed: {turn.output_data}")
         ledger.record(
             kind=EventKind.TOOL_INVOCATION,
@@ -145,7 +147,15 @@ async def _run_initial(workspace: Path) -> dict[str, Any]:
         plan = await ExecutionEngine(config, runner=QualificationRunner()).execute_plan(
             plan
         )
-        if any(task.status.value != "completed" for task in plan.tasks):
+        investigation_task = next(
+            task for task in plan.tasks if task.id == "investigate"
+        )
+        modification_task = next(task for task in plan.tasks if task.id == "modify")
+        investigation_passed = investigation_passed and (
+            investigation_task.status.value == "completed"
+        )
+        modification_passed = modification_task.status.value == "completed"
+        if not investigation_passed or not modification_passed:
             raise RuntimeError("Execution plan did not complete successfully")
 
         artifact = workspace / ARTIFACT_NAME
@@ -204,6 +214,10 @@ async def _run_initial(workspace: Path) -> dict[str, Any]:
         return {
             "passed": True,
             "phase": "initial",
+            "task_submitted": True,
+            "task": task_description,
+            "investigation_passed": investigation_passed,
+            "modification_passed": modification_passed,
             "agent": {"turn_id": turn.turn_id, "status": turn.status},
             "tool": "read_task",
             "tasks": [task.id for task in plan.tasks],
@@ -280,12 +294,18 @@ def _run_subprocess(phase: str, workspace: Path) -> dict[str, Any]:
             f"{phase} phase failed with exit code {result.returncode}: "
             f"{result.stderr.strip() or result.stdout.strip()}"
         )
-    try:
-        return json.loads(result.stdout)
-    except json.JSONDecodeError as exc:
-        raise RuntimeError(
-            f"{phase} phase emitted invalid JSON: {result.stdout!r}"
-        ) from exc
+    for line in reversed(result.stdout.splitlines()):
+        if line.startswith(RESULT_MARKER):
+            try:
+                return json.loads(line[len(RESULT_MARKER) :])
+            except json.JSONDecodeError as exc:
+                raise RuntimeError(
+                    f"{phase} phase emitted invalid result JSON: {line!r}"
+                ) from exc
+    raise RuntimeError(
+        f"{phase} phase emitted no {RESULT_MARKER} result marker: "
+        f"{result.stdout!r}"
+    )
 
 
 def run(workspace: str) -> dict[str, Any]:
@@ -319,7 +339,7 @@ def main() -> int:
             result = run(args.workspace)
     except Exception as exc:
         result = {"passed": False, "phase": args.phase, "error": str(exc)}
-    print(json.dumps(result, indent=2, sort_keys=True))
+    print(f"{RESULT_MARKER}{json.dumps(result, sort_keys=True)}")
     return 0 if result.get("passed") else 1
 
 
