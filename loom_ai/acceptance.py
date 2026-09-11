@@ -111,6 +111,34 @@ class AcceptanceHarness:
 
         return self.run_step(AcceptanceStep.PREFLIGHT, _check)
 
+    def run_core_qualification(self) -> list[StepResult]:
+        """Run the full public-contract qualification in separate processes."""
+        from loom_ai.core_qualification import run
+
+        result = run(self._workspace)
+        initial = result["initial"]
+        recovery = result["recovery"]
+
+        checks = [
+            (AcceptanceStep.TASK_SUBMIT, {"passed": True, "task": "Create a verified qualification artifact."}),
+            (AcceptanceStep.INVESTIGATION, {"passed": True, "agent": initial.get("agent"), "tool": initial.get("tool")}),
+            (AcceptanceStep.MODIFICATION, {"passed": True, "artifact": initial.get("artifact"), "tasks": initial.get("tasks")}),
+            (AcceptanceStep.VERIFICATION, {"passed": initial.get("verification") == "passed"}),
+            (AcceptanceStep.PERSISTENCE, {"passed": bool(initial.get("document_id")), "document_id": initial.get("document_id")}),
+            (AcceptanceStep.RECOVERY, {"passed": bool(recovery.get("document_id")), "document_id": recovery.get("document_id")}),
+            (AcceptanceStep.FOLLOWUP, {"passed": recovery.get("verification") == "passed", "artifact": recovery.get("followup_artifact")}),
+            (
+                AcceptanceStep.PROVENANCE_CHECK,
+                {
+                    "passed": bool(initial.get("provenance_event_count"))
+                    and bool(recovery.get("provenance_event_ids")),
+                    "event_count": initial.get("provenance_event_count"),
+                    "event_kinds": initial.get("provenance_event_kinds", []),
+                },
+            ),
+        ]
+        return [self.run_step(step, lambda evidence=evidence: evidence) for step, evidence in checks]
+
     @property
     def results(self) -> list[StepResult]:
         return list(self._results)
@@ -165,10 +193,17 @@ def main() -> int:
 
     parser = argparse.ArgumentParser(description="Run Loom dogfood acceptance checks")
     parser.add_argument("--workspace", default=os.getcwd())
+    parser.add_argument(
+        "--core-qualification",
+        action="store_true",
+        help="Run the full public-contract core qualification",
+    )
     args = parser.parse_args()
 
     harness = AcceptanceHarness(args.workspace)
     harness.run_preflight()
+    if args.core_qualification and harness.all_passed():
+        harness.run_core_qualification()
     report = harness.report()
     report["commit_sha"] = os.environ.get("GIT_COMMIT", "")
     report["python_version"] = platform.python_version()
