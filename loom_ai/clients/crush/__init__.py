@@ -1,3 +1,0 @@
-"""Crush MCP consensus server adapter for loom-ai."""
-
-from __future__ import annotations
