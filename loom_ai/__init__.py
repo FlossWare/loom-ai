@@ -1,43 +1,23 @@
-"""loom-ai: Pluggable AI orchestration framework.
+"""loom-ai: intent-driven AI orchestration runtime.
 
-Exports ``LoomConfig`` (the central registry), all Protocol interfaces,
-all data-model dataclasses, ``ConsensusEngine`` for multi-model
-fan-out, ``ExecutionEngine`` for DAG-based task scheduling, and
-MCP tool/resource contracts for a clean public API.
+The canonical execution model is deliberately small:
 
-Quick start::
+    Intent -> Worker -> result
+                 ^
+               Arbiter
 
-    import asyncio
-    from loom_ai import LoomConfig
+``Intent`` describes desired outcome without prescribing execution.
+``Worker`` is the fundamental executable abstraction. ``Arbiter`` is a
+composable Worker that coordinates other Workers.
 
-    # Zero-config: all in-memory / no-op backends
-    cfg = asyncio.run(LoomConfig.from_env())
-
-    # Or inject your own backends
-    cfg = LoomConfig(
-        storage=my_pg_storage,
-        queue=my_redis_queue,
-        secrets=my_vault_secrets,
-        embedding=my_openai_embeddings,
-        search=my_pg_search,
-        graph=my_orientdb_graph,
-        llm=my_http_llm,
-    )
-
-For the full set of 81 protocol contracts, use the consolidated
-facade::
-
-    from loom_ai.contracts import StorageBackend, WorkflowEngine, ...
-
-See ``docs/contracts.md`` for the canonical contract inventory.
+The older contract facade and execution classes remain temporarily available
+for compatibility while the repository is consolidated around these
+primitives. They are not the preferred architecture for new code.
 """
 
+from loom_ai.arbiter import Arbiter, ArbiterDecision, WorkerEvaluation
 from loom_ai.config import LoomConfig
-from loom_ai.config_validator import (
-    Environment,
-    LoomConfigValidator,
-    validate_env,
-)
+from loom_ai.config_validator import Environment, LoomConfigValidator, validate_env
 from loom_ai.consensus import ConsensusEngine, ConsensusResult
 from loom_ai.contracts_core import (
     ConversationManager,
@@ -45,26 +25,11 @@ from loom_ai.contracts_core import (
     PersistentMemoryBackend,
     StructuredOutputMixin,
 )
-from loom_ai.contracts_execution import (
-    ExecutionObserver,
-    ExecutionPipeline,
-    ExecutionStep,
-)
-from loom_ai.contracts_session import (
-    EvaluationHarness,
-    SessionInitializer,
-    WorkerRegistry,
-)
-from loom_ai.contracts_workflow import (
-    ObservabilityBackend,
-    WorkflowEngine,
-)
-from loom_ai.execution import (
-    CyclicDependencyError,
-    ExecutionEngine,
-    LLMTaskRunner,
-    NoopTaskRunner,
-)
+from loom_ai.contracts_execution import ExecutionObserver, ExecutionPipeline, ExecutionStep
+from loom_ai.contracts_session import EvaluationHarness, SessionInitializer, WorkerRegistry
+from loom_ai.contracts_workflow import ObservabilityBackend, WorkflowEngine
+from loom_ai.execution import CyclicDependencyError, ExecutionEngine, LLMTaskRunner, NoopTaskRunner
+from loom_ai.intent import Intent, IntentParseError
 from loom_ai.models import (
     ChatMessage,
     ChatResponse,
@@ -103,8 +68,18 @@ from loom_ai.protocols import (
     TaskRunner,
     ToolProvider,
 )
+from loom_ai.worker import Worker, WorkerContext, WorkerResult, WorkerStatus
 
 __all__ = [
+    "Arbiter",
+    "ArbiterDecision",
+    "WorkerEvaluation",
+    "Intent",
+    "IntentParseError",
+    "Worker",
+    "WorkerContext",
+    "WorkerResult",
+    "WorkerStatus",
     "LoomConfig",
     "ConsensusEngine",
     "ConsensusResult",
@@ -147,11 +122,9 @@ __all__ = [
     "StorageBackend",
     "TaskRunner",
     "ToolProvider",
-    # Configuration validation
     "Environment",
     "LoomConfigValidator",
     "validate_env",
-    # Most-used advanced contracts
     "ConversationManager",
     "EvaluationHarness",
     "ModelRouter",
