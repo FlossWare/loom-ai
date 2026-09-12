@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from dataclasses import dataclass, field
+from dataclasses import dataclass
 from enum import Enum
 from typing import Callable, Iterable
 
@@ -35,8 +35,8 @@ class Arbiter:
     """A Worker that coordinates one or more Workers.
 
     Arbiter deliberately exposes the same ``execute`` contract as an ordinary
-    Worker.  This makes nested Arbiter -> Worker -> Arbiter composition
-    ordinary composition rather than a second orchestration mechanism.
+    Worker. This makes nested Arbiter -> Worker -> Arbiter composition ordinary
+    composition rather than a second orchestration mechanism.
     """
 
     workers: Iterable[Worker]
