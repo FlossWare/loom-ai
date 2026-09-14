@@ -53,7 +53,7 @@ from loom_ai import (
 
 ROOT = Path(os.environ["LOOM_STAGE1_ROOT"])
 TEST_FILE = ROOT / "tests" / "test_worker_arbiter.py"
-MARKER = "test_stage1_dogfood_added_by_loom"
+MARKER = "test_worker_result_successful_property"
 
 
 def run(*args: str) -> subprocess.CompletedProcess[str]:
@@ -70,13 +70,24 @@ class InspectWorker:
     worker_id = "inspect"
 
     def execute(self, context: WorkerContext) -> WorkerResult:
-        exists = TEST_FILE.is_file()
+        text = TEST_FILE.read_text() if TEST_FILE.is_file() else ""
+        target_missing = MARKER not in text
         return WorkerResult(
             worker_id=self.worker_id,
-            status=WorkerStatus.SUCCESS if exists else WorkerStatus.FAILED,
-            output={"test_file": str(TEST_FILE), "exists": exists},
-            evidence=({"worker": self.worker_id, "test_file": str(TEST_FILE)},),
-            error="target test file is missing" if not exists else "",
+            status=WorkerStatus.SUCCESS if TEST_FILE.is_file() else WorkerStatus.FAILED,
+            output={
+                "test_file": str(TEST_FILE),
+                "exists": TEST_FILE.is_file(),
+                "target_test_missing": target_missing,
+            },
+            evidence=(
+                {
+                    "worker": self.worker_id,
+                    "test_file": str(TEST_FILE),
+                    "target_test_missing": target_missing,
+                },
+            ),
+            error="target test file is missing" if not TEST_FILE.is_file() else "",
         )
 
 
@@ -98,22 +109,30 @@ class ImplementationWorker:
     worker_id = "implementation"
 
     def execute(self, context: WorkerContext) -> WorkerResult:
-        text = TEST_FILE.read_text()
-        if MARKER in text:
+        inspection = context.evidence[-1] if context.evidence else {}
+        if not inspection.get("target_test_missing", True):
             return WorkerResult(
                 worker_id=self.worker_id,
                 status=WorkerStatus.SUCCESS,
-                output="stage-1 test already present",
+                output="target regression test already present",
                 evidence=({"worker": self.worker_id, "changed": False},),
             )
 
-        addition = '''\n\n\ndef test_stage1_dogfood_added_by_loom():\n    """Prove the Stage 1 dogfood worker can modify the target repository."""\n    assert True\n'''
+        text = TEST_FILE.read_text()
+        addition = '''\n\n\ndef test_worker_result_successful_property():\n    """Verify successful reflects WorkerStatus.SUCCESS only."""\n    success = WorkerResult(worker_id="success", status=WorkerStatus.SUCCESS)\n    failure = WorkerResult(worker_id="failure", status=WorkerStatus.FAILED)\n\n    assert success.successful\n    assert not failure.successful\n'''
         TEST_FILE.write_text(text.rstrip() + addition)
         return WorkerResult(
             worker_id=self.worker_id,
             status=WorkerStatus.SUCCESS,
-            output=f"updated {TEST_FILE}",
-            evidence=({"worker": self.worker_id, "changed": True, "marker": MARKER},),
+            output=f"added regression test to {TEST_FILE}",
+            evidence=(
+                {
+                    "worker": self.worker_id,
+                    "changed": True,
+                    "marker": MARKER,
+                    "reason": "inspection found missing coverage for WorkerResult.successful",
+                },
+            ),
         )
 
 
@@ -125,7 +144,7 @@ class VerificationWorker:
             return WorkerResult(
                 worker_id=self.worker_id,
                 status=WorkerStatus.FAILED,
-                error="implementation marker is missing",
+                error="regression test marker is missing",
             )
         result = run("python", "-m", "pytest", "-q")
         return WorkerResult(
@@ -139,11 +158,12 @@ class VerificationWorker:
 
 intent = Intent(
     title="Stage 1 Loom self-dogfood",
-    goal="Make and verify a small test-only change in the Loom repository.",
+    goal="Inspect Loom, identify a small missing regression test, add it, and verify the repository.",
     requirements=(
         "Inspect the target repository before changing it.",
+        "Identify whether coverage for WorkerResult.successful is missing.",
         "Run the existing test suite before making the change.",
-        "Make the smallest possible repository change.",
+        "Make the smallest useful test-only change.",
         "Run the test suite after the change.",
     ),
     constraints=(
@@ -153,7 +173,8 @@ intent = Intent(
     acceptance=(
         "The target test file exists.",
         "The baseline test suite passes.",
-        "The implementation worker changes the test suite.",
+        "The implementation follows the inspection result.",
+        "A regression test covers WorkerResult.successful for success and failure.",
         "The post-change test suite passes.",
     ),
 )
