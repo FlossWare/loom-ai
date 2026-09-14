@@ -109,7 +109,11 @@ class LLMPlanningWorker:
     worker_id = "llm-planner"
 
     def execute(self, context: WorkerContext) -> WorkerResult:
-        source = context.evidence[-1]["source"]
+        source = next(
+            evidence["source"]
+            for evidence in reversed(context.evidence)
+            if evidence.get("worker") == "inspect" and "source" in evidence
+        )
         plan = ask_model(source)
         if plan.get("action") not in {"add_successful_regression_test", "no_change"}:
             return WorkerResult(
@@ -129,7 +133,11 @@ class ImplementationWorker:
     worker_id = "implementation"
 
     def execute(self, context: WorkerContext) -> WorkerResult:
-        plan = context.evidence[-1].get("plan", {})
+        plan = next(
+            evidence["plan"]
+            for evidence in reversed(context.evidence)
+            if evidence.get("worker") == "llm-planner" and "plan" in evidence
+        )
         action = plan.get("action")
         text = TEST_FILE.read_text()
         if action == "no_change":
@@ -227,12 +235,3 @@ for output in result.output:
     print(f"{output.worker_id:>18}: {output.status.value}")
     if output.worker_id == "llm-planner" and output.output:
         print(f"{'LLM plan':>18}: {output.output}")
-
-if not result.successful:
-    raise SystemExit(f"Stage 2 failed: {result.error}")
-
-print("\nRESULT: LOOM STAGE 2 DOGFOOD PASSED")
-PY
-
-printf '\nNOTE: Stage 2 intentionally leaves the test-only change in the checkout.\n'
-printf 'Review it with: git diff -- tests/test_worker_arbiter.py\n'
