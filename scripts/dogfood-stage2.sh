@@ -235,3 +235,6 @@ for output in result.output:
     print(f"{output.worker_id:>18}: {output.status.value}")
     if output.worker_id == "llm-planner" and output.output:
         print(f"{'LLM plan':>18}: {output.output}")
+
+print("RESULT: LOOM STAGE 2 DOGFOOD PASSED")
+PY
