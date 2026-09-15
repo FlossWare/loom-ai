@@ -20,6 +20,9 @@ classifiers = [
     "Typing :: Typed",
 ]
 
+[project.scripts]
+loom-server = "loom_ai.server:main"
+
 [project.optional-dependencies]
 dev = ["pytest>=7.0", "ruff>=0.4", "build>=1.2"]
 
