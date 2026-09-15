@@ -3,9 +3,12 @@
 from __future__ import annotations
 
 import json
+from http.server import ThreadingHTTPServer
 from threading import Thread
+from urllib.error import HTTPError
 from urllib.request import Request, urlopen
 
+from loom_ai.arbiter import Arbiter, ArbiterDecision, WorkerEvaluation
 from loom_ai.server import LoomServer
 from loom_ai.worker import WorkerContext, WorkerResult, WorkerStatus
 
@@ -22,12 +25,21 @@ class RecordingWorker:
         )
 
 
-def test_server_executes_intent_over_http() -> None:
-    server = LoomServer([RecordingWorker()], port=0)
-    httpd = server._handler_factory()
-    from http.server import ThreadingHTTPServer
+def build_server() -> LoomServer:
+    def evaluate(result: WorkerResult, _context: WorkerContext) -> WorkerEvaluation:
+        decision = (
+            ArbiterDecision.COMPLETE
+            if result.successful
+            else ArbiterDecision.COMPLETE
+        )
+        return WorkerEvaluation(decision, reason=result.error)
 
-    instance = ThreadingHTTPServer((server.host, server.port), httpd)
+    return LoomServer(Arbiter([RecordingWorker()], evaluate), port=0)
+
+
+def test_server_executes_intent_over_http() -> None:
+    server = build_server()
+    instance = ThreadingHTTPServer((server.host, server.port), server._handler_factory())
     thread = Thread(target=instance.serve_forever, daemon=True)
     thread.start()
     try:
@@ -55,9 +67,7 @@ def test_server_executes_intent_over_http() -> None:
 
 
 def test_server_rejects_intent_without_goal() -> None:
-    server = LoomServer([RecordingWorker()], port=0)
-    from http.server import ThreadingHTTPServer
-
+    server = build_server()
     instance = ThreadingHTTPServer((server.host, server.port), server._handler_factory())
     thread = Thread(target=instance.serve_forever, daemon=True)
     thread.start()
@@ -70,9 +80,10 @@ def test_server_rejects_intent_without_goal() -> None:
         )
         try:
             urlopen(request)
+        except HTTPError as exc:
+            assert exc.code == 400
+        else:
             raise AssertionError("expected HTTP 400")
-        except Exception as exc:
-            assert getattr(exc, "code", None) == 400
     finally:
         instance.shutdown()
         instance.server_close()
