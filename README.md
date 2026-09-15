@@ -32,13 +32,26 @@ HTTP client
         -> result
 ```
 
-For a transport smoke test:
+The deployed `loom.service` is the Stage 3 dogfood target. It runs the smallest real-worker pipeline:
 
-```bash
-loom-server --host 127.0.0.1 --port 8000
+```text
+POST /intents
+    -> Intent
+    -> Arbiter
+        -> ArtifactWriter
+        -> ArtifactVerifier
+    -> structured result + evidence
 ```
 
-Then `GET /health` checks server availability and `POST /intents` submits an Intent JSON document. The command-line server uses a no-op Worker solely for transport verification. Applications should configure the server with their own Arbiter and Workers.
+The pipeline performs a bounded deterministic filesystem change and verifies the exact result. The artifact location defaults to `/tmp/loom-stage3-artifact.txt` and can be overridden with `LOOM_STAGE3_ARTIFACT`. No model gateway or Crush dependency is involved.
+
+For a local health check:
+
+```bash
+curl http://127.0.0.1:18000/health
+```
+
+Applications should configure the server with their own Arbiter and Workers when using Loom as a library. The Stage 3 CLI configuration exists specifically to provide a concrete deployed dogfood path.
 
 ## Architectural boundaries
 
@@ -76,7 +89,7 @@ python -m pytest -q
 python -m build --wheel --sdist
 ```
 
-Run the core dogfood gate with `./scripts/dogfood.sh` and the server gate with `./scripts/dogfood-stage2.sh`.
+Run the core dogfood gate with `./scripts/dogfood.sh`. Run the deployed Stage 3 gate with `./scripts/dogfood-stage3.sh`; it tests the systemd-managed `loom.service`, real worker execution, verification evidence, and service restart/recovery.
 
 ## License
 
