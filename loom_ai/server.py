@@ -18,7 +18,8 @@ from uuid import uuid4
 
 from loom_ai.arbiter import Arbiter, ArbiterDecision, WorkerEvaluation
 from loom_ai.intent import Intent
-from loom_ai.worker import WorkerContext, WorkerResult, WorkerStatus
+from loom_ai.stage3 import ArtifactVerifier, ArtifactWriter
+from loom_ai.worker import WorkerContext, WorkerResult
 
 MAX_PAYLOAD_BYTES = 10 * 1024 * 1024
 
@@ -137,34 +138,32 @@ def _json_default(value: Any) -> Any:
     raise TypeError(f"Object of type {type(value).__name__} is not JSON serializable")
 
 
+def _stage3_arbiter() -> Arbiter:
+    """Build the bounded real-worker pipeline used by the service."""
+
+    def evaluate(result: WorkerResult, _context: WorkerContext) -> WorkerEvaluation:
+        if not result.successful:
+            return WorkerEvaluation(
+                ArbiterDecision.REPLAN, reason=result.error or "worker failed"
+            )
+        if result.worker_id == "artifact-writer":
+            return WorkerEvaluation(ArbiterDecision.CONTINUE)
+        return WorkerEvaluation(ArbiterDecision.COMPLETE, reason="verified")
+
+    return Arbiter(
+        [ArtifactWriter(), ArtifactVerifier()],
+        evaluate,
+        max_retries=0,
+    )
+
+
 def main() -> None:
-    """Run a transport-only server for manual health checks."""
+    """Run the Stage 3 real-worker Loom server."""
     parser = argparse.ArgumentParser(description="Run the Loom HTTP server")
     parser.add_argument("--host", default="127.0.0.1")
     parser.add_argument("--port", type=int, default=8000)
     args = parser.parse_args()
-
-    class NoOpWorker:
-        worker_id = "server"
-
-        def execute(self, context: WorkerContext) -> WorkerResult:
-            return WorkerResult(
-                worker_id=self.worker_id,
-                status=WorkerStatus.SUCCESS,
-                output={"intent_id": context.intent.intent_id},
-            )
-
-    def evaluate(result: WorkerResult, _context: WorkerContext) -> WorkerEvaluation:
-        if result.successful:
-            return WorkerEvaluation(
-                ArbiterDecision.COMPLETE, reason="transport smoke test"
-            )
-        return WorkerEvaluation(
-            ArbiterDecision.REPLAN, reason=result.error or "worker failed"
-        )
-
-    arbiter = Arbiter([NoOpWorker()], evaluate, max_retries=0)
-    LoomServer(arbiter, host=args.host, port=args.port).serve_forever()
+    LoomServer(_stage3_arbiter(), host=args.host, port=args.port).serve_forever()
 
 
 if __name__ == "__main__":
