@@ -15,7 +15,9 @@ class StubWorker:
             worker_id=self.worker_id,
             status=self.status,
             output={"worker": self.worker_id},
-            evidence=({"worker": self.worker_id, "intent_id": context.intent.intent_id},),
+            evidence=(
+                {"worker": self.worker_id, "intent_id": context.intent.intent_id},
+            ),
         )
 
 

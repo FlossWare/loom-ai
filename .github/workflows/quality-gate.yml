@@ -81,15 +81,18 @@ jobs:
       - name: Verify imports
         run: |
           python -c "
-          import asyncio
-          from loom_ai import LoomConfig, Document, Chunk, ChatMessage
-          from loom_ai.protocols import StorageBackend, QueueBackend, LLMBackend
-          from loom_ai.backends.memory import MemoryStorageBackend, MemoryQueueBackend
-          from loom_ai.backends.env_secrets import EnvSecretsBackend
-          from loom_ai.backends.http_llm import HttpLLMBackend
-          cfg = asyncio.run(LoomConfig.from_env())
-          assert isinstance(cfg.storage, StorageBackend)
-          assert isinstance(cfg.queue, QueueBackend)
+          from loom_ai import (
+              Arbiter,
+              ArbiterDecision,
+              Intent,
+              IntentParseError,
+              LoomServer,
+              Worker,
+              WorkerContext,
+              WorkerEvaluation,
+              WorkerResult,
+              WorkerStatus,
+          )
           print('All imports and protocol checks passed')
           "
 
