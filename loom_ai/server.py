@@ -9,21 +9,21 @@ from __future__ import annotations
 
 import argparse
 import json
-import socketserver
 from dataclasses import asdict, is_dataclass
 from enum import Enum
 from http import HTTPStatus
+from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from typing import Any
 from uuid import uuid4
 
-from loom_ai.arbiter import Arbiter
+from loom_ai.arbiter import Arbiter, ArbiterDecision, WorkerEvaluation
 from loom_ai.intent import Intent
 from loom_ai.worker import WorkerContext, WorkerResult, WorkerStatus
 
-MAX_PAYLOAD_BYTES = 10 * 1024 * 1024  # 10 MB limit for incoming requests
+MAX_PAYLOAD_BYTES = 10 * 1024 * 1024
 
 
-class _TCPServer(socketserver.ThreadingTCPServer):
+class _LoomHTTPServer(ThreadingHTTPServer):
     allow_reuse_address = True
     daemon_threads = True
 
@@ -32,7 +32,7 @@ class LoomServer:
     """HTTP transport boundary for a configured Loom Arbiter."""
 
     def __init__(
-        self, arbiter: Arbiter, *, host: str = "localhost", port: int = 8000
+        self, arbiter: Arbiter, *, host: str = "127.0.0.1", port: int = 8000
     ) -> None:
         self.host = host
         self.port = port
@@ -45,94 +45,75 @@ class LoomServer:
     def serve_forever(self) -> None:
         """Serve requests until interrupted."""
         handler = self._handler_factory()
-        server = _TCPServer((self.host, self.port), handler)
+        server = _LoomHTTPServer((self.host, self.port), handler)
         self.port = server.server_address[1]
-        server.serve_forever()
+        try:
+            server.serve_forever()
+        finally:
+            server.server_close()
 
-    def _handler_factory(self) -> type[socketserver.StreamRequestHandler]:
+    def _handler_factory(self) -> type[BaseHTTPRequestHandler]:
         owner = self
 
-        class Handler(socketserver.StreamRequestHandler):
+        class Handler(BaseHTTPRequestHandler):
             def _send(self, status: HTTPStatus, payload: dict[str, Any]) -> None:
                 body = json.dumps(payload, default=_json_default).encode("utf-8")
-                reason = status.phrase
-                header = (
-                    f"HTTP/1.1 {status.value} {reason}\r\n"
-                    "Content-Type: application/json\r\n"
-                    f"Content-Length: {len(body)}\r\n"
-                    "Connection: close\r\n\r\n"
-                )
-                self.wfile.write(header.encode("utf-8") + body)
+                self.send_response(status)
+                self.send_header("Content-Type", "application/json")
+                self.send_header("Content-Length", str(len(body)))
+                self.send_header("Connection", "close")
+                self.end_headers()
+                self.wfile.write(body)
 
-            def handle(self) -> None:
-                request_line = self.rfile.readline(65536).decode("utf-8", "replace")
-                if not request_line:
+            def do_GET(self) -> None:  # noqa: N802
+                if self.path == "/health":
+                    self._send(HTTPStatus.OK, {"status": "ok"})
                     return
-                parts = request_line.split()
-                if len(parts) < 2:
-                    return
-                method, path = parts[0], parts[1]
+                self._send(HTTPStatus.NOT_FOUND, {"error": "not found"})
 
-                headers = {}
-                while True:
-                    line = self.rfile.readline(65536).decode("utf-8", "replace")
-                    if not line or line in ("\r\n", "\n"):
-                        break
-                    if ":" in line:
-                        k, v = line.split(":", 1)
-                        headers[k.strip().lower()] = v.strip()
-
-                if method == "GET":
-                    if path == "/health":
-                        self._send(HTTPStatus.OK, {"status": "ok"})
-                        return
+            def do_POST(self) -> None:  # noqa: N802
+                if self.path != "/intents":
                     self._send(HTTPStatus.NOT_FOUND, {"error": "not found"})
                     return
 
-                if method == "POST":
-                    if path != "/intents":
-                        self._send(HTTPStatus.NOT_FOUND, {"error": "not found"})
-                        return
-
-                    try:
-                        length = int(headers.get("content-length", "0"))
-                        if length > MAX_PAYLOAD_BYTES:
-                            self._send(
-                                HTTPStatus.REQUEST_ENTITY_TOO_LARGE,
-                                {"error": "payload too large"},
-                            )
-                            return
-
-                        raw_body = self.rfile.read(length)
-                        payload = json.loads(raw_body.decode("utf-8"))
-                        goal = payload["goal"]
-                        intent = Intent(
-                            title=payload.get("title", "Intent"),
-                            goal=goal,
-                            requirements=tuple(payload.get("requirements", ())),
-                            constraints=tuple(payload.get("constraints", ())),
-                            acceptance=tuple(payload.get("acceptance", ())),
-                            intent_id=payload.get("intent_id") or str(uuid4()),
-                        )
-                        result = owner.execute(intent)
-                    except (
-                        KeyError,
-                        TypeError,
-                        ValueError,
-                        json.JSONDecodeError,
-                    ) as exc:
-                        self._send(HTTPStatus.BAD_REQUEST, {"error": str(exc)})
-                        return
-                    except Exception as exc:  # pragma: no cover - transport safety net
+                try:
+                    length = self.headers.get("Content-Length")
+                    if length is None:
+                        raise ValueError("Content-Length is required")
+                    length = int(length)
+                    if length < 0:
+                        raise ValueError("Content-Length must be non-negative")
+                    if length > MAX_PAYLOAD_BYTES:
                         self._send(
-                            HTTPStatus.INTERNAL_SERVER_ERROR, {"error": str(exc)}
+                            HTTPStatus.REQUEST_ENTITY_TOO_LARGE,
+                            {"error": "payload too large"},
                         )
                         return
 
-                    self._send(HTTPStatus.OK, _result_payload(result))
+                    payload = json.loads(self.rfile.read(length).decode("utf-8"))
+                    if not isinstance(payload, dict):
+                        raise TypeError("request body must be a JSON object")
+
+                    intent = Intent(
+                        title=payload.get("title", "Intent"),
+                        goal=payload["goal"],
+                        requirements=tuple(payload.get("requirements", ())),
+                        constraints=tuple(payload.get("constraints", ())),
+                        acceptance=tuple(payload.get("acceptance", ())),
+                        intent_id=payload.get("intent_id") or str(uuid4()),
+                    )
+                    result = owner.execute(intent)
+                except (KeyError, TypeError, ValueError, json.JSONDecodeError) as exc:
+                    self._send(HTTPStatus.BAD_REQUEST, {"error": str(exc)})
+                    return
+                except Exception as exc:  # pragma: no cover
+                    self._send(HTTPStatus.INTERNAL_SERVER_ERROR, {"error": str(exc)})
                     return
 
-                self._send(HTTPStatus.NOT_FOUND, {"error": "not found"})
+                self._send(HTTPStatus.OK, _result_payload(result))
+
+            def log_message(self, _format: str, *_args: Any) -> None:
+                return
 
         return Handler
 
@@ -159,7 +140,7 @@ def _json_default(value: Any) -> Any:
 def main() -> None:
     """Run a transport-only server for manual health checks."""
     parser = argparse.ArgumentParser(description="Run the Loom HTTP server")
-    parser.add_argument("--host", default="localhost")
+    parser.add_argument("--host", default="127.0.0.1")
     parser.add_argument("--port", type=int, default=8000)
     args = parser.parse_args()
 
@@ -173,18 +154,16 @@ def main() -> None:
                 output={"intent_id": context.intent.intent_id},
             )
 
-    def evaluate(result: WorkerResult, _context: WorkerContext):
-        from loom_ai.arbiter import ArbiterDecision, WorkerEvaluation
-
+    def evaluate(result: WorkerResult, _context: WorkerContext) -> WorkerEvaluation:
         if result.successful:
             return WorkerEvaluation(
                 ArbiterDecision.COMPLETE, reason="transport smoke test"
             )
         return WorkerEvaluation(
-            ArbiterDecision.COMPLETE, reason=result.error or "failed"
+            ArbiterDecision.REPLAN, reason=result.error or "worker failed"
         )
 
-    arbiter = Arbiter([NoOpWorker()], evaluate)
+    arbiter = Arbiter([NoOpWorker()], evaluate, max_retries=0)
     LoomServer(arbiter, host=args.host, port=args.port).serve_forever()
 
 
