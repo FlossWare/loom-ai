@@ -19,6 +19,27 @@ Intent
 
 The fundamental executable abstraction is **Worker**. An **Arbiter is a Worker that coordinates Workers**, so nesting is ordinary composition.
 
+## Server boundary
+
+Loom provides a minimal HTTP transport around a configured Arbiter. The server translates requests into declarative Intents and returns structured execution results. It does not select models, invoke providers, persist state, or implement other capabilities.
+
+```text
+HTTP client
+    -> Loom Server
+        -> Intent
+        -> Arbiter
+            -> Workers
+        -> result
+```
+
+For a transport smoke test:
+
+```bash
+loom-server --host 127.0.0.1 --port 8000
+```
+
+Then `GET /health` checks server availability and `POST /intents` submits an Intent JSON document. The command-line server uses a no-op Worker solely for transport verification. Applications should configure the server with their own Arbiter and Workers.
+
 ## Architectural boundaries
 
 Loom owns Intent, Worker and Arbiter execution, explicit execution state, evidence collection, task-level orchestration, and integration points for evaluation, Knowledge, strategies, and external capabilities.
@@ -55,7 +76,7 @@ python -m pytest -q
 python -m build --wheel --sdist
 ```
 
-Run the core dogfood gate with `./scripts/dogfood.sh`.
+Run the core dogfood gate with `./scripts/dogfood.sh` and the server gate with `./scripts/dogfood-stage2.sh`.
 
 ## License
 
