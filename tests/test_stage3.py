@@ -2,7 +2,7 @@ from pathlib import Path
 
 from loom_ai.intent import Intent
 from loom_ai.server import _stage3_arbiter
-from loom_ai.stage3 import ArtifactVerifier, MAX_GOAL_BYTES
+from loom_ai.stage3 import ArtifactVerifier, ArtifactWriter, MAX_GOAL_BYTES
 from loom_ai.worker import WorkerContext, WorkerStatus
 
 
@@ -33,18 +33,14 @@ def test_stage3_rejects_oversized_goal(tmp_path: Path, monkeypatch) -> None:
     monkeypatch.setenv("LOOM_STAGE3_ARTIFACT", str(artifact))
 
     intent = Intent(goal="x" * (MAX_GOAL_BYTES + 1), intent_id="oversized")
-    result = _stage3_arbiter().execute(WorkerContext(intent=intent))
+    result = ArtifactWriter().execute(WorkerContext(intent=intent))
 
-    assert not result.successful
-    assert result.output[0].worker_id == "artifact-writer"
-    assert result.output[0].status is WorkerStatus.FAILED
-    assert "exceeds Stage 3 limit" in result.output[0].error
+    assert result.status is WorkerStatus.FAILED
+    assert "exceeds Stage 3 limit" in result.error
     assert not artifact.exists()
 
 
-def test_stage3_verifier_rejects_missing_artifact(
-    tmp_path: Path, monkeypatch
-) -> None:
+def test_stage3_verifier_rejects_missing_artifact(tmp_path: Path, monkeypatch) -> None:
     artifact = tmp_path / "missing.txt"
     monkeypatch.setenv("LOOM_STAGE3_ARTIFACT", str(artifact))
 
@@ -55,9 +51,7 @@ def test_stage3_verifier_rejects_missing_artifact(
     assert "No such file" in result.error
 
 
-def test_stage3_verifier_rejects_content_mismatch(
-    tmp_path: Path, monkeypatch
-) -> None:
+def test_stage3_verifier_rejects_content_mismatch(tmp_path: Path, monkeypatch) -> None:
     artifact = tmp_path / "artifact.txt"
     artifact.write_text("not the expected artifact", encoding="utf-8")
     monkeypatch.setenv("LOOM_STAGE3_ARTIFACT", str(artifact))
