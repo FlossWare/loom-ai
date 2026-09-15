@@ -13,7 +13,8 @@ from dataclasses import asdict, is_dataclass
 from enum import Enum
 from http import HTTPStatus
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
-from typing import Any, Callable
+from typing import Any
+from uuid import uuid4
 
 from loom_ai.arbiter import Arbiter, ArbiterDecision, WorkerEvaluation
 from loom_ai.intent import Intent
@@ -71,13 +72,14 @@ class LoomServer:
                 try:
                     length = int(self.headers.get("Content-Length", "0"))
                     payload = json.loads(self.rfile.read(length))
+                    goal = payload["goal"]
                     intent = Intent(
                         title=payload.get("title", "Intent"),
-                        goal=payload["goal"],
+                        goal=goal,
                         requirements=tuple(payload.get("requirements", ())),
                         constraints=tuple(payload.get("constraints", ())),
                         acceptance=tuple(payload.get("acceptance", ())),
-                        intent_id=payload.get("intent_id") or Intent(goal=payload["goal"]).intent_id,
+                        intent_id=payload.get("intent_id") or str(uuid4()),
                     )
                     result = owner.execute(intent)
                 except (KeyError, TypeError, ValueError, json.JSONDecodeError) as exc:
