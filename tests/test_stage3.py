@@ -2,7 +2,7 @@ from pathlib import Path
 
 from loom_ai.intent import Intent
 from loom_ai.server import _stage3_arbiter
-from loom_ai.stage3 import ArtifactVerifier, ArtifactWriter, MAX_GOAL_BYTES
+from loom_ai.stage3 import MAX_GOAL_BYTES, ArtifactVerifier, ArtifactWriter
 from loom_ai.worker import WorkerContext, WorkerStatus
 
 
