@@ -21,7 +21,7 @@ def test_stage3_writes_and_verifies_artifact(tmp_path: Path, monkeypatch) -> Non
     assert artifact.read_text(encoding="utf-8") == (
         "Loom Stage 3\n"
         "intent_id=stage3-test\n"
-        "goal_sha256=bd7c1eab8f0e9c0c8e8d8c8a9d9e5c5b6b5a0b5f7b8c9f6f1e2d4a6f8c3d2e1\n"
+        "goal_sha256=dc06a7f1a04a327e330447bdadcd8cdef6e8fb2c0e4daf22ff0ffa055181083d\n"
     )
     evidence_types = [item["type"] for item in result.evidence]
     assert "artifact-written" in evidence_types
