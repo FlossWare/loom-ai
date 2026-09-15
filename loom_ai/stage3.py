@@ -7,6 +7,7 @@ verification, evidence, and failure propagation without introducing a gateway.
 
 from __future__ import annotations
 
+import hashlib
 import os
 from pathlib import Path
 
@@ -22,14 +23,24 @@ def artifact_path() -> Path:
 
 
 def artifact_content(context: WorkerContext) -> str:
-    """Build the deterministic artifact content from the submitted Intent."""
+    """Build deterministic artifact content from the submitted Intent.
+
+    Raises:
+        TypeError: if the Intent goal is not a string.
+        ValueError: if the UTF-8 goal exceeds the Stage 3 limit.
+    """
     goal = context.intent.goal
     if not isinstance(goal, str):
         raise TypeError("Intent goal must be a string")
     encoded = goal.encode("utf-8")
     if len(encoded) > MAX_GOAL_BYTES:
         raise ValueError("Intent goal exceeds Stage 3 limit")
-    return f"Loom Stage 3\nintent_id={context.intent.intent_id}\ngoal={goal}\n"
+    goal_digest = hashlib.sha256(encoded).hexdigest()
+    return (
+        "Loom Stage 3\n"
+        f"intent_id={context.intent.intent_id}\n"
+        f"goal_sha256={goal_digest}\n"
+    )
 
 
 class ArtifactWriter:
