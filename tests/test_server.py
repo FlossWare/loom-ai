@@ -3,7 +3,7 @@
 from __future__ import annotations
 
 import json
-from http.server import ThreadingHTTPServer  # NOSONAR
+import socketserver
 from threading import Thread
 from urllib.error import HTTPError, URLError
 from urllib.request import Request, urlopen
@@ -11,6 +11,11 @@ from urllib.request import Request, urlopen
 from loom_ai.arbiter import Arbiter, ArbiterDecision, WorkerEvaluation
 from loom_ai.server import LoomServer
 from loom_ai.worker import WorkerContext, WorkerResult, WorkerStatus
+
+
+class _TestServer(socketserver.ThreadingTCPServer):
+    allow_reuse_address = True
+    daemon_threads = True
 
 
 class RecordingWorker:
@@ -34,13 +39,11 @@ def build_server() -> LoomServer:
 
 def test_server_executes_intent_over_http() -> None:
     server = build_server()
-    instance = ThreadingHTTPServer(
-        (server.host, server.port), server._handler_factory()
-    )  # NOSONAR
+    instance = _TestServer((server.host, server.port), server._handler_factory())
     thread = Thread(target=instance.serve_forever, daemon=True)
     thread.start()
     try:
-        base_url = f"http://{server.host}:{instance.server_port}"
+        base_url = f"http://{server.host}:{instance.server_address[1]}"
         with urlopen(f"{base_url}/health") as response:
             assert response.status == 200
             assert json.load(response) == {"status": "ok"}
@@ -65,14 +68,12 @@ def test_server_executes_intent_over_http() -> None:
 
 def test_server_rejects_intent_without_goal() -> None:
     server = build_server()
-    instance = ThreadingHTTPServer(
-        (server.host, server.port), server._handler_factory()
-    )  # NOSONAR
+    instance = _TestServer((server.host, server.port), server._handler_factory())
     thread = Thread(target=instance.serve_forever, daemon=True)
     thread.start()
     try:
         request = Request(
-            f"http://{server.host}:{instance.server_port}/intents",
+            f"http://{server.host}:{instance.server_address[1]}/intents",
             data=b"{}",
             headers={"Content-Type": "application/json"},
             method="POST",
@@ -91,15 +92,13 @@ def test_server_rejects_intent_without_goal() -> None:
 
 def test_server_rejects_overlarge_payload() -> None:
     server = build_server()
-    instance = ThreadingHTTPServer(
-        (server.host, server.port), server._handler_factory()
-    )  # NOSONAR
+    instance = _TestServer((server.host, server.port), server._handler_factory())
     thread = Thread(target=instance.serve_forever, daemon=True)
     thread.start()
     try:
         data = b"x" * (10 * 1024 * 1024 + 1024)
         request = Request(
-            f"http://{server.host}:{instance.server_port}/intents",
+            f"http://{server.host}:{instance.server_address[1]}/intents",
             data=data,
             headers={"Content-Type": "application/json"},
             method="POST",

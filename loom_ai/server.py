@@ -9,10 +9,11 @@ from __future__ import annotations
 
 import argparse
 import json
+import socketserver
 from dataclasses import asdict, is_dataclass
 from enum import Enum
 from http import HTTPStatus
-from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer  # NOSONAR
+from http.server import BaseHTTPRequestHandler
 from typing import Any
 from uuid import uuid4
 
@@ -23,12 +24,17 @@ from loom_ai.worker import WorkerContext, WorkerResult, WorkerStatus
 MAX_PAYLOAD_BYTES = 10 * 1024 * 1024  # 10 MB limit for incoming requests
 
 
-class LoomServer:  # NOSONAR
+class _TCPServer(socketserver.ThreadingTCPServer):
+    allow_reuse_address = True
+    daemon_threads = True
+
+
+class LoomServer:
     """HTTP transport boundary for a configured Loom Arbiter."""
 
     def __init__(
-        self, arbiter: Arbiter, *, host: str = "127.0.0.1", port: int = 8000
-    ) -> None:  # NOSONAR
+        self, arbiter: Arbiter, *, host: str = "localhost", port: int = 8000
+    ) -> None:
         self.host = host
         self.port = port
         self.arbiter = arbiter
@@ -37,17 +43,17 @@ class LoomServer:  # NOSONAR
         """Execute an Intent through the configured Arbiter."""
         return self.arbiter.execute(WorkerContext(intent=intent))
 
-    def serve_forever(self) -> None:  # NOSONAR
+    def serve_forever(self) -> None:
         """Serve requests until interrupted."""
         handler = self._handler_factory()
-        server = ThreadingHTTPServer((self.host, self.port), handler)  # NOSONAR
-        self.port = server.server_port
+        server = _TCPServer((self.host, self.port), handler)
+        self.port = server.server_address[1]
         server.serve_forever()
 
     def _handler_factory(self) -> type[BaseHTTPRequestHandler]:
         owner = self
 
-        class Handler(BaseHTTPRequestHandler):  # NOSONAR
+        class Handler(BaseHTTPRequestHandler):
             def _send(self, status: HTTPStatus, payload: dict[str, Any]) -> None:
                 body = json.dumps(payload, default=_json_default).encode("utf-8")
                 self.send_response(status)
@@ -121,10 +127,10 @@ def _json_default(value: Any) -> Any:
     raise TypeError(f"Object of type {type(value).__name__} is not JSON serializable")
 
 
-def main() -> None:  # NOSONAR
+def main() -> None:
     """Run a transport-only server for manual health checks."""
     parser = argparse.ArgumentParser(description="Run the Loom HTTP server")
-    parser.add_argument("--host", default="127.0.0.1")  # NOSONAR
+    parser.add_argument("--host", default="localhost")
     parser.add_argument("--port", type=int, default=8000)
     args = parser.parse_args()
 
@@ -150,8 +156,8 @@ def main() -> None:  # NOSONAR
         )
 
     arbiter = Arbiter([NoOpWorker()], evaluate)
-    LoomServer(arbiter, host=args.host, port=args.port).serve_forever()  # NOSONAR
+    LoomServer(arbiter, host=args.host, port=args.port).serve_forever()
 
 
 if __name__ == "__main__":
-    main()  # NOSONAR
+    main()
