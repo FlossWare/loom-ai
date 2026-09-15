@@ -27,12 +27,7 @@ class RecordingWorker:
 
 def build_server() -> LoomServer:
     def evaluate(result: WorkerResult, _context: WorkerContext) -> WorkerEvaluation:
-        decision = (
-            ArbiterDecision.COMPLETE
-            if result.successful
-            else ArbiterDecision.COMPLETE
-        )
-        return WorkerEvaluation(decision, reason=result.error)
+        return WorkerEvaluation(ArbiterDecision.COMPLETE, reason=result.error)
 
     return LoomServer(Arbiter([RecordingWorker()], evaluate), port=0)
 
