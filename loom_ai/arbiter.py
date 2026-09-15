@@ -81,7 +81,9 @@ class Arbiter:
 
             if evaluation.decision is ArbiterDecision.RETRY:
                 if attempts[worker.worker_id] > self.max_retries + 1:
-                    return self._result(outputs, evidence, "failed", "retry limit exceeded")
+                    return self._result(
+                        outputs, evidence, "failed", "retry limit exceeded"
+                    )
                 continue
 
             if evaluation.decision is ArbiterDecision.REPLAN:
