@@ -82,4 +82,6 @@ for _ in {1..50}; do
 done
 check_health
 printf '%s\n' "restart: success"
+run_intent
+printf '%s\n' "recovery-execution: success"
 printf '%s\n' "RESULT: LOOM STAGE 3 SERVER DOGFOOD PASSED"
