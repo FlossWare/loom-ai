@@ -1,8 +1,8 @@
 """Minimal HTTP transport for the Loom execution substrate.
 
 The server owns transport and request-to-Intent translation. Execution remains
-owned by the existing Intent, Worker, and Arbiter primitives. Provider/model
-access is deliberately not part of this module.
+owned by the supplied Arbiter and its Workers. Provider/model access is
+ deliberately not part of this module.
 """
 
 from __future__ import annotations
@@ -16,27 +16,21 @@ from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from typing import Any
 from uuid import uuid4
 
-from loom_ai.arbiter import Arbiter, ArbiterDecision, WorkerEvaluation
+from loom_ai.arbiter import Arbiter
 from loom_ai.intent import Intent
-from loom_ai.worker import Worker, WorkerContext, WorkerResult, WorkerStatus
+from loom_ai.worker import WorkerContext, WorkerResult, WorkerStatus
 
 
 class LoomServer:
-    """HTTP server that exposes a configured Loom execution graph."""
+    """HTTP transport boundary for a configured Loom Arbiter."""
 
-    def __init__(self, workers: list[Worker], *, host: str = "127.0.0.1", port: int = 8000):
+    def __init__(self, arbiter: Arbiter, *, host: str = "127.0.0.1", port: int = 8000):
         self.host = host
         self.port = port
-        self.arbiter = Arbiter(workers=workers, evaluator=self._evaluate)
-
-    @staticmethod
-    def _evaluate(result: WorkerResult, _context: WorkerContext) -> WorkerEvaluation:
-        if result.status is WorkerStatus.SUCCESS:
-            return WorkerEvaluation(ArbiterDecision.CONTINUE)
-        return WorkerEvaluation(ArbiterDecision.COMPLETE, reason=result.error or "worker failed")
+        self.arbiter = arbiter
 
     def execute(self, intent: Intent) -> WorkerResult:
-        """Execute an Intent through the configured Loom graph."""
+        """Execute an Intent through the configured Arbiter."""
         return self.arbiter.execute(WorkerContext(intent=intent))
 
     def serve_forever(self) -> None:
@@ -133,7 +127,15 @@ def main() -> None:
                 output={"intent_id": context.intent.intent_id},
             )
 
-    LoomServer([NoOpWorker()], host=args.host, port=args.port).serve_forever()
+    def evaluate(result: WorkerResult, _context: WorkerContext):
+        from loom_ai.arbiter import ArbiterDecision, WorkerEvaluation
+
+        if result.successful:
+            return WorkerEvaluation(ArbiterDecision.COMPLETE, reason="transport smoke test")
+        return WorkerEvaluation(ArbiterDecision.COMPLETE, reason=result.error or "failed")
+
+    arbiter = Arbiter([NoOpWorker()], evaluate)
+    LoomServer(arbiter, host=args.host, port=args.port).serve_forever()
 
 
 if __name__ == "__main__":
