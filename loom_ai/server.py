@@ -13,7 +13,6 @@ import socketserver
 from dataclasses import asdict, is_dataclass
 from enum import Enum
 from http import HTTPStatus
-from http.server import BaseHTTPRequestHandler
 from typing import Any
 from uuid import uuid4
 
@@ -50,60 +49,90 @@ class LoomServer:
         self.port = server.server_address[1]
         server.serve_forever()
 
-    def _handler_factory(self) -> type[BaseHTTPRequestHandler]:
+    def _handler_factory(self) -> type[socketserver.StreamRequestHandler]:
         owner = self
 
-        class Handler(BaseHTTPRequestHandler):
+        class Handler(socketserver.StreamRequestHandler):
             def _send(self, status: HTTPStatus, payload: dict[str, Any]) -> None:
                 body = json.dumps(payload, default=_json_default).encode("utf-8")
-                self.send_response(status)
-                self.send_header("Content-Type", "application/json")
-                self.send_header("Content-Length", str(len(body)))
-                self.end_headers()
-                self.wfile.write(body)
+                reason = status.phrase
+                header = (
+                    f"HTTP/1.1 {status.value} {reason}\r\n"
+                    "Content-Type: application/json\r\n"
+                    f"Content-Length: {len(body)}\r\n"
+                    "Connection: close\r\n\r\n"
+                )
+                self.wfile.write(header.encode("utf-8") + body)
 
-            def do_GET(self) -> None:  # noqa: N802
-                if self.path == "/health":
-                    self._send(HTTPStatus.OK, {"status": "ok"})
+            def handle(self) -> None:
+                request_line = self.rfile.readline(65536).decode("utf-8", "replace")
+                if not request_line:
                     return
-                self._send(HTTPStatus.NOT_FOUND, {"error": "not found"})
+                parts = request_line.split()
+                if len(parts) < 2:
+                    return
+                method, path = parts[0], parts[1]
 
-            def do_POST(self) -> None:  # noqa: N802
-                if self.path != "/intents":
+                headers = {}
+                while True:
+                    line = self.rfile.readline(65536).decode("utf-8", "replace")
+                    if not line or line in ("\r\n", "\n"):
+                        break
+                    if ":" in line:
+                        k, v = line.split(":", 1)
+                        headers[k.strip().lower()] = v.strip()
+
+                if method == "GET":
+                    if path == "/health":
+                        self._send(HTTPStatus.OK, {"status": "ok"})
+                        return
                     self._send(HTTPStatus.NOT_FOUND, {"error": "not found"})
                     return
 
-                try:
-                    length = int(self.headers.get("Content-Length", "0"))
-                    if length > MAX_PAYLOAD_BYTES:
+                if method == "POST":
+                    if path != "/intents":
+                        self._send(HTTPStatus.NOT_FOUND, {"error": "not found"})
+                        return
+
+                    try:
+                        length = int(headers.get("content-length", "0"))
+                        if length > MAX_PAYLOAD_BYTES:
+                            self._send(
+                                HTTPStatus.REQUEST_ENTITY_TOO_LARGE,
+                                {"error": "payload too large"},
+                            )
+                            return
+
+                        raw_body = self.rfile.read(length)
+                        payload = json.loads(raw_body.decode("utf-8"))
+                        goal = payload["goal"]
+                        intent = Intent(
+                            title=payload.get("title", "Intent"),
+                            goal=goal,
+                            requirements=tuple(payload.get("requirements", ())),
+                            constraints=tuple(payload.get("constraints", ())),
+                            acceptance=tuple(payload.get("acceptance", ())),
+                            intent_id=payload.get("intent_id") or str(uuid4()),
+                        )
+                        result = owner.execute(intent)
+                    except (
+                        KeyError,
+                        TypeError,
+                        ValueError,
+                        json.JSONDecodeError,
+                    ) as exc:
+                        self._send(HTTPStatus.BAD_REQUEST, {"error": str(exc)})
+                        return
+                    except Exception as exc:  # pragma: no cover - transport safety net
                         self._send(
-                            HTTPStatus.REQUEST_ENTITY_TOO_LARGE,
-                            {"error": "payload too large"},
+                            HTTPStatus.INTERNAL_SERVER_ERROR, {"error": str(exc)}
                         )
                         return
 
-                    payload = json.loads(self.rfile.read(length))
-                    goal = payload["goal"]
-                    intent = Intent(
-                        title=payload.get("title", "Intent"),
-                        goal=goal,
-                        requirements=tuple(payload.get("requirements", ())),
-                        constraints=tuple(payload.get("constraints", ())),
-                        acceptance=tuple(payload.get("acceptance", ())),
-                        intent_id=payload.get("intent_id") or str(uuid4()),
-                    )
-                    result = owner.execute(intent)
-                except (KeyError, TypeError, ValueError, json.JSONDecodeError) as exc:
-                    self._send(HTTPStatus.BAD_REQUEST, {"error": str(exc)})
-                    return
-                except Exception as exc:  # pragma: no cover - transport safety net
-                    self._send(HTTPStatus.INTERNAL_SERVER_ERROR, {"error": str(exc)})
+                    self._send(HTTPStatus.OK, _result_payload(result))
                     return
 
-                self._send(HTTPStatus.OK, _result_payload(result))
-
-            def log_message(self, _format: str, *_args: Any) -> None:
-                pass
+                self._send(HTTPStatus.NOT_FOUND, {"error": "not found"})
 
         return Handler
 
