@@ -94,6 +94,15 @@ class LoomServer:
                     if not isinstance(payload, dict):
                         raise TypeError("request body must be a JSON object")
 
+                    provenance = payload.get("provenance", {})
+                    if not isinstance(provenance, dict):
+                        raise TypeError("provenance must be a JSON object")
+                    if not all(
+                        isinstance(key, str) and isinstance(value, str)
+                        for key, value in provenance.items()
+                    ):
+                        raise TypeError("provenance keys and values must be strings")
+
                     intent = Intent(
                         title=payload.get("title", "Intent"),
                         goal=payload["goal"],
@@ -101,7 +110,7 @@ class LoomServer:
                         constraints=tuple(payload.get("constraints", ())),
                         acceptance=tuple(payload.get("acceptance", ())),
                         intent_id=payload.get("intent_id") or str(uuid4()),
-                        provenance=dict(payload.get("provenance", {})),
+                        provenance=provenance,
                     )
                     result = owner.execute(intent)
                 except (KeyError, TypeError, ValueError, json.JSONDecodeError) as exc:
