@@ -18,24 +18,14 @@ class InspectWorker(Worker):
     def execute(self, context: WorkerContext) -> WorkerResult:
         path = pathlib.Path(context.intent.provenance["task_path"])
         text = path.read_text(encoding="utf-8")
-        return WorkerResult(
-            worker_id=self.worker_id,
-            status=WorkerStatus.SUCCESS,
-            output={"path": str(path), "contains_return_41": "return 41" in text},
-            evidence=["inspected repository task file"],
-        )
+        return WorkerResult(self.worker_id, WorkerStatus.SUCCESS, {"path": str(path), "contains_return_41": "return 41" in text}, None, ["inspected repository task file"])
 
 
 class PlanWorker(Worker):
     worker_id = "plan"
 
     def execute(self, context: WorkerContext) -> WorkerResult:
-        return WorkerResult(
-            worker_id=self.worker_id,
-            status=WorkerStatus.SUCCESS,
-            output={"replacement": "return 42"},
-            evidence=["planned replacement of return 41 with return 42"],
-        )
+        return WorkerResult(self.worker_id, WorkerStatus.SUCCESS, {"replacement": "return 42"}, None, ["planned replacement of return 41 with return 42"])
 
 
 class ImplementationWorker(Worker):
@@ -46,18 +36,9 @@ class ImplementationWorker(Worker):
         text = path.read_text(encoding="utf-8")
         updated = text.replace("return 41", "return 42")
         if updated == text:
-            return WorkerResult(
-                worker_id=self.worker_id,
-                status=WorkerStatus.FAILURE,
-                error="planned replacement was not present",
-            )
+            return WorkerResult(self.worker_id, WorkerStatus.FAILURE, error="planned replacement was not present")
         path.write_text(updated, encoding="utf-8")
-        return WorkerResult(
-            worker_id=self.worker_id,
-            status=WorkerStatus.SUCCESS,
-            output={"changed": True},
-            evidence=["implementation applied"],
-        )
+        return WorkerResult(self.worker_id, WorkerStatus.SUCCESS, {"changed": True}, None, ["implementation applied"])
 
 
 class VerificationWorker(Worker):
@@ -67,19 +48,12 @@ class VerificationWorker(Worker):
         path = pathlib.Path(context.intent.provenance["task_path"])
         text = path.read_text(encoding="utf-8")
         accepted = "return 42" in text and "return 41" not in text
-        return WorkerResult(
-            worker_id=self.worker_id,
-            status=WorkerStatus.SUCCESS if accepted else WorkerStatus.FAILURE,
-            output={"acceptance": accepted},
-            evidence=["verified repository task result"] if accepted else [],
-            error=None if accepted else "acceptance condition failed",
-        )
+        return WorkerResult(self.worker_id, WorkerStatus.SUCCESS if accepted else WorkerStatus.FAILURE, {"acceptance": accepted}, None if accepted else "acceptance condition failed", ["verified repository task result"] if accepted else [])
 
 
 def main() -> int:
     if len(sys.argv) != 2:
         raise SystemExit("usage: stage4_task.py TASK_PATH")
-
     task_path = pathlib.Path(sys.argv[1]).resolve()
     intent = Intent(
         goal="Update the repository task fixture and verify the result",
@@ -88,38 +62,19 @@ def main() -> int:
         acceptance=["the task file contains return 42 and not return 41"],
         provenance={"task_path": str(task_path)},
     )
-
-    arbiter = Arbiter(
-        workers=[InspectWorker(), PlanWorker(), ImplementationWorker(), VerificationWorker()],
-        max_retries=0,
-    )
+    arbiter = Arbiter(workers=[InspectWorker(), PlanWorker(), ImplementationWorker(), VerificationWorker()], max_retries=0)
     server = _LoomHTTPServer(("127.0.0.1", 0), _RequestHandler, arbiter=arbiter)
     thread = threading.Thread(target=server.serve_forever, daemon=True)
     thread.start()
     try:
-        body = json.dumps(
-            {
-                "goal": intent.goal,
-                "requirements": intent.requirements,
-                "constraints": intent.constraints,
-                "acceptance": intent.acceptance,
-                "provenance": intent.provenance,
-            }
-        ).encode("utf-8")
-        request = urllib.request.Request(
-            f"http://127.0.0.1:{server.server_port}/intents",
-            data=body,
-            headers={"Content-Type": "application/json"},
-            method="POST",
-        )
+        body = json.dumps({"goal": intent.goal, "requirements": intent.requirements, "constraints": intent.constraints, "acceptance": intent.acceptance, "provenance": intent.provenance}).encode("utf-8")
+        request = urllib.request.Request(f"http://127.0.0.1:{server.server_port}/intents", data=body, headers={"Content-Type": "application/json"}, method="POST")
         with urllib.request.urlopen(request, timeout=10) as response:
-            payload = json.load(response)
-        print(json.dumps(payload))
+            print(json.dumps(json.load(response)))
     finally:
         server.shutdown()
         thread.join(timeout=5)
         server.server_close()
-
     return 0
 
 
