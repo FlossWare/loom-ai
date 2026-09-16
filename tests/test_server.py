@@ -25,7 +25,10 @@ class RecordingWorker:
         return WorkerResult(
             worker_id=self.worker_id,
             status=WorkerStatus.SUCCESS,
-            output={"goal": context.intent.goal},
+            output={
+                "goal": context.intent.goal,
+                "provenance": context.intent.provenance,
+            },
             evidence=({"source": self.worker_id},),
         )
 
@@ -50,7 +53,13 @@ def test_server_executes_intent_over_http() -> None:
 
         request = Request(
             f"{base_url}/intents",
-            data=json.dumps({"title": "Test", "goal": "exercise Loom"}).encode(),
+            data=json.dumps(
+                {
+                    "title": "Test",
+                    "goal": "exercise Loom",
+                    "provenance": {"source": "stage3-test"},
+                }
+            ).encode(),
             headers={"Content-Type": "application/json"},
             method="POST",
         )
@@ -58,7 +67,10 @@ def test_server_executes_intent_over_http() -> None:
             payload = json.load(response)
 
         assert payload["status"] == "success"
-        assert payload["output"][0]["output"] == {"goal": "exercise Loom"}
+        assert payload["output"][0]["output"] == {
+            "goal": "exercise Loom",
+            "provenance": {"source": "stage3-test"},
+        }
         assert payload["output"][0]["worker_id"] == "recording"
     finally:
         instance.shutdown()
