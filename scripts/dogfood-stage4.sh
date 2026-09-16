@@ -24,9 +24,8 @@ task_root = pathlib.Path(sys.argv[1])
 fixture = task_root / "stage4_fixture.py"
 fixture.write_text("def value():\n    return 41\n", encoding="utf-8")
 
-script = root / "scripts" / "stage4_task.py"
 result = subprocess.run(
-    [sys.executable, str(script), str(fixture)],
+    [sys.executable, str(root / "scripts" / "stage4_task.py"), str(fixture)],
     check=False,
     text=True,
     capture_output=True,
