@@ -18,18 +18,12 @@ import json
 import pathlib
 import subprocess
 import sys
-import urllib.request
-from http.server import ThreadingHTTPServer
-from threading import Thread
 
 root = pathlib.Path.cwd()
 task_root = pathlib.Path(sys.argv[1])
 fixture = task_root / "stage4_fixture.py"
 fixture.write_text("def value():\n    return 41\n", encoding="utf-8")
 
-# Stage 4 proves the real repository-task contract without an LLM:
-# inspect -> plan -> implement -> verify, all through the server boundary.
-# The fixture stands in for a real checkout while keeping the dogfood isolated.
 script = root / "scripts" / "stage4_task.py"
 result = subprocess.run(
     [sys.executable, str(script), str(fixture)],
