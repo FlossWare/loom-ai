@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Run the deterministic Stage 4 repository-task through Loom's HTTP boundary."""
+"""Run a deterministic Stage 4 repository task through Loom's HTTP boundary."""
 from __future__ import annotations
 
 import json
@@ -30,12 +30,11 @@ class PlanWorker(Worker):
     worker_id = "plan"
 
     def execute(self, context: WorkerContext) -> WorkerResult:
-        inspect = next(e for e in context.evidence if e.get("worker_id") == "inspect")
         return WorkerResult(
             worker_id=self.worker_id,
             status=WorkerStatus.SUCCESS,
             output={"replacement": "return 42"},
-            evidence=[{"plan": "replace return 41 with return 42", "inspection": inspect}],
+            evidence=["planned replacement of return 41 with return 42"],
         )
 
 
@@ -98,9 +97,18 @@ def main() -> int:
     thread = threading.Thread(target=server.serve_forever, daemon=True)
     thread.start()
     try:
+        body = json.dumps(
+            {
+                "goal": intent.goal,
+                "requirements": intent.requirements,
+                "constraints": intent.constraints,
+                "acceptance": intent.acceptance,
+                "provenance": intent.provenance,
+            }
+        ).encode("utf-8")
         request = urllib.request.Request(
             f"http://127.0.0.1:{server.server_port}/intents",
-            data=json.dumps(intent.to_dict()).encode("utf-8"),
+            data=body,
             headers={"Content-Type": "application/json"},
             method="POST",
         )
