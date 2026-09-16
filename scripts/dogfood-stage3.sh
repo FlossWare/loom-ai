@@ -20,7 +20,7 @@ from threading import Thread
 from urllib.request import Request, urlopen
 
 from loom_ai.arbiter import Arbiter, ArbiterDecision, WorkerEvaluation
-from loom_ai.server import LoomServer
+from loom_ai.server import LoomServer, _LoomHTTPServer
 from loom_ai.worker import WorkerContext, WorkerResult, WorkerStatus
 
 
@@ -28,7 +28,7 @@ class InspectWorker:
     worker_id = "inspect"
 
     def execute(self, context: WorkerContext) -> WorkerResult:
-        path = Path(context.metadata["task_path"])
+        path = Path(context.intent.provenance["task_path"])
         exists = path.exists()
         return WorkerResult(
             worker_id=self.worker_id,
@@ -43,7 +43,7 @@ class ImplementationWorker:
     worker_id = "implementation"
 
     def execute(self, context: WorkerContext) -> WorkerResult:
-        path = Path(context.metadata["task_path"])
+        path = Path(context.intent.provenance["task_path"])
         path.write_text(path.read_text() + "\nStage 3 dogfood marker.\n")
         return WorkerResult(
             worker_id=self.worker_id,
@@ -57,7 +57,7 @@ class VerificationWorker:
     worker_id = "verification"
 
     def execute(self, context: WorkerContext) -> WorkerResult:
-        path = Path(context.metadata["task_path"])
+        path = Path(context.intent.provenance["task_path"])
         content = path.read_text()
         verified = "Stage 3 dogfood marker." in content
         return WorkerResult(
@@ -76,12 +76,20 @@ def build_arbiter() -> Arbiter:
 
     def evaluate(result: WorkerResult, _context: WorkerContext) -> WorkerEvaluation:
         if result.status is not WorkerStatus.SUCCESS:
-            return WorkerEvaluation(ArbiterDecision.REPLAN, reason=result.error or "worker failed")
+            return WorkerEvaluation(
+                ArbiterDecision.REPLAN, reason=result.error or "worker failed"
+            )
         if result.worker_id == inspect.worker_id:
-            return WorkerEvaluation(ArbiterDecision.REPLAN, workers=(implementation,))
+            return WorkerEvaluation(
+                ArbiterDecision.REPLAN, workers=(implementation,)
+            )
         if result.worker_id == implementation.worker_id:
-            return WorkerEvaluation(ArbiterDecision.REPLAN, workers=(verification,))
-        return WorkerEvaluation(ArbiterDecision.COMPLETE, reason="Stage 3 acceptance verified")
+            return WorkerEvaluation(
+                ArbiterDecision.REPLAN, workers=(verification,)
+            )
+        return WorkerEvaluation(
+            ArbiterDecision.COMPLETE, reason="Stage 3 acceptance verified"
+        )
 
     return Arbiter([inspect], evaluate, max_retries=0)
 
@@ -91,15 +99,11 @@ with tempfile.TemporaryDirectory(prefix="loom-stage3-") as tmp:
     target.write_text("Stage 3 server task fixture.\n")
 
     server = LoomServer(build_arbiter(), host="127.0.0.1", port=0)
-    handler = server._handler_factory()
-    from loom_ai.server import _LoomHTTPServer
-
-    instance = _LoomHTTPServer((server.host, server.port), handler)
-    server.port = instance.server_address[1]
+    instance = _LoomHTTPServer((server.host, server.port), server._handler_factory())
     thread = Thread(target=instance.serve_forever, daemon=True)
     thread.start()
     try:
-        base = f"http://{server.host}:{server.port}"
+        base = f"http://{server.host}:{instance.server_address[1]}"
         with urlopen(f"{base}/health", timeout=5) as response:
             assert response.status == 200
 
@@ -111,26 +115,14 @@ with tempfile.TemporaryDirectory(prefix="loom-stage3-") as tmp:
                     "goal": "Inspect, modify, and verify the task fixture through Loom.",
                     "acceptance": ["The Stage 3 dogfood marker is present."],
                     "intent_id": "stage3-server-task",
+                    "provenance": {"task_path": str(target)},
                 }
             ).encode(),
-            headers={"Content-Type": "application/json", "X-Loom-Task-Path": str(target)},
+            headers={"Content-Type": "application/json"},
             method="POST",
         )
-
-        # WorkerContext metadata is intentionally supplied by the fixture rather than
-        # the transport. The production server remains responsible only for HTTP -> Intent.
-        # Rebuild the request through the server's configured execution boundary.
-        original_execute = server.execute
-        def execute_with_task(intent):
-            return server.arbiter.execute(
-                WorkerContext(intent=intent, metadata={"task_path": str(target)})
-            )
-        server.execute = execute_with_task
-        try:
-            with urlopen(request, timeout=5) as response:
-                payload = json.load(response)
-        finally:
-            server.execute = original_execute
+        with urlopen(request, timeout=5) as response:
+            payload = json.load(response)
 
         assert payload["status"] == "success", payload
         workers = [item["worker_id"] for item in payload["output"]]
