@@ -102,6 +102,32 @@ def test_server_rejects_intent_without_goal() -> None:
         thread.join(timeout=2)
 
 
+def test_server_rejects_non_string_provenance() -> None:
+    server = build_server()
+    instance = _TestServer((server.host, server.port), server._handler_factory())
+    thread = Thread(target=instance.serve_forever, daemon=True)
+    thread.start()
+    try:
+        request = Request(
+            f"http://{server.host}:{instance.server_address[1]}/intents",
+            data=json.dumps(
+                {"goal": "exercise Loom", "provenance": {"attempt": 1}}
+            ).encode(),
+            headers={"Content-Type": "application/json"},
+            method="POST",
+        )
+        try:
+            urlopen(request)
+        except HTTPError as exc:
+            assert exc.code == 400
+        else:
+            raise AssertionError("expected HTTP 400")
+    finally:
+        instance.shutdown()
+        instance.server_close()
+        thread.join(timeout=2)
+
+
 def test_server_rejects_overlarge_payload() -> None:
     server = build_server()
     instance = _TestServer((server.host, server.port), server._handler_factory())
