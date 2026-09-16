@@ -1,5 +1,6 @@
 #!/usr/bin/env python3
 """Run a deterministic Stage 4 repository task through Loom's HTTP boundary."""
+
 from __future__ import annotations
 
 import json
@@ -10,7 +11,7 @@ import threading
 import urllib.request
 
 from loom_ai import Arbiter, Intent, Worker, WorkerContext, WorkerResult, WorkerStatus
-from loom_ai.server import _LoomHTTPServer, _RequestHandler
+from loom_ai.server import LoomServer
 
 
 class InspectWorker(Worker):
@@ -36,8 +37,14 @@ class PlanWorker(Worker):
     worker_id = "plan"
 
     def execute(self, context: WorkerContext) -> WorkerResult:
-        if not any("inspected repository task file" in item for item in context.evidence):
-            return WorkerResult(self.worker_id, WorkerStatus.FAILURE, error="inspect evidence is missing")
+        if not any(
+            "inspected repository task file" in item for item in context.evidence
+        ):
+            return WorkerResult(
+                self.worker_id,
+                WorkerStatus.FAILURE,
+                error="inspect evidence is missing",
+            )
         return WorkerResult(
             self.worker_id,
             WorkerStatus.SUCCESS,
@@ -52,12 +59,21 @@ class ImplementationWorker(Worker):
 
     def execute(self, context: WorkerContext) -> WorkerResult:
         path = pathlib.Path(context.intent.provenance["task_path"])
-        if not any("planned replacement of return 41 with return 42" in item for item in context.evidence):
-            return WorkerResult(self.worker_id, WorkerStatus.FAILURE, error="plan evidence is missing")
+        if not any(
+            "planned replacement of return 41 with return 42" in item
+            for item in context.evidence
+        ):
+            return WorkerResult(
+                self.worker_id, WorkerStatus.FAILURE, error="plan evidence is missing"
+            )
         text = path.read_text(encoding="utf-8")
         updated = text.replace("return 41", "return 42")
         if updated == text:
-            return WorkerResult(self.worker_id, WorkerStatus.FAILURE, error="planned replacement was not present")
+            return WorkerResult(
+                self.worker_id,
+                WorkerStatus.FAILURE,
+                error="planned replacement was not present",
+            )
         path.write_text(updated, encoding="utf-8")
         return WorkerResult(
             self.worker_id,
@@ -100,7 +116,8 @@ def main() -> int:
         workers=[InspectWorker(), PlanWorker(), ImplementationWorker(), VerificationWorker()],
         max_retries=0,
     )
-    server = _LoomHTTPServer(("127.0.0.1", 0), _RequestHandler, arbiter=arbiter)
+    server = LoomServer(arbiter, port=0)
+    server.start()
     thread = threading.Thread(target=server.serve_forever, daemon=True)
     thread.start()
     try:
@@ -114,7 +131,7 @@ def main() -> int:
             }
         ).encode("utf-8")
         request = urllib.request.Request(
-            f"http://127.0.0.1:{server.server_port}/intents",
+            f"http://{server.host}:{server.port}/intents",
             data=body,
             headers={"Content-Type": "application/json"},
             method="POST",
@@ -129,9 +146,8 @@ def main() -> int:
                 check=True,
             )
     finally:
-        server.shutdown()
+        server.close()
         thread.join(timeout=5)
-        server.server_close()
     return 0
 
 
