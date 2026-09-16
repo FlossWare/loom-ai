@@ -125,8 +125,13 @@ with tempfile.TemporaryDirectory(prefix="loom-stage3-") as tmp:
             payload = json.load(response)
 
         assert payload["status"] == "success", payload
-        workers = [item["worker_id"] for item in payload["output"]]
-        assert workers == ["inspect", "implementation", "verification"], payload
+        workers = payload["output"]
+        assert [item["worker_id"] for item in workers] == [
+            "inspect",
+            "implementation",
+            "verification",
+        ], payload
+        assert all(item["status"] == "success" for item in workers), payload
         assert target.read_text().endswith("Stage 3 dogfood marker.\n")
         print("health: success")
         print("intent: success")
