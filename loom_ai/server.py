@@ -101,6 +101,7 @@ class LoomServer:
                         constraints=tuple(payload.get("constraints", ())),
                         acceptance=tuple(payload.get("acceptance", ())),
                         intent_id=payload.get("intent_id") or str(uuid4()),
+                        provenance=dict(payload.get("provenance", {})),
                     )
                     result = owner.execute(intent)
                 except (KeyError, TypeError, ValueError, json.JSONDecodeError) as exc:
