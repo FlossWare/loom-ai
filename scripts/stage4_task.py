@@ -37,8 +37,7 @@ class InspectWorker(Worker):
                 "git_repository": (path.parent / ".git").is_dir(),
                 "contains_return_41": "return 41" in text,
             },
-            None,
-            ["inspected repository task file"],
+            evidence=({"message": "inspected repository task file"},),
         )
 
 
@@ -47,7 +46,8 @@ class PlanWorker(Worker):
 
     def execute(self, context: WorkerContext) -> WorkerResult:
         if not any(
-            "inspected repository task file" in item for item in context.evidence
+            item.get("message") == "inspected repository task file"
+            for item in context.evidence
         ):
             return WorkerResult(
                 self.worker_id,
@@ -58,8 +58,7 @@ class PlanWorker(Worker):
             self.worker_id,
             WorkerStatus.SUCCESS,
             {"replacement": "return 42"},
-            None,
-            ["planned replacement of return 41 with return 42"],
+            evidence=({"message": "planned replacement of return 41 with return 42"},),
         )
 
 
@@ -69,7 +68,7 @@ class ImplementationWorker(Worker):
     def execute(self, context: WorkerContext) -> WorkerResult:
         path = pathlib.Path(context.intent.provenance["task_path"])
         if not any(
-            "planned replacement of return 41 with return 42" in item
+            item.get("message") == "planned replacement of return 41 with return 42"
             for item in context.evidence
         ):
             return WorkerResult(
@@ -88,8 +87,7 @@ class ImplementationWorker(Worker):
             self.worker_id,
             WorkerStatus.SUCCESS,
             {"changed": True},
-            None,
-            ["implementation applied"],
+            evidence=({"message": "implementation applied"},),
         )
 
 
@@ -104,8 +102,10 @@ class VerificationWorker(Worker):
             self.worker_id,
             WorkerStatus.SUCCESS if accepted else WorkerStatus.FAILURE,
             {"acceptance": accepted},
-            None if accepted else "acceptance condition failed",
-            ["verified repository task result"] if accepted else [],
+            error="" if accepted else "acceptance condition failed",
+            evidence=(
+                ({"message": "verified repository task result"},) if accepted else ()
+            ),
         )
 
 

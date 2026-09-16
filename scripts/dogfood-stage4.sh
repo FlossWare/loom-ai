@@ -57,8 +57,13 @@ if result.returncode:
 
 payload = json.loads(result.stdout)
 assert payload["status"] == "success"
-assert payload["acceptance"] is True
-assert payload["workers"] == ["inspect", "plan", "implement", "verify"]
+outputs = payload["output"]
+assert outputs
+verification = next(
+    result for result in outputs if result["worker_id"] == "verify"
+)
+assert verification["output"]["acceptance"] is True
+assert [result["worker_id"] for result in outputs] == ["inspect", "plan", "implement", "verify"]
 assert payload["evidence"]
 assert "return 42" in fixture.read_text(encoding="utf-8")
 assert subprocess.run(["git", "-C", str(repo), "diff", "--check"], check=False).returncode == 0
