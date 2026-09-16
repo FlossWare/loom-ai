@@ -21,10 +21,35 @@ import sys
 
 root = pathlib.Path.cwd()
 task_root = pathlib.Path(sys.argv[1])
-fixture = task_root / "stage4_fixture.py"
+repo = task_root / "fixture-repo"
+repo.mkdir()
+subprocess.run(["git", "init", "-q", str(repo)], check=True)
+fixture = repo / "stage4_fixture.py"
 fixture.write_text("def value():\n    return 41\n", encoding="utf-8")
+subprocess.run(["git", "-C", str(repo), "add", fixture.name], check=True)
+subprocess.run(
+    [
+        "git",
+        "-C",
+        str(repo),
+        "-c",
+        "user.name=Loom Dogfood",
+        "-c",
+        "user.email=loom@example.invalid",
+        "commit",
+        "-q",
+        "-m",
+        "fixture",
+    ],
+    check=True,
+)
 
-result = subprocess.run([sys.executable, str(root / "scripts" / "stage4_task.py"), str(fixture)], check=False, text=True, capture_output=True)
+result = subprocess.run(
+    [sys.executable, str(root / "scripts" / "stage4_task.py"), str(fixture)],
+    check=False,
+    text=True,
+    capture_output=True,
+)
 if result.returncode:
     print(result.stdout)
     print(result.stderr, file=sys.stderr)
@@ -36,5 +61,7 @@ assert payload["acceptance"] is True
 assert payload["workers"] == ["inspect", "plan", "implement", "verify"]
 assert payload["evidence"]
 assert "return 42" in fixture.read_text(encoding="utf-8")
+assert subprocess.run(["git", "-C", str(repo), "diff", "--check"], check=False).returncode == 0
+assert subprocess.run(["git", "-C", str(repo), "status", "--short"], check=True, capture_output=True, text=True).stdout
 print("RESULT: LOOM STAGE 4 DOGFOOD PASSED")
 PY
