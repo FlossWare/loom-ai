@@ -3,6 +3,9 @@
 The server owns transport and request-to-Intent translation. Execution remains
 owned by the supplied Arbiter and its Workers. Provider/model access is
 deliberately not part of this module.
+
+Stage 3 dogfood binds to loopback by default (127.0.0.1). Cleartext HTTP is
+intentional for local verification only; TLS belongs to a later boundary.
 """
 
 from __future__ import annotations
@@ -18,7 +21,8 @@ from uuid import uuid4
 
 from loom_ai.arbiter import Arbiter, ArbiterDecision, WorkerEvaluation
 from loom_ai.intent import Intent
-from loom_ai.worker import WorkerContext, WorkerResult, WorkerStatus
+from loom_ai.stage3 import ArtifactVerifier, ArtifactWriter
+from loom_ai.worker import WorkerContext, WorkerResult
 
 MAX_PAYLOAD_BYTES = 10 * 1024 * 1024
 
@@ -43,8 +47,12 @@ class LoomServer:
         return self.arbiter.execute(WorkerContext(intent=intent))
 
     def serve_forever(self) -> None:
-        """Serve requests until interrupted."""
+        """Serve requests until interrupted.
+
+        Cleartext HTTP is intentional for Stage 3 loopback dogfood only.
+        """
         handler = self._handler_factory()
+        # NOSONAR python:S5332 -- Stage 3 dogfood is cleartext on loopback by design
         server = _LoomHTTPServer((self.host, self.port), handler)
         self.port = server.server_address[1]
         try:
@@ -103,7 +111,8 @@ class LoomServer:
                         intent_id=payload.get("intent_id") or str(uuid4()),
                     )
                     result = owner.execute(intent)
-                except (KeyError, TypeError, ValueError, json.JSONDecodeError) as exc:
+                except (KeyError, TypeError, ValueError) as exc:
+                    # json.JSONDecodeError is a ValueError subclass
                     self._send(HTTPStatus.BAD_REQUEST, {"error": str(exc)})
                     return
                 except Exception as exc:  # pragma: no cover
@@ -137,34 +146,32 @@ def _json_default(value: Any) -> Any:
     raise TypeError(f"Object of type {type(value).__name__} is not JSON serializable")
 
 
+def _stage3_arbiter() -> Arbiter:
+    """Build the bounded real-worker pipeline used by the service."""
+
+    def evaluate(result: WorkerResult, _context: WorkerContext) -> WorkerEvaluation:
+        if not result.successful:
+            return WorkerEvaluation(
+                ArbiterDecision.REPLAN, reason=result.error or "worker failed"
+            )
+        if result.worker_id == "artifact-writer":
+            return WorkerEvaluation(ArbiterDecision.CONTINUE)
+        return WorkerEvaluation(ArbiterDecision.COMPLETE, reason="verified")
+
+    return Arbiter(
+        [ArtifactWriter(), ArtifactVerifier()],
+        evaluate,
+        max_retries=0,
+    )
+
+
 def main() -> None:
-    """Run a transport-only server for manual health checks."""
+    """Run the Stage 3 real-worker Loom server."""
     parser = argparse.ArgumentParser(description="Run the Loom HTTP server")
     parser.add_argument("--host", default="127.0.0.1")
     parser.add_argument("--port", type=int, default=8000)
     args = parser.parse_args()
-
-    class NoOpWorker:
-        worker_id = "server"
-
-        def execute(self, context: WorkerContext) -> WorkerResult:
-            return WorkerResult(
-                worker_id=self.worker_id,
-                status=WorkerStatus.SUCCESS,
-                output={"intent_id": context.intent.intent_id},
-            )
-
-    def evaluate(result: WorkerResult, _context: WorkerContext) -> WorkerEvaluation:
-        if result.successful:
-            return WorkerEvaluation(
-                ArbiterDecision.COMPLETE, reason="transport smoke test"
-            )
-        return WorkerEvaluation(
-            ArbiterDecision.REPLAN, reason=result.error or "worker failed"
-        )
-
-    arbiter = Arbiter([NoOpWorker()], evaluate, max_retries=0)
-    LoomServer(arbiter, host=args.host, port=args.port).serve_forever()
+    LoomServer(_stage3_arbiter(), host=args.host, port=args.port).serve_forever()
 
 
 if __name__ == "__main__":
