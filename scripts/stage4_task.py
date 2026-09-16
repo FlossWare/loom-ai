@@ -136,7 +136,12 @@ def main() -> int:
         provenance={"task_path": str(task_path)},
     )
     arbiter = Arbiter(
-        workers=[InspectWorker(), PlanWorker(), ImplementationWorker(), VerificationWorker()],
+        workers=[
+            InspectWorker(),
+            PlanWorker(),
+            ImplementationWorker(),
+            VerificationWorker(),
+        ],
         evaluator=evaluate,
         max_retries=0,
     )
