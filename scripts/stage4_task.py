@@ -51,7 +51,7 @@ class PlanWorker(Worker):
         ):
             return WorkerResult(
                 self.worker_id,
-                WorkerStatus.FAILURE,
+                WorkerStatus.FAILED,
                 error="inspect evidence is missing",
             )
         return WorkerResult(
@@ -72,14 +72,14 @@ class ImplementationWorker(Worker):
             for item in context.evidence
         ):
             return WorkerResult(
-                self.worker_id, WorkerStatus.FAILURE, error="plan evidence is missing"
+                self.worker_id, WorkerStatus.FAILED, error="plan evidence is missing"
             )
         text = path.read_text(encoding="utf-8")
         updated = text.replace("return 41", "return 42")
         if updated == text:
             return WorkerResult(
                 self.worker_id,
-                WorkerStatus.FAILURE,
+                WorkerStatus.FAILED,
                 error="planned replacement was not present",
             )
         path.write_text(updated, encoding="utf-8")
@@ -100,7 +100,7 @@ class VerificationWorker(Worker):
         accepted = "return 42" in text and "return 41" not in text
         return WorkerResult(
             self.worker_id,
-            WorkerStatus.SUCCESS if accepted else WorkerStatus.FAILURE,
+            WorkerStatus.SUCCESS if accepted else WorkerStatus.FAILED,
             {"acceptance": accepted},
             error="" if accepted else "acceptance condition failed",
             evidence=(
