@@ -63,7 +63,7 @@ class LoomServer:
 
     def serve_forever(self) -> None:
         """Serve requests until interrupted."""
-        server = self.start()
+        server = self._server or self.start()
         try:
             server.serve_forever()
         finally:
