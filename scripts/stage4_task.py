@@ -55,13 +55,7 @@ def main() -> int:
     if len(sys.argv) != 2:
         raise SystemExit("usage: stage4_task.py TASK_PATH")
     task_path = pathlib.Path(sys.argv[1]).resolve()
-    intent = Intent(
-        goal="Update the repository task fixture and verify the result",
-        requirements=["inspect", "plan", "implement", "verify"],
-        constraints=["modify only the task file"],
-        acceptance=["the task file contains return 42 and not return 41"],
-        provenance={"task_path": str(task_path)},
-    )
+    intent = Intent(goal="Update the repository task fixture and verify the result", requirements=["inspect", "plan", "implement", "verify"], constraints=["modify only the task file"], acceptance=["the task file contains return 42 and not return 41"], provenance={"task_path": str(task_path)})
     arbiter = Arbiter(workers=[InspectWorker(), PlanWorker(), ImplementationWorker(), VerificationWorker()], max_retries=0)
     server = _LoomHTTPServer(("127.0.0.1", 0), _RequestHandler, arbiter=arbiter)
     thread = threading.Thread(target=server.serve_forever, daemon=True)
