@@ -3,6 +3,9 @@
 The server owns transport and request-to-Intent translation. Execution remains
 owned by the supplied Arbiter and its Workers. Provider/model access is
 deliberately not part of this module.
+
+Stage 3 dogfood binds to loopback by default (127.0.0.1). Cleartext HTTP is
+intentional for local verification only; TLS belongs to a later boundary.
 """
 
 from __future__ import annotations
@@ -44,8 +47,12 @@ class LoomServer:
         return self.arbiter.execute(WorkerContext(intent=intent))
 
     def serve_forever(self) -> None:
-        """Serve requests until interrupted."""
+        """Serve requests until interrupted.
+
+        Cleartext HTTP is intentional for Stage 3 loopback dogfood only.
+        """
         handler = self._handler_factory()
+        # NOSONAR python:S5332 -- Stage 3 dogfood is cleartext on loopback by design
         server = _LoomHTTPServer((self.host, self.port), handler)
         self.port = server.server_address[1]
         try:
@@ -104,7 +111,8 @@ class LoomServer:
                         intent_id=payload.get("intent_id") or str(uuid4()),
                     )
                     result = owner.execute(intent)
-                except (KeyError, TypeError, ValueError, json.JSONDecodeError) as exc:
+                except (KeyError, TypeError, ValueError) as exc:
+                    # json.JSONDecodeError is a ValueError subclass
                     self._send(HTTPStatus.BAD_REQUEST, {"error": str(exc)})
                     return
                 except Exception as exc:  # pragma: no cover
