@@ -24,12 +24,7 @@ task_root = pathlib.Path(sys.argv[1])
 fixture = task_root / "stage4_fixture.py"
 fixture.write_text("def value():\n    return 41\n", encoding="utf-8")
 
-result = subprocess.run(
-    [sys.executable, str(root / "scripts" / "stage4_task.py"), str(fixture)],
-    check=False,
-    text=True,
-    capture_output=True,
-)
+result = subprocess.run([sys.executable, str(root / "scripts" / "stage4_task.py"), str(fixture)], check=False, text=True, capture_output=True)
 if result.returncode:
     print(result.stdout)
     print(result.stderr, file=sys.stderr)
@@ -41,6 +36,5 @@ assert payload["acceptance"] is True
 assert payload["workers"] == ["inspect", "plan", "implement", "verify"]
 assert payload["evidence"]
 assert "return 42" in fixture.read_text(encoding="utf-8")
-
 print("RESULT: LOOM STAGE 4 DOGFOOD PASSED")
 PY
