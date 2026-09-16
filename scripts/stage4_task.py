@@ -10,7 +10,16 @@ import sys
 import threading
 import urllib.request
 
-from loom_ai import Arbiter, Intent, Worker, WorkerContext, WorkerResult, WorkerStatus
+from loom_ai import (
+    Arbiter,
+    ArbiterDecision,
+    Intent,
+    Worker,
+    WorkerContext,
+    WorkerEvaluation,
+    WorkerResult,
+    WorkerStatus,
+)
 from loom_ai.server import LoomServer
 
 
@@ -100,6 +109,20 @@ class VerificationWorker(Worker):
         )
 
 
+def evaluate(result: WorkerResult, _context: WorkerContext) -> WorkerEvaluation:
+    if not result.successful:
+        return WorkerEvaluation(
+            ArbiterDecision.RETRY,
+            reason=result.error or f"{result.worker_id} failed",
+        )
+    if result.worker_id == "verify":
+        return WorkerEvaluation(
+            ArbiterDecision.COMPLETE,
+            reason="repository task verified",
+        )
+    return WorkerEvaluation(ArbiterDecision.CONTINUE)
+
+
 def main() -> int:
     if len(sys.argv) != 2:
         raise SystemExit("usage: stage4_task.py TASK_PATH")
@@ -114,6 +137,7 @@ def main() -> int:
     )
     arbiter = Arbiter(
         workers=[InspectWorker(), PlanWorker(), ImplementationWorker(), VerificationWorker()],
+        evaluator=evaluate,
         max_retries=0,
     )
     server = LoomServer(arbiter, port=0)
