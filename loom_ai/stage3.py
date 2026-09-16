@@ -13,7 +13,8 @@ from pathlib import Path
 
 from loom_ai.worker import WorkerContext, WorkerResult, WorkerStatus
 
-DEFAULT_ARTIFACT = "/tmp/loom-stage3-artifact.txt"
+# User-private default (not a publicly writable directory such as /tmp).
+DEFAULT_ARTIFACT = str(Path.home() / ".cache" / "loom" / "stage3-artifact.txt")
 MAX_GOAL_BYTES = 4096
 
 

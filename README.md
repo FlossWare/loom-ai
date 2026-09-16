@@ -43,7 +43,7 @@ POST /intents
     -> structured result + evidence
 ```
 
-The pipeline performs a bounded deterministic filesystem change and verifies the exact result. The artifact location defaults to `/tmp/loom-stage3-artifact.txt` and can be overridden with `LOOM_STAGE3_ARTIFACT`. No model gateway or Crush dependency is involved.
+The pipeline performs a bounded deterministic filesystem change and verifies the exact result. The artifact location defaults to `~/.cache/loom/stage3-artifact.txt` and can be overridden with `LOOM_STAGE3_ARTIFACT`. No model gateway or Crush dependency is involved.
 
 For a local health check:
 
