@@ -37,20 +37,39 @@ class LoomServer:
         self.host = host
         self.port = port
         self.arbiter = arbiter
+        self._server: _LoomHTTPServer | None = None
 
     def execute(self, intent: Intent) -> WorkerResult:
         """Execute an Intent through the configured Arbiter."""
         return self.arbiter.execute(WorkerContext(intent=intent))
 
+    def start(self) -> _LoomHTTPServer:
+        """Bind the HTTP server and return its running server instance."""
+        if self._server is not None:
+            raise RuntimeError("Loom server is already running")
+        handler = self._handler_factory()
+        self._server = _LoomHTTPServer((self.host, self.port), handler)
+        self.port = self._server.server_address[1]
+        return self._server
+
+    def close(self) -> None:
+        """Stop and close a running HTTP server."""
+        server = self._server
+        if server is None:
+            return
+        self._server = None
+        server.shutdown()
+        server.server_close()
+
     def serve_forever(self) -> None:
         """Serve requests until interrupted."""
-        handler = self._handler_factory()
-        server = _LoomHTTPServer((self.host, self.port), handler)
-        self.port = server.server_address[1]
+        server = self._server or self.start()
         try:
             server.serve_forever()
         finally:
-            server.server_close()
+            if self._server is server:
+                self._server = None
+                server.server_close()
 
     def _handler_factory(self) -> type[BaseHTTPRequestHandler]:
         owner = self
