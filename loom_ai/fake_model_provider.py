@@ -10,9 +10,6 @@ class FakeModelProvider:
 
     provider_id = "fake"
 
-    def __init__(self, *, model: str = "fake-model") -> None:
-        self.model = model
-
     def generate(self, request: ModelRequest) -> ModelResponse:
         return ModelResponse(
             text=f"fake response: {request.prompt}",
