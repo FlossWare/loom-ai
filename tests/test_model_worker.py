@@ -38,6 +38,17 @@ class FailingProvider:
         raise RuntimeError("https://provider.example/request?api_key=secret-value")
 
 
+class MismatchedProvider:
+    provider_id = "declared"
+
+    def generate(self, request: ModelRequest) -> ModelResponse:
+        return ModelResponse(
+            text="result",
+            provider="actual",
+            model="test-model",
+        )
+
+
 def test_model_worker_uses_provider_without_vendor_knowledge() -> None:
     worker = ModelWorker(FakeModelProvider(), model="test-model")
     context = WorkerContext(
@@ -88,6 +99,15 @@ def test_model_worker_returns_safe_failure_without_provider_error_text() -> None
     assert "api_key" not in str(result.error).lower()
     assert result.metadata["provider"] == "failing"
     assert result.metadata["model"] == "test-model"
+
+
+def test_model_worker_rejects_provider_provenance_mismatch() -> None:
+    result = ModelWorker(MismatchedProvider(), model="test-model").execute(
+        WorkerContext(intent=Intent(goal="exercise provenance consistency"))
+    )
+
+    assert result.status is WorkerStatus.FAILED
+    assert result.error == "model provider invocation failed"
 
 
 def test_model_worker_preserves_response_metadata_and_provenance_in_evidence() -> None:
