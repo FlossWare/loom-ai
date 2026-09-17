@@ -19,15 +19,22 @@ Loom defines a minimal provider-neutral capability:
 ModelProvider.generate(ModelRequest) -> ModelResponse
 ```
 
+The contract is intentionally synchronous. Async execution, threading, or
+transport bridges belong in provider adapters and must not become part of the
+Loom execution contract merely to accommodate a provider implementation.
+
 `ModelRequest` contains only the prompt, requested model identifier, and
 non-secret metadata. `ModelResponse` contains generated text, provider/model
-provenance, a finish reason, and non-secret metadata.
+provenance, a finish reason, and non-secret metadata. Contract mappings are
+copied and exposed immutably.
 
 A `ModelWorker` adapts a Loom `Intent` to this contract. It knows the
-provider-neutral interface, not provider or vendor mechanics.
+provider-neutral interface, not provider or vendor mechanics. Provider failures
+are mapped to a safe generic Worker error rather than exposing provider
+exception text through Loom results.
 
 A deterministic fake provider is the reference implementation for tests and
-Stage 5 dogfood.
+Stage 5 dogfood and is exported as part of the Stage 5 reference API.
 
 ## Boundaries
 
