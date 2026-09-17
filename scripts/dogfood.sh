@@ -74,8 +74,15 @@ import json
 from threading import Thread
 from urllib.request import Request, urlopen
 
-from loom_ai import Arbiter, ArbiterDecision, Intent, LoomServer, ModelWorker, WorkerEvaluation
-from loom_ai.fake_model_provider import FakeModelProvider
+from loom_ai import (
+    Arbiter,
+    ArbiterDecision,
+    FakeModelProvider,
+    Intent,
+    LoomServer,
+    ModelWorker,
+    WorkerEvaluation,
+)
 
 worker = ModelWorker(FakeModelProvider(), model="dogfood-model", worker_id="model-dogfood")
 arbiter = Arbiter(
@@ -113,6 +120,7 @@ try:
     assert model_result["output"].startswith("fake response: exercise the model provider boundary")
     assert model_result["metadata"]["provider"] == "fake"
     assert model_result["metadata"]["model"] == "dogfood-model"
+    assert model_result["evidence"][0]["finish_reason"] == "stop"
     assert "api_key" not in json.dumps(payload)
     assert "secret" not in json.dumps(payload).lower()
 finally:
@@ -120,5 +128,7 @@ finally:
     thread.join(timeout=2)
 PY
 
+log "Stage 5 model boundary qualification complete"
 echo
+printf 'RESULT: LOOM CORE DOGFOOD PASSED\n'
 printf 'RESULT: LOOM STAGE 5 DOGFOOD PASSED\n'
