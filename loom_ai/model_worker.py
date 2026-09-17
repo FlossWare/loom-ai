@@ -44,11 +44,11 @@ class ModelWorker:
                     metadata={"intent_id": intent.intent_id},
                 )
             )
-        except Exception as exc:
+        except Exception:
             return WorkerResult(
                 worker_id=self.worker_id,
                 status=WorkerStatus.FAILED,
-                error=str(exc),
+                error="model provider invocation failed",
                 metadata={
                     "provider": self.provider.provider_id,
                     "model": self.model,
@@ -61,6 +61,8 @@ class ModelWorker:
                 "provider": response.provider,
                 "model": response.model,
                 "finish_reason": response.finish_reason,
+                "metadata": dict(response.metadata),
+                "provenance": dict(response.provenance),
             },
         )
         return WorkerResult(
@@ -71,6 +73,7 @@ class ModelWorker:
             metadata={
                 "provider": response.provider,
                 "model": response.model,
+                "finish_reason": response.finish_reason,
                 "provenance": dict(response.provenance),
             },
         )
