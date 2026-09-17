@@ -27,7 +27,10 @@ class RecordingProvider:
             model=self.response_model,
             finish_reason="stop",
             metadata={"implementation": "recording"},
-            provenance={"provider": self.response_provider, "model": self.response_model},
+            provenance={
+                "provider": self.response_provider,
+                "model": self.response_model,
+            },
         )
 
 
@@ -118,7 +121,10 @@ def test_model_worker_preserves_response_metadata_and_provenance_in_evidence() -
 
     evidence = result.evidence[0]
     assert evidence["metadata"] == {"implementation": "recording"}
-    assert evidence["provenance"] == {"provider": "recording", "model": "test-model"}
+    assert evidence["provenance"] == {
+        "provider": "recording",
+        "model": "test-model",
+    }
     assert result.metadata["finish_reason"] == "stop"
 
 
