@@ -6,14 +6,16 @@
 
 ## Context
 
-Loom Workers need model-backed capabilities without becoming coupled to a
+`loom-ai` Workers need model-backed capabilities without becoming coupled to a
 specific model vendor, credential scheme, gateway, routing strategy, or model
-SDK. Loom also needs a stable seam that can later be implemented in another
-language, including Java.
+SDK. The generic Loom protocol is defined separately in `FlossWare/loom`.
+
+`loom-ai` also needs a stable seam that can later be implemented in another
+language, including Java, without changing the Loom protocol.
 
 ## Decision
 
-Loom defines a minimal provider-neutral capability:
+`loom-ai` defines an AI-oriented provider-neutral capability:
 
 ```text
 ModelProvider.generate(ModelRequest) -> ModelResponse
@@ -21,18 +23,18 @@ ModelProvider.generate(ModelRequest) -> ModelResponse
 
 The contract is intentionally synchronous. Async execution, threading, or
 transport bridges belong in provider adapters and must not become part of the
-Loom execution contract merely to accommodate a provider implementation.
+AI capability contract merely to accommodate a provider implementation.
 
 `ModelRequest` contains only the prompt, requested model identifier, and
 non-secret metadata. `ModelResponse` contains generated text, provider/model
 provenance, a finish reason, and non-secret metadata. Contract mappings are
 copied and exposed immutably.
 
-A `ModelWorker` adapts a Loom `Intent` to this contract. It forwards the goal,
-requirements, and constraints as model input. Acceptance criteria remain the
-responsibility of the evaluator/Arbiter and are deliberately not encoded into
-the provider contract. The Worker knows the provider-neutral interface, not
-provider or vendor mechanics.
+A `ModelWorker` adapts a Loom `Intent` to this AI capability. It forwards the
+goal, requirements, and constraints as model input. Acceptance criteria remain
+the responsibility of the evaluator/Arbiter and are deliberately not encoded
+into the provider contract. The Worker knows the provider-neutral interface,
+not provider or vendor mechanics.
 
 Provider failures are mapped to a safe generic Worker error rather than
 exposing provider exception text through Loom results. A response whose
@@ -43,7 +45,7 @@ Stage 5 dogfood and is exported as part of the Stage 5 reference API.
 
 ## Boundaries
 
-The following remain outside Loom core:
+The following remain outside the `loom-ai` model capability:
 
 - provider adapters and SDKs;
 - credentials and secrets;
@@ -63,5 +65,5 @@ configuration, evidence, or HTTP results.
 Workers can be tested deterministically and providers can be replaced without
 changing Worker logic. The boundary is deliberately small enough to preserve a
 language-neutral contract for future implementations. More sophisticated
-provider infrastructure can evolve behind the seam without expanding the Loom
-execution model.
+provider infrastructure can evolve behind the seam without expanding the
+Loom protocol or making `loom-ai` the protocol definition.
