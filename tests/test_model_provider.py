@@ -61,7 +61,9 @@ def test_response_rejects_empty_required_fields() -> None:
     with pytest.raises(ValueError):
         ModelResponse(text="result", provider="fake", model=" ")
     with pytest.raises(ValueError):
-        ModelResponse(text="result", provider="fake", model="test", finish_reason=" ")
+        ModelResponse(
+            text="result", provider="fake", model="test", finish_reason=" "
+        )
 
 
 def test_request_mappings_are_immutable_copies() -> None:
@@ -78,7 +80,11 @@ def test_response_mappings_are_immutable_copies() -> None:
     metadata = {"implementation": "test"}
     provenance = {"provider": "fake"}
     response = ModelResponse(
-        text="result", provider="fake", model="test", metadata=metadata, provenance=provenance
+        text="result",
+        provider="fake",
+        model="test",
+        metadata=metadata,
+        provenance=provenance,
     )
     metadata["implementation"] = "changed"
     provenance["provider"] = "changed"
