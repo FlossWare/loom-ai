@@ -7,9 +7,15 @@ from loom_ai.worker import WorkerContext, WorkerResult, WorkerStatus
 
 
 class ModelWorker:
-    """Adapt an Intent into a provider-neutral model invocation."""
+    """Adapt an Intent to a provider-neutral model invocation."""
 
-    def __init__(self, provider: ModelProvider, *, model: str = "default", worker_id: str = "model") -> None:
+    def __init__(
+        self,
+        provider: ModelProvider,
+        *,
+        model: str = "default",
+        worker_id: str = "model",
+    ) -> None:
         self.provider = provider
         self.model = model
         self._worker_id = worker_id
@@ -22,9 +28,13 @@ class ModelWorker:
         intent = context.intent
         prompt = intent.goal
         if intent.requirements:
-            prompt += "\nRequirements:\n" + "\n".join(f"- {item}" for item in intent.requirements)
+            prompt += "\nRequirements:\n" + "\n".join(
+                f"- {item}" for item in intent.requirements
+            )
         if intent.constraints:
-            prompt += "\nConstraints:\n" + "\n".join(f"- {item}" for item in intent.constraints)
+            prompt += "\nConstraints:\n" + "\n".join(
+                f"- {item}" for item in intent.constraints
+            )
 
         try:
             response = self.provider.generate(
@@ -39,7 +49,10 @@ class ModelWorker:
                 worker_id=self.worker_id,
                 status=WorkerStatus.FAILED,
                 error=str(exc),
-                metadata={"provider": self.provider.provider_id, "model": self.model},
+                metadata={
+                    "provider": self.provider.provider_id,
+                    "model": self.model,
+                },
             )
 
         evidence = (
