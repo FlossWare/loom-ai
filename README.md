@@ -1,31 +1,37 @@
 # loom-ai
 
-**Loom is the AI-first execution substrate for turning declarative intent into verified change.**
+**`loom-ai` is an AI-oriented implementation and ecosystem built on the language-neutral Loom protocol.**
 
-Loom is not a coding-agent product. Crush, Claude Code, Codex, Cursor, and other clients consume Loom through external interfaces. The runtime itself is deliberately small.
+The canonical Loom protocol and semantic specification live in [`FlossWare/loom`](https://github.com/FlossWare/loom). This repository provides concrete AI-oriented implementations such as Workers, Arbiters, model capabilities, and AI-specific execution machinery. Its Python classes are implementations of Loom concepts, not the definition of Loom itself.
 
-## Core execution model
+`loom-ai` is not required to define Loom's transport, registry technology, serialization format, or programming-language model. Future implementations such as `loom-java` are peers that should conform to the same Loom semantics.
+
+## AI execution model
 
 ```text
-Intent
-  -> Arbiter
-      -> Worker
-      -> Worker
-      -> Arbiter
-  -> evidence
-  -> evaluation
-  -> result
+Loom Contract
+     |
+ loom-ai implementation
+     |
+   Intent
+     -> Arbiter
+         -> Worker
+         -> Worker
+         -> Arbiter
+     -> evidence
+     -> evaluation
+     -> result
 ```
 
-The fundamental executable abstraction is **Worker**. An **Arbiter is a Worker that coordinates Workers**, so nesting is ordinary composition.
+The fundamental AI executable abstraction is **Worker**. An **Arbiter is a Worker that coordinates Workers**, so nesting is ordinary composition within the `loom-ai` ecosystem.
 
-## Server boundary
+## Server binding
 
-Loom provides a minimal HTTP transport around a configured Arbiter. The server translates requests into declarative Intents and returns structured execution results. It does not select models, invoke providers, persist state, or implement other capabilities.
+`loom-ai` currently provides an HTTP binding around a configured Arbiter. HTTP is a binding implementation here, not the definition of Loom. The server translates requests into declarative Intents and returns structured execution results.
 
 ```text
 HTTP client
-    -> Loom Server
+    -> loom-ai HTTP binding
         -> Intent
         -> Arbiter
             -> Workers
@@ -42,7 +48,7 @@ Then `GET /health` checks server availability and `POST /intents` submits an Int
 
 ## Stage 3 server task dogfood
 
-Stage 3 proves that the server boundary can carry a real multi-worker task, not merely a health check. The dogfood fixture creates a temporary task file and submits an Intent over HTTP. The configured Arbiter then composes three Workers:
+Stage 3 proves that the `loom-ai` server binding can carry a real multi-worker task, not merely a health check. The dogfood fixture creates a temporary task file and submits an Intent over HTTP. The configured Arbiter then composes three Workers:
 
 ```text
 POST /intents
@@ -65,7 +71,7 @@ This is intentionally deterministic and does not require Crush, an LLM, model ro
 
 ## Architectural boundaries
 
-Loom owns Intent, Worker and Arbiter execution, explicit execution state, evidence collection, task-level orchestration, and integration points for evaluation, Knowledge, strategies, and external capabilities.
+Loom itself owns the language-neutral protocol semantics. `loom-ai` owns AI-oriented realizations of those semantics.
 
 Dedicated repositories own capability implementations:
 
@@ -78,7 +84,7 @@ Dedicated repositories own capability implementations:
 - `loom-setup`: installation and runtime setup
 - `loom-client-setup`: external client configuration
 
-Loom must not grow parallel implementations of those systems merely because it can compose them.
+`loom-ai` must not grow parallel implementations merely because it can compose them. AI-specific behavior belongs here; generic protocol semantics belong in `FlossWare/loom`.
 
 ## Hard constraints
 
