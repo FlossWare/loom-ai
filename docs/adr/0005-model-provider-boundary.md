@@ -28,10 +28,15 @@ non-secret metadata. `ModelResponse` contains generated text, provider/model
 provenance, a finish reason, and non-secret metadata. Contract mappings are
 copied and exposed immutably.
 
-A `ModelWorker` adapts a Loom `Intent` to this contract. It knows the
-provider-neutral interface, not provider or vendor mechanics. Provider failures
-are mapped to a safe generic Worker error rather than exposing provider
-exception text through Loom results.
+A `ModelWorker` adapts a Loom `Intent` to this contract. It forwards the goal,
+requirements, and constraints as model input. Acceptance criteria remain the
+responsibility of the evaluator/Arbiter and are deliberately not encoded into
+the provider contract. The Worker knows the provider-neutral interface, not
+provider or vendor mechanics.
+
+Provider failures are mapped to a safe generic Worker error rather than
+exposing provider exception text through Loom results. A response whose
+provider provenance does not match the provider identity is also rejected.
 
 A deterministic fake provider is the reference implementation for tests and
 Stage 5 dogfood and is exported as part of the Stage 5 reference API.
