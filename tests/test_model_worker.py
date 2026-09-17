@@ -35,7 +35,9 @@ def test_model_worker_composes_through_arbiter() -> None:
     result = Arbiter(
         [worker],
         lambda worker_result, _context: WorkerEvaluation(
-            ArbiterDecision.COMPLETE if worker_result.successful else ArbiterDecision.REPLAN
+            ArbiterDecision.COMPLETE
+            if worker_result.successful
+            else ArbiterDecision.REPLAN
         ),
         max_retries=0,
     ).execute(WorkerContext(intent=intent))
