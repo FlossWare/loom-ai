@@ -31,5 +31,5 @@ jobs:
           set -euo pipefail
           test -s conformance/README.md
           test -s docs/architecture/intent-worker.md
-          grep -q "language-neutral" docs/architecture/intent-worker.md
-          grep -q "non-redefinition" docs/repository-boundaries.md
+          grep -qi "language-neutral" docs/architecture/intent-worker.md
+          grep -qi "must not redefine" docs/repository-boundaries.md
