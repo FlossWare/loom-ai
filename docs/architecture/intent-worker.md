@@ -1,64 +1,122 @@
 # Intent, Worker, and Arbiter
 
-Loom's canonical execution model is intentionally small:
+This document defines the language-neutral AI-domain semantics. It is normative for meaning, not for a particular programming-language API.
 
-```text
-Intent
-  |
-Worker
-  |
-Arbiter
- / | \
-W  W  W
-  |
-result -> evidence -> evaluation
-```
+The Python types in `loom-ai-python` are one realization of these concepts. A future implementation in Java, Erlang, or another language must preserve the semantics without copying Python method signatures.
 
 ## Intent
 
-`Intent` describes the desired outcome, requirements, constraints, and
-acceptance criteria. It does not contain an execution plan, model choice,
-provider configuration, or workflow definition.
+An **Intent** describes a desired outcome and the information required to evaluate that outcome.
 
-Markdown is a human-friendly transport representation. The runtime contract
-is the `Intent` value object so clients can submit intents through MCP, API,
-CLI/TUI, files, or other adapters without coupling execution to Markdown.
+An Intent MAY contain:
+
+- a goal or desired outcome;
+- requirements;
+- constraints;
+- acceptance criteria;
+- provenance or other caller-supplied context.
+
+An Intent MUST NOT acquire a language-specific execution plan merely by being represented as an Intent. Model selection, provider configuration, credentials, and implementation-specific routing are outside the Intent contract.
+
+A language-neutral conceptual representation is:
+
+```text
+Intent {
+  goal
+  requirements[]
+  constraints[]
+  acceptance[]
+  provenance
+}
+```
+
+The wire representation may be JSON, another serialization, or an adapter-specific form. The representation does not change the semantic contract.
 
 ## Worker
 
-`Worker` is the fundamental executable abstraction:
+A **Worker** is an executable implementation that accepts execution context and produces a Worker Result.
 
-```python
-result = worker.execute(context)
+Conceptually:
+
+```text
+Worker
+  execute(Context)
+      |
+      v
+WorkerResult
 ```
 
-Execution state is explicit in `WorkerContext`. A Worker does not need to
-inherit from a Loom base class. Structural typing keeps implementations
-independent of the runtime and provider ecosystem.
+The operation is semantic, not a Python signature. An implementation may expose it through an in-process API, HTTP, messaging, or another Loom binding.
+
+A Worker Result contains, at minimum:
+
+- an implementation/worker identity;
+- execution status;
+- an output value;
+- evidence describing material execution facts;
+- an error or failure description when unsuccessful.
+
+Execution context MUST make relevant execution state explicit rather than relying on hidden global state.
 
 ## Arbiter
 
-`Arbiter` satisfies the same Worker contract. It is therefore a Composite,
-not a second orchestration universe.
+An **Arbiter** is a Worker that composes other Workers.
 
-An Arbiter can coordinate one Worker or many Workers, including other
-Arbiters. After each result it may complete, continue, retry, or replan by
-adding further Workers.
+It evaluates Worker Results and may decide to:
 
-This means fix/iterate, SDLC activities, verification retries, and larger
-task graphs are ordinary Worker composition. They do not require a special
-coding-agent or workflow subsystem.
+- complete;
+- continue with another Worker;
+- retry an eligible operation;
+- replan by selecting another Worker or composition.
 
-## Boundaries
+The Arbiter therefore remains a Composite of the Worker contract. It does not establish a second orchestration model.
 
-- `model-gateway` owns model/provider invocation and resource selection.
-- `evaluation` owns outcome evaluation and reward signals.
-- `knowledge` owns durable derived knowledge.
-- `strategy` owns interchangeable decision strategies.
-- Cross-cutting repositories provide resilience, budget, security,
-  observability, streaming, and caching without becoming orchestrators.
-- Loom owns Intent interpretation, Worker/Arbiter composition, execution
-  state, evidence, and task-level orchestration.
+Conceptually:
 
-The old Agent and Workflow abstractions are migration targets, not the
-canonical Loom execution model.
+```text
+Arbiter
+  |
+  +-- Worker
+  +-- Worker
+  +-- Worker
+       |
+       v
+   Result + Evidence
+       |
+       v
+   Evaluation
+       |
+       +--> Complete
+       +--> Continue
+       +--> Retry
+       +--> Replan
+```
+
+Nested Arbiters are valid because an Arbiter satisfies the Worker contract.
+
+## Result and evidence
+
+Results communicate externally meaningful execution outcomes. Evidence communicates provenance or other facts needed to understand how the result was produced or verified.
+
+These are not private chain-of-thought. Implementations MUST NOT require disclosure of private reasoning traces to satisfy this contract.
+
+## Model-provider boundary
+
+AI-domain model invocation is represented by a provider-neutral contract. A Model Request describes the requested generation inputs and associated metadata. A Model Response describes generated output, provider/model identity, completion status, and provenance.
+
+The contract does not prescribe a provider SDK, credential mechanism, routing strategy, caching mechanism, budget implementation, or optimization algorithm.
+
+## Conformance
+
+A conforming implementation MUST preserve the semantics defined here while remaining free to choose:
+
+- programming language;
+- in-process or remote binding;
+- serialization format;
+- internal data structures;
+- transport;
+- runtime architecture.
+
+Python-specific types and method signatures in `loom-ai-python` are implementation details. They are evidence of one conforming realization, not the definition of the AI-domain contract.
+
+Generic Loom semantics remain authoritative in `FlossWare/loom`. AI-domain semantics may extend Loom but must not redefine or contradict them.

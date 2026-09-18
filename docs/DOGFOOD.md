@@ -1,28 +1,25 @@
-# Loom core dogfood
+# Loom AI contract conformance
 
-The qualification target is the canonical runtime, not the retired client/server/backend stack.
+The Loom AI contract repository defines language-neutral semantics and conformance expectations. Executable dogfood belongs to language-specific implementation repositories.
 
-## Baseline
+## Contract-repository validation
 
-Run:
+This repository's CI validates the contract artifacts themselves:
 
-```bash
-./scripts/dogfood.sh
-```
+- JSON conformance fixtures are syntactically valid.
+- The conformance documentation and normative architecture documents are present.
+- The repository boundary documentation continues to identify the AI layer as language-neutral.
 
-The script creates an isolated virtual environment, installs the small development dependency set, checks formatting and linting, runs the core tests, builds the package, and executes an Intent -> Arbiter -> Worker smoke path.
+The executable Python dogfood, package build, runtime tests, and HTTP/server qualification live in `FlossWare/loom-ai-python`.
 
-No provider credentials, PostgreSQL, Redis, OrientDB, Podman, or local model server are required for the core qualification gate.
+## Python implementation dogfood
 
-## What this proves
+For the current Python realization, use the dogfood entry points in `loom-ai-python`. They exercise the implementation against the AI-domain contracts defined here.
 
-The baseline gate proves that:
+The Python implementation is not the authority for the meaning of Intent, Worker, Arbiter, Result, Evidence, or ModelProvider. Those semantics are defined in this repository and realized by language-specific repositories.
 
-1. `Intent` can represent a declarative goal.
-2. `Worker` can execute against explicit `WorkerContext` state.
-3. `Arbiter` can compose Workers using the same Worker contract.
-4. Evidence survives the Worker result boundary.
-5. Evaluation can drive completion without introducing another orchestration abstraction.
-6. The package builds independently of provider and infrastructure implementations.
+## What conformance means
 
-Provider/model dogfood belongs behind `model-gateway` and should be added only after the core substrate is stable.
+Conformance is about observable behavior and semantic compatibility, not a particular programming language, package layout, framework, or private implementation detail.
+
+No private chain-of-thought or other hidden reasoning is part of the conformance contract.

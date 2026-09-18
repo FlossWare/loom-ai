@@ -1,21 +1,32 @@
 # FlossWare repository boundaries
 
-This document records the current architectural ownership after consolidation of the former agent stack and supporting AI capabilities.
+This document records architectural ownership for the Loom family and supporting capabilities.
 
-## Core Loom
+## Loom contract family
 
 | Repository | Canonical responsibility |
 |---|---|
-| `loom-ai` | Intent, Worker, Arbiter, execution, evidence, evaluation integration, checkpoints, Knowledge runtime contract, interaction observations, orchestration |
+| `loom` | Foundational, language-neutral Loom protocol and semantic contract |
+| `loom-python` | Python implementation of the foundational Loom contract |
+| `loom-ai` | Language-neutral AI-domain contracts and semantics built on Loom |
+| `loom-ai-python` | Python implementation of the AI-domain contracts |
+
+The contract repositories are authoritative for meaning. Language-specific repositories are authoritative only for their realization of those contracts.
+
+`loom-ai` MUST NOT redefine, contradict, or replace generic Loom semantics owned by `loom`. It may extend Loom with AI-domain semantics.
+
+Concrete Python runtime code, packaging, implementation tests, and Python-specific dogfood belong in `loom-ai-python`, not `loom-ai`.
+
+Future implementations such as `loom-ai-java` and `loom-ai-erlang` are peers of `loom-ai-python`.
+
+## Supporting capabilities
+
+| Repository | Canonical responsibility |
+|---|---|
 | `loom-setup` | Loom installation, runtime configuration, backend/resource setup, deployment validation |
 | `loom-client-setup` | Configure external clients such as Crush, Claude Code, Codex, and Cursor to consume Loom |
 | `model-gateway` | Provider/model/resource abstraction, invocation, credentials, hard feasibility, routing/selection, prompt caching |
 | `knowledge` | Version-controlled canonical human-reviewable knowledge |
-
-## Reusable AI capabilities
-
-| Repository | Canonical responsibility |
-|---|---|
 | `evaluation` | Reusable evaluation and verification implementations; reward/outcome attribution |
 | `strategy` | Reusable decision and optimization strategies |
 | `consensus` | Reusable consensus/disagreement strategies |
@@ -39,27 +50,17 @@ This document records the current architectural ownership after consolidation of
 | `resilience` | Retry, circuit breaking, rate limiting, and health policies |
 | `security` | Secret handling, authorization/policy primitives, audit logging, and security constraints |
 
-## Superseded / retirement candidates
-
-| Repository | Decision |
-|---|---|
-| `learning` | Consolidate reusable pieces into Loom, Knowledge, Evaluation, and Strategy, then archive |
-| `workflow` | Superseded by Loom orchestration; migrate reusable mechanics, then archive |
-
-These repositories must not receive new architectural features while migration is underway.
-
 ## Architectural rules
 
-1. A repository provides one coherent capability boundary. A capability implementation must not become a second control plane.
-2. `loom-ai` owns orchestration. Do not create another Worker/Agent/Workflow runtime in a supporting repository.
-3. Stable contracts live at the appropriate capability boundary. Implementations remain replaceable.
-4. Composition is preferred over inheritance where a component merely uses another capability.
-5. Execution state is explicit. Avoid hidden global state and service-locator contexts.
-6. Model invocation belongs to `model-gateway`.
-7. Durable Knowledge belongs to `knowledge`; runtime Knowledge access is a Loom capability.
-8. Evaluation determines outcome quality. Strategy chooses among feasible alternatives.
-9. Hard policy, authorization, safety, budget, quota, rate, availability, and capability constraints are authoritative. Learned optimization cannot bypass them.
-10. Cross-cutting capabilities may decorate or support execution but must not own orchestration.
+1. A repository provides one coherent capability or contract boundary.
+2. Contract repositories define language-neutral meaning. Implementations remain replaceable.
+3. A domain contract may extend its foundational contract but must not redefine or contradict it.
+4. Concrete language implementations belong in language-specific repositories.
+5. `loom-ai` is a contract layer, not a Python runtime or orchestration implementation.
+6. Model invocation belongs to `model-gateway`; provider SDKs, credentials, routing, budgets, caching, and optimization remain separate capabilities.
+7. Execution state is explicit. Avoid hidden global state and service-locator contexts.
+8. Cross-cutting capabilities may decorate or support execution but must not create a second orchestration control plane.
+9. Composition is preferred over inheritance where a component merely uses another capability.
 
 ## Adaptive model/resource selection
 
