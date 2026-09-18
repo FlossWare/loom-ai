@@ -1,12 +1,12 @@
 # Stage 4: real repository task dogfood
 
-Stage 4 proves that Loom can execute a useful repository task through the HTTP server boundary without requiring an LLM or model provider.
+Stage 4 is executable implementation dogfood for the Python realization of the Loom AI contracts. It is maintained in `FlossWare/loom-ai-python`, not in this contract repository.
 
-The deterministic task follows:
+The deterministic task exercises a real repository operation through the Python implementation's HTTP boundary:
 
 ```text
 HTTP client
-  -> Loom Server
+  -> Python Loom Server
       -> Intent
           -> Arbiter
               -> Inspect Worker
@@ -16,8 +16,12 @@ HTTP client
           -> Result + evidence
 ```
 
-The dogfood uses an isolated temporary fixture so it exercises real filesystem behavior without modifying the Loom checkout. The task is intentionally small: inspect a Python file, plan a replacement, apply it, and verify the acceptance condition.
+The task uses an isolated temporary fixture so it exercises real filesystem behavior without modifying the checkout. It verifies submission, Intent provenance, worker completion, acceptance, evidence, and the expected file change.
 
-The gate checks that the task is submitted via `POST /intents`, Intent provenance carries the task path through the server boundary, all four workers succeed, the acceptance condition is true, evidence is present, and the expected file change occurs.
+No Crush, LLM, model routing, or local inference is involved. Model-backed planning belongs to later implementation stages and remains outside the foundational Loom contract.
 
-No Crush, LLM, model routing, or local inference is involved. Model-backed planning belongs to a later stage and remains outside Loom core.
+## Contract relevance
+
+The executable test is an implementation qualification of the language-neutral semantics defined by `loom-ai`. Changes to the semantic contract belong here; changes to Python runtime mechanics belong in `loom-ai-python`.
+
+See the Python implementation repository for the executable Stage 4 dogfood entry point.
