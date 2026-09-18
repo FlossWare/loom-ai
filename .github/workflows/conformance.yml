@@ -1,0 +1,35 @@
+name: Contract Conformance
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+
+permissions:
+  contents: read
+
+jobs:
+  validate:
+    name: Validate contract artifacts
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Validate JSON fixtures
+        shell: bash
+        run: |
+          set -euo pipefail
+          for fixture in conformance/fixtures/*.json; do
+            jq empty "$fixture"
+          done
+
+      - name: Verify fixture documentation
+        shell: bash
+        run: |
+          set -euo pipefail
+          test -s conformance/README.md
+          test -s docs/architecture/intent-worker.md
+          grep -q "language-neutral" docs/architecture/intent-worker.md
+          grep -q "non-redefinition" docs/repository-boundaries.md
