@@ -1,6 +1,7 @@
 # Loom documentation
 
 - [Intent, Worker, and Arbiter](architecture/intent-worker.md)
+- [Portable learning artifacts](architecture/decisions/0001-portable-learning-artifacts.md)
 - [Repository boundaries](repository-boundaries.md)
 - [Dogfood](DOGFOOD.md)
 
