@@ -1,0 +1,153 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://flossware.org/loom-ai/schemas/worker-configuration-0.1.json",
+  "title": "Loom AI Worker Configuration 0.1",
+  "description": "Language-neutral declarative configuration for a Worker. Provider, credential, and account selection remain owned by the referenced model gateway.",
+  "type": "object",
+  "required": [
+    "schema_version",
+    "worker_id",
+    "purpose",
+    "model_gateway",
+    "instructions",
+    "capabilities",
+    "policy",
+    "limits"
+  ],
+  "properties": {
+    "schema_version": {
+      "const": "0.1"
+    },
+    "worker_id": {
+      "type": "string",
+      "minLength": 1
+    },
+    "purpose": {
+      "type": "string",
+      "minLength": 1,
+      "description": "Worker responsibility, independent of the selected model or provider."
+    },
+    "model_gateway": {
+      "type": "object",
+      "required": [
+        "gateway_ref",
+        "selection_ref"
+      ],
+      "properties": {
+        "gateway_ref": {
+          "type": "string",
+          "minLength": 1,
+          "description": "Logical reference to a configured model gateway; not a URL or credential."
+        },
+        "selection_ref": {
+          "type": "string",
+          "minLength": 1,
+          "description": "Logical model-selection policy/profile resolved by the gateway, not a vendor-specific provider or account."
+        }
+      },
+      "additionalProperties": false
+    },
+    "instructions": {
+      "type": "array",
+      "minItems": 1,
+      "items": {
+        "type": "string",
+        "minLength": 1
+      }
+    },
+    "tools": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "required": [
+          "capability_ref",
+          "required"
+        ],
+        "properties": {
+          "capability_ref": {
+            "type": "string",
+            "minLength": 1
+          },
+          "required": {
+            "type": "boolean"
+          },
+          "input_schema_ref": {
+            "type": "string",
+            "minLength": 1
+          }
+        },
+        "additionalProperties": false
+      },
+      "uniqueItems": true
+    },
+    "capabilities": {
+      "type": "array",
+      "items": {
+        "type": "string",
+        "minLength": 1
+      },
+      "uniqueItems": true
+    },
+    "policy": {
+      "type": "object",
+      "required": [
+        "policy_ref",
+        "approval_required"
+      ],
+      "properties": {
+        "policy_ref": {
+          "type": "string",
+          "minLength": 1
+        },
+        "approval_required": {
+          "type": "boolean"
+        },
+        "allowed_capabilities": {
+          "type": "array",
+          "items": {
+            "type": "string",
+            "minLength": 1
+          },
+          "uniqueItems": true
+        },
+        "denied_capabilities": {
+          "type": "array",
+          "items": {
+            "type": "string",
+            "minLength": 1
+          },
+          "uniqueItems": true
+        }
+      },
+      "additionalProperties": false
+    },
+    "limits": {
+      "type": "object",
+      "required": [
+        "max_attempts",
+        "max_duration_seconds",
+        "max_output_bytes"
+      ],
+      "properties": {
+        "max_attempts": {
+          "type": "integer",
+          "minimum": 1
+        },
+        "max_duration_seconds": {
+          "type": "integer",
+          "minimum": 1
+        },
+        "max_output_bytes": {
+          "type": "integer",
+          "minimum": 1
+        }
+      },
+      "additionalProperties": false
+    },
+    "metadata": {
+      "type": "object",
+      "description": "Non-sensitive implementation-neutral annotations."
+    }
+  },
+  "additionalProperties": false
+}
