@@ -1,6 +1,8 @@
 # Loom documentation
 
 - [Intent, Worker, and Arbiter](architecture/intent-worker.md)
+- [Execution tracing and reasoning boundary (ADR-001)](architecture/adr-001-execution-tracing-and-reasoning-boundary.md)
+- [External agent execution boundary (ADR-002)](architecture/adr-002-external-agent-execution-boundary.md)
 - [Portable learning artifacts](architecture/decisions/0001-portable-learning-artifacts.md)
 - [Repository boundaries](repository-boundaries.md)
 - [Dogfood](DOGFOOD.md)
