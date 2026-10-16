@@ -1,0 +1,40 @@
+{
+  "fixture": "interrupted-execution-resume",
+  "version": "0.1",
+  "semantic_area": "orchestrator_lifecycle",
+  "setup": {
+    "execution_id": "exec-resumable-001",
+    "lifecycle": "interrupted",
+    "state_version": 1,
+    "prior_result": {
+      "status": "success",
+      "output": {
+        "phase": "initial"
+      }
+    },
+    "evidence": [
+      {
+        "type": "phase-completed",
+        "phase": "initial"
+      }
+    ]
+  },
+  "operation": {
+    "name": "continue",
+    "execution_id": "exec-resumable-001",
+    "after_process_restart": true,
+    "transcript_replay": false
+  },
+  "required_semantics": {
+    "lifecycle_after_resume": "running",
+    "execution_id": "exec-resumable-001",
+    "preserve_prior_result": true,
+    "preserve_prior_evidence": true,
+    "conformance": [
+      "only explicitly interrupted/resumable executions may continue",
+      "continuation reconstructs required context from persisted state",
+      "execution identity and prior history survive process restart",
+      "final terminal result is committed only after resumed work reaches terminal completion"
+    ]
+  }
+}
