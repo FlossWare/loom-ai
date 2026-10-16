@@ -1,0 +1,42 @@
+{
+  "fixture": "terminal-execution-not-resumable",
+  "version": "0.1",
+  "semantic_area": "orchestrator_lifecycle",
+  "setup": {
+    "execution_id": "exec-terminal-001",
+    "lifecycle": "completed",
+    "terminal_result": {
+      "status": "success",
+      "output": {
+        "value": "original"
+      }
+    },
+    "worker_invocations": 1
+  },
+  "operation": {
+    "name": "continue",
+    "execution_id": "exec-terminal-001"
+  },
+  "required_semantics": {
+    "outcome": "protocol_failure",
+    "category": "execution.not_resumable",
+    "execution_accepted": false,
+    "existing_execution": {
+      "execution_id": "exec-terminal-001",
+      "lifecycle": "completed",
+      "terminal_result": {
+        "status": "success",
+        "output": {
+          "value": "original"
+        }
+      }
+    },
+    "worker_invocations_after_request": 1,
+    "conformance": [
+      "terminal execution is not reopened",
+      "terminal Result, evidence, evaluations, and provenance are not rewritten",
+      "a rejected continuation does not invoke Workers",
+      "additional work after terminal completion uses a new execution identity"
+    ]
+  }
+}
