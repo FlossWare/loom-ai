@@ -48,6 +48,17 @@ When resuming, the implementation reconstructs the execution context from durabl
 
 A continuation is new work against an existing execution state. It must not silently create an unrelated execution that happens to reuse the same intent data.
 
+### Interrupted execution and terminal immutability
+
+The [interrupted-execution-resume fixture](fixtures/interrupted-execution-resume.json)
+requires continuation to resume an explicitly interrupted execution from durable
+state while preserving its identity and history. The
+[terminal-execution-not-resumable fixture](fixtures/terminal-execution-not-resumable.json)
+requires a terminal execution to remain immutable: a continuation request must
+fail explicitly and must not invoke Workers or rewrite the prior Result. These
+cases distinguish resuming incomplete work from starting additional work after
+a completed execution.
+
 ### Duplicate submission identity
 
 [duplicate-execution-identity-conflict.json](fixtures/duplicate-execution-identity-conflict.json)
