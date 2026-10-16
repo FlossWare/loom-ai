@@ -25,10 +25,18 @@ The contract is intentionally synchronous. Async execution, threading, or
 transport bridges belong in provider adapters and must not become part of the
 AI capability contract merely to accommodate a provider implementation.
 
-`ModelRequest` contains only the prompt, requested model identifier, and
-non-secret metadata. `ModelResponse` contains generated text, provider/model
-provenance, a finish reason, and non-secret metadata. Contract mappings are
-copied and exposed immutably.
+`ModelRequest` contains the prompt, requested model identifier, non-secret
+metadata, and an optional positive finite `timeout_seconds` per-call transport
+budget. `ModelResponse` contains generated text, provider/model provenance, a
+finish reason, and non-secret metadata. Contract mappings are copied and
+exposed immutably.
+
+When `timeout_seconds` is present, a provider adapter MUST enforce it at its
+transport boundary and raise a timeout failure rather than silently ignore the
+budget. Adapters should use the transport's native timeout mechanism; a Loom
+caller may reject an over-budget result after return, but cannot forcibly stop a
+synchronous call that does not honor its timeout. This per-call timeout is not a
+provider-selection strategy or aggregate retry/budget policy.
 
 A `ModelWorker` adapts a Loom `Intent` to this AI capability. It forwards the
 goal, requirements, constraints, and acceptance criteria as prompt context.
