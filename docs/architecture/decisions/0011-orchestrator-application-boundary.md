@@ -177,6 +177,15 @@ failures MUST remain observable through the Orchestrator boundary. A client MUST
 be able to distinguish a failed execution from an unavailable observation
 transport and from a task whose outcome has not yet been evaluated.
 
+Consistent with [Loom's protocol failure semantics](https://github.com/FlossWare/loom/blob/main/docs/adr/0012-protocol-failure-semantics.md),
+the Orchestrator MUST distinguish a protocol failure from the Result of an
+accepted Execution. A rejection before acceptance MUST NOT imply that execution
+began; failures during accepted work MUST remain observable through that
+Execution's lifecycle and Result. Protocol failures MUST expose a stable
+machine-readable category, not only a human-readable message. Transport adapters
+may translate the representation but MUST preserve the distinction and MUST NOT
+disclose secrets or Evidence the caller is not authorized to access.
+
 Recovery actions MUST follow Recovery Policy and preserve the original execution
 identity, prior results, and provenance. Cancellation MUST NOT be rewritten as
 ordinary failure or success. A deadline MUST NOT be silently ignored or converted
