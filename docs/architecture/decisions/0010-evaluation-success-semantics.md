@@ -88,6 +88,36 @@ Any aggregate success rule MUST identify the criteria and policy version used.
 The contract does not define a universal confidence threshold, weighted score, or
 majority-vote rule.
 
+## Mapping to Loom core Result outcomes
+
+The language-neutral Action/Result envelope is defined in
+[`FlossWare/loom` Action and Result Contracts](https://github.com/FlossWare/loom/blob/main/docs/action-result-contracts.md).
+AI-domain Evaluation statuses remain a separate dimension and MUST NOT be
+substituted directly for the core Result outcome.
+
+The initial mapping is:
+
+| AI-domain condition | Loom core Result interpretation |
+| --- | --- |
+| Required acceptance criteria are evaluated as `met` | `succeeded`, provided all other Contract success conditions hold |
+| Criteria are evaluated as `partially_met` | `partially_succeeded` |
+| Criteria are evaluated as `not_met` | The Result MUST NOT be `succeeded`; use `failed` or a more specific Contract-defined outcome |
+| Evaluation is `inconclusive` or `not_evaluated` | Do not claim `succeeded` unless the Contract explicitly defines a separate sufficient basis for success |
+| Execution is cancelled or its deadline expires | Preserve `cancelled` or `deadline_exceeded` as the execution outcome; do not rewrite it as an evaluation judgment |
+| Policy denies an accepted operation | Preserve `policy_denied`; do not collapse it into a generic evaluation failure |
+
+A core Result outcome describes the observable operation result. An Evaluation
+describes whether specified criteria are supported by evidence. A Result of
+`failed` does not, by itself, prove that task criteria were evaluated and
+`not_met`; a missing Evaluation remains `not_evaluated`. Likewise, an
+evaluation of `met` cannot override cancellation, deadline expiry, policy
+denial, or another mandatory failure condition.
+
+Implementations MUST retain both dimensions in durable state and expose them
+separately through REST, MCP, and other bindings. A compatibility field such as
+`status` MUST NOT silently collapse lifecycle, Result outcome, and Evaluation
+status into one ambiguous value.
+
 ## Objective criteria and subjective feedback
 
 Evaluation and feedback are related but not interchangeable:
