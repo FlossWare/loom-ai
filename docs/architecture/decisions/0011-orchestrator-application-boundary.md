@@ -194,7 +194,11 @@ An implementation claiming conformance SHOULD test that:
 6. local and distributed Workers use the same Worker contract;
 7. model selection and effective configuration remain owned by their designated
    external capabilities;
-8. transport completion is not conflated with task success.
+8. transport completion is not conflated with task success;
+9. cancellation requests are idempotent, pending cancellation is not reported as
+   confirmed termination, and terminal-state races preserve one committed outcome;
+10. deadlines survive continuation/restart, expired deadlines prevent new Worker
+    invocation, and deadline expiry remains distinct from user cancellation.
 
 No HTTP framework, MCP SDK, database, provider SDK, or programming-language API
 is normative.
