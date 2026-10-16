@@ -48,6 +48,16 @@ When resuming, the implementation reconstructs the execution context from durabl
 
 A continuation is new work against an existing execution state. It must not silently create an unrelated execution that happens to reuse the same intent data.
 
+### Duplicate submission identity
+
+[duplicate-execution-identity-conflict.json](fixtures/duplicate-execution-identity-conflict.json)
+defines create-only semantics for a caller-supplied durable execution identity.
+A duplicate submit is rejected with a stable machine-readable conflict; it must
+not overwrite the original Intent/Result or invoke Workers again. The original
+execution remains observable by its existing identity. This is especially
+important after a client-side timeout, which does not prove the server rejected
+the original request.
+
 ### Process interruption and terminal state
 
 A process interruption before successful terminal completion must not be represented as successful completion.

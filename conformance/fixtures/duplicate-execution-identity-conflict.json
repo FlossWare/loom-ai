@@ -1,0 +1,50 @@
+{
+  "fixture": "duplicate-execution-identity-conflict",
+  "version": "0.1",
+  "semantic_area": "orchestrator_submission",
+  "setup": {
+    "durable_execution_exists": {
+      "execution_id": "exec-stable-001",
+      "intent_id": "intent-original-001",
+      "worker_invocations": 1,
+      "terminal_result": {
+        "status": "success",
+        "output": {
+          "value": "original"
+        }
+      }
+    }
+  },
+  "operation": {
+    "submit": {
+      "execution_id": "exec-stable-001",
+      "intent_id": "intent-different-002",
+      "goal": "must not replace accepted work"
+    }
+  },
+  "required_semantics": {
+    "duplicate_submission": {
+      "outcome": "protocol_failure",
+      "category": "execution_identity_conflict",
+      "execution_accepted": false
+    },
+    "existing_execution": {
+      "execution_id": "exec-stable-001",
+      "intent_id": "intent-original-001",
+      "terminal_result": {
+        "status": "success",
+        "output": {
+          "value": "original"
+        }
+      }
+    },
+    "worker_invocations_after_duplicate": 1,
+    "conformance": [
+      "a duplicate caller-supplied execution identity never overwrites durable execution state",
+      "a duplicate caller-supplied execution identity never invokes Workers a second time",
+      "the duplicate operation returns an explicit machine-readable conflict",
+      "the original execution remains observable with its original Intent, Result, evidence, and provenance",
+      "a client timeout alone does not establish that submission was rejected"
+    ]
+  }
+}
