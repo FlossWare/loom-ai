@@ -38,9 +38,17 @@ A conforming Orchestrator contract MUST provide semantics equivalent to:
   current observable result or lifecycle state.
 - **Observe:** retrieve the lifecycle state, current/final result, failures,
   evidence, and provenance for an execution identity.
-- **Continue:** continue an existing execution from its persisted state and
+- **Continue:** resume an interrupted execution from its persisted state and
   evidence, preserving the execution identity and relevant history rather than
   requiring a client transcript replay.
+
+Continue is valid only for an execution whose lifecycle is explicitly
+interrupted/resumable. An interrupted execution is nonterminal. A terminal
+execution MUST NOT be reopened or have its committed Result rewritten; a request
+to continue a terminal execution MUST return an explicit machine-readable
+not-resumable failure. Work requested after terminal completion starts a new
+execution with a distinct identity and an explicit relationship to the prior
+execution.
 
 A caller-supplied execution identity is unique within the durable execution
 store. Submitting a new Intent with an identity that already exists MUST NOT
