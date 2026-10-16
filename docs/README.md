@@ -12,6 +12,7 @@
 - [Recovery policy (ADR-0007)](architecture/decisions/0007-recovery-policy.md)
 - [Execution economics (ADR-0008)](architecture/decisions/0008-execution-economics.md)
 - [Provider/model health (ADR-0009)](architecture/decisions/0009-provider-model-health.md)
+- [Evaluation and success semantics (ADR-0010)](architecture/decisions/0010-evaluation-success-semantics.md)
 - [Repository boundaries](repository-boundaries.md)
 - [Dogfood](DOGFOOD.md)
 
