@@ -84,6 +84,11 @@ Orchestrator MUST persist the deadline failure when durable state is configured.
 If a Worker cannot stop promptly, the execution remains nonterminal with an
 observable deadline/cancellation-pending cause until termination is confirmed.
 
+If cancellation and deadline expiry both occur, the first termination cause
+durably recorded determines the primary terminal cause. Later causes MUST remain
+visible in evidence and MUST NOT overwrite the primary cause or rewrite an
+already-terminal outcome.
+
 The operations and representations are language-neutral; the contract does not
 mandate method names, HTTP routes, or a particular RPC mechanism.
 
