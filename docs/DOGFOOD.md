@@ -30,11 +30,19 @@ The real external-client qualification uses
 [dogfood-crush-mcp-real.py](https://github.com/FlossWare/loom-ai-python/blob/main/scripts/dogfood-crush-mcp-real.py)
 against a fresh clone of this repository. It requires:
 
-- the Crush executable to be installed and a model provider configured for it;
+- the Crush executable to be installed;
+- the FlossWare OpenAI-compatible model gateway to be running and reachable
+  (default `http://127.0.0.1:8765/v1`);
 - the Python environment used by the MCP command to have the project's MCP dependency;
 - a durable Loom server profile with an execution state store;
 - a fresh Crush session that performs the real repository edit through generic
   MCP and then receives the persisted verification result and evidence.
+
+The harness creates a disposable project-local `.crushrc` with an explicit
+provider and model, so it does not rely on provider settings from the user's
+global Crush profile. The default model is `flossware/flossware`. Override the
+gateway URL with `FLOSSWARE_CRUSH_BASE_URL` or `--provider-base-url`, and
+override the model with `FLOSSWARE_CRUSH_MODEL` or `--model`.
 
 Run the harness from a configured `loom-ai-python` checkout:
 
