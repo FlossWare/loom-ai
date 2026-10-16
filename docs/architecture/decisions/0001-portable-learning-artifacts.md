@@ -38,6 +38,17 @@ Learning artifacts MUST be separable from:
 
 An artifact SHOULD contain enough provenance and version information to support independent inspection, evaluation, replay, and controlled promotion.
 
+## Reusable artifacts and experiment telemetry
+
+Experiment telemetry and portable learning artifacts are related but distinct:
+
+- **Experiment telemetry** records observations about a run, such as timing, cost, intermediate measurements, debug events, and experiment-specific operational details. Telemetry MAY be retained as research evidence, but it is not automatically reusable learned state.
+- **A portable learning artifact** is an explicitly identified, versioned domain object with declared semantics, provenance, intended use, and relevant compatibility and data-boundary information.
+
+Raw telemetry MUST NOT be treated as a portable learning artifact merely because it was produced by a learning experiment. A dataset, measurement, or outcome MAY be promoted into an artifact when its meaning and intended use are explicit and its privacy and sharing constraints are satisfied. Telemetry needed to reproduce or evaluate an artifact may accompany it as separate evidence without becoming part of the artifact's learned state.
+
+This distinction lets systems retain detailed experimental evidence without coupling consumers to a particular experiment runner or mistaking logs for reusable policy, experience, or calibration.
+
 ## Rationale
 
 This allows CE to act as a genuine experimental laboratory:
@@ -45,8 +56,10 @@ This allows CE to act as a genuine experimental laboratory:
 ```text
 CE experiment
     |
+    +--> experiment telemetry (research evidence)
+    |
     v
-portable learning artifact
+explicitly selected learning artifact
     |
     +--> evaluate
     |
@@ -72,6 +85,7 @@ A failed technique can be discarded while retaining its experimental evidence.
 - Learned state gains explicit provenance and versioning.
 - Experiments can be evaluated offline before becoming production behavior.
 - Loom remains independent of any particular neural algorithm.
+- Experiment telemetry remains available for research without being confused with portable learned state.
 
 ### Negative
 
@@ -79,6 +93,7 @@ A failed technique can be discarded while retaining its experimental evidence.
 - Not every learned artifact will be portable, especially model-specific weights or private data.
 - Provenance and compatibility become part of the artifact lifecycle.
 - Sharing learned state requires explicit data-boundary and privacy controls.
+- Artifact promotion requires explicit classification and validation rather than indiscriminate copying of experiment output.
 
 ## Non-goals
 
@@ -107,9 +122,10 @@ A CE learning experiment should be considered for Loom promotion only when its r
 The default lifecycle is:
 
 1. Experiment in CE.
-2. Emit portable artifacts and measurements.
-3. Evaluate reproducibility, value, cost, and operational implications.
-4. Promote the technique and contract into Loom only when evidence justifies it.
-5. Otherwise retain the experiment as research evidence and do not burden Loom with it.
+2. Retain experiment telemetry and measurements as research evidence.
+3. Explicitly classify and emit portable learning artifacts with provenance and version identity.
+4. Evaluate reproducibility, value, cost, privacy, and operational implications.
+5. Promote the technique and contract into Loom only when evidence justifies it.
+6. Otherwise retain the experiment as research evidence and do not burden Loom with it.
 
 Related: CE #175; Loom #1019, #964, #967.
