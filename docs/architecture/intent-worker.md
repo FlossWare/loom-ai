@@ -67,7 +67,10 @@ It evaluates Worker Results and may decide to:
 - complete;
 - continue with another Worker;
 - retry an eligible operation;
-- replan by selecting another Worker or composition.
+- replan by selecting another Worker or composition;
+- interrupt the current execution at a resumable boundary when additional external work or input is required.
+
+An **interrupt** is distinct from `continue`, which schedules another Worker in the current composition, and `complete`, which ends the current execution. An interrupt preserves the current execution identity, required state, prior Results, Evidence, and provenance, and exposes a nonterminal interrupted lifecycle. The same execution may resume only from that persisted interrupted state. A terminal execution MUST NOT be reopened by continuation; additional work after terminal completion requires a new execution linked to the prior one.
 
 The Arbiter therefore remains a Composite of the Worker contract. It does not establish a second orchestration model.
 
