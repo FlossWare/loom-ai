@@ -4,6 +4,7 @@
 - [Execution tracing and reasoning boundary (ADR-001)](architecture/adr-001-execution-tracing-and-reasoning-boundary.md)
 - [External agent execution boundary (ADR-002)](architecture/adr-002-external-agent-execution-boundary.md)
 - [Portable learning artifacts](architecture/decisions/0001-portable-learning-artifacts.md)
+- [First-class routing policy (ADR-0002)](architecture/decisions/0002-first-class-routing-policy.md)
 - [Repository boundaries](repository-boundaries.md)
 - [Dogfood](DOGFOOD.md)
 
