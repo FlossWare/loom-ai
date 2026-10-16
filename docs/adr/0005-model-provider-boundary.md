@@ -31,10 +31,12 @@ provenance, a finish reason, and non-secret metadata. Contract mappings are
 copied and exposed immutably.
 
 A `ModelWorker` adapts a Loom `Intent` to this AI capability. It forwards the
-goal, requirements, and constraints as model input. Acceptance criteria remain
-the responsibility of the evaluator/Arbiter and are deliberately not encoded
-into the provider contract. The Worker knows the provider-neutral interface,
-not provider or vendor mechanics.
+goal, requirements, constraints, and acceptance criteria as prompt context.
+Acceptance criteria guide generation but do not delegate evaluation authority
+to the provider: the evaluator/Arbiter remains responsible for deciding whether
+the criteria were met. Criteria are prompt content, not a provider-specific
+parameter or a new field in the provider-neutral request contract. The Worker
+knows the provider-neutral interface, not provider or vendor mechanics.
 
 Provider failures are mapped to a safe generic Worker error rather than
 exposing provider exception text through Loom results. A response whose
