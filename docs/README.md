@@ -10,6 +10,7 @@
 - [Execution outcome and feedback contract (ADR-0005)](architecture/decisions/0005-execution-outcome-feedback-contract.md)
 - [Context lifecycle and artifact (ADR-0006)](architecture/decisions/0006-context-lifecycle-artifact.md)
 - [Recovery policy (ADR-0007)](architecture/decisions/0007-recovery-policy.md)
+- [Execution economics (ADR-0008)](architecture/decisions/0008-execution-economics.md)
 - [Repository boundaries](repository-boundaries.md)
 - [Dogfood](DOGFOOD.md)
 
