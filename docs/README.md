@@ -11,6 +11,7 @@
 - [Context lifecycle and artifact (ADR-0006)](architecture/decisions/0006-context-lifecycle-artifact.md)
 - [Recovery policy (ADR-0007)](architecture/decisions/0007-recovery-policy.md)
 - [Execution economics (ADR-0008)](architecture/decisions/0008-execution-economics.md)
+- [Provider/model health (ADR-0009)](architecture/decisions/0009-provider-model-health.md)
 - [Repository boundaries](repository-boundaries.md)
 - [Dogfood](DOGFOOD.md)
 
