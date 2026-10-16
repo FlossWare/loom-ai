@@ -1,0 +1,54 @@
+{
+  "schema_version": "0.1",
+  "worker_id": "coding-worker",
+  "purpose": "Make bounded repository changes and report verifiable evidence",
+  "model_gateway": {
+    "gateway_ref": "default-model-gateway",
+    "selection_ref": "coding-balanced"
+  },
+  "instructions": [
+    "Inspect the repository before editing.",
+    "Keep changes within the declared task scope.",
+    "Report changed files and verification results without claiming unrun checks."
+  ],
+  "tools": [
+    {
+      "capability_ref": "repository.read",
+      "required": true
+    },
+    {
+      "capability_ref": "repository.edit",
+      "required": true
+    },
+    {
+      "capability_ref": "verification.run",
+      "required": true
+    }
+  ],
+  "capabilities": [
+    "repository.read",
+    "repository.edit",
+    "verification.run"
+  ],
+  "policy": {
+    "policy_ref": "bounded-repository-change",
+    "approval_required": true,
+    "allowed_capabilities": [
+      "repository.read",
+      "repository.edit",
+      "verification.run"
+    ],
+    "denied_capabilities": [
+      "credential.read",
+      "secret.export"
+    ]
+  },
+  "limits": {
+    "max_attempts": 2,
+    "max_duration_seconds": 900,
+    "max_output_bytes": 200000
+  },
+  "metadata": {
+    "team": "engineering"
+  }
+}
