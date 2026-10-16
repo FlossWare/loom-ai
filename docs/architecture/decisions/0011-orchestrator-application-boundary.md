@@ -42,6 +42,15 @@ A conforming Orchestrator contract MUST provide semantics equivalent to:
   evidence, preserving the execution identity and relevant history rather than
   requiring a client transcript replay.
 
+A caller-supplied execution identity is unique within the durable execution
+store. Submitting a new Intent with an identity that already exists MUST NOT
+overwrite the existing state, replace its Result, or invoke Workers again. The
+Orchestrator MUST return an explicit machine-readable identity-conflict outcome
+and preserve the original execution for observation. A client that times out
+while submitting MUST observe the known execution identity before deciding
+whether to submit new work; a transport timeout does not establish that the
+original request was rejected.
+
 A conforming Orchestrator MUST provide a cancellation operation with
 semantics equivalent to `RequestCancellation(execution_id, reason?)`. The
 operation name and transport representation are not normative. It MUST return
@@ -212,7 +221,9 @@ An implementation claiming conformance SHOULD test that:
 9. cancellation requests are idempotent, pending cancellation is not reported as
    confirmed termination, and terminal-state races preserve one committed outcome;
 10. deadlines survive continuation/restart, expired deadlines prevent new Worker
-    invocation, and deadline expiry remains distinct from user cancellation.
+    invocation, and deadline expiry remains distinct from user cancellation;
+11. duplicate caller-supplied execution identities produce an explicit conflict
+    without overwriting prior state or invoking Workers a second time.
 
 No HTTP framework, MCP SDK, database, provider SDK, or programming-language API
 is normative.
