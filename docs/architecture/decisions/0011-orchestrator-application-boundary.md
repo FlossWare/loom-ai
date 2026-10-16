@@ -42,14 +42,55 @@ A conforming Orchestrator contract MUST provide semantics equivalent to:
   evidence, preserving the execution identity and relevant history rather than
   requiring a client transcript replay.
 
-An implementation MAY expose additional operations, such as cancellation or
-session management, when their lifecycle and authorization semantics are
-specified. The operations and representations are language-neutral; the contract
-does not mandate method names, HTTP routes, or a particular RPC mechanism.
+A conforming Orchestrator MUST provide a cancellation operation with
+semantics equivalent to `RequestCancellation(execution_id, reason?)`. The
+operation name and transport representation are not normative. It MUST return
+the current execution snapshot and make clear whether cancellation was accepted,
+was already requested, was unsupported, or arrived after a terminal outcome.
+
+Cancellation requests MUST be idempotent for an execution identity. A request
+against an already-terminal execution MUST return its existing terminal outcome
+without rewriting it. For an active execution, the Orchestrator MUST durably
+record the request before reporting it as accepted and propagate cancellation to
+the active work. The operation MAY return while cleanup is in progress, but the
+observable state MUST distinguish a pending request from confirmed termination.
+An execution MUST NOT be reported as `cancelled` until the work has stopped and
+the terminal state has been persisted.
+
+Cancellation is cooperative unless a Worker contract explicitly provides a
+stronger interruption guarantee. Workers MUST check cancellation before starting
+new work and at documented safe points. If a Worker cannot stop immediately, the
+Orchestrator MUST expose that cancellation is still pending rather than claiming
+that the work has terminated. If cancellation races with completion, the
+Orchestrator MUST serialize the competing terminal transition: a terminal result
+already committed MUST remain unchanged; an accepted cancellation that wins
+before terminal completion MUST end in `cancelled` after cleanup. Partial results
+and evidence MUST be retained.
+
+Submit MAY accept an absolute execution deadline as execution metadata separate
+from the Intent's objective. A deadline MUST identify one unambiguous instant
+using an RFC 3339 timestamp with an explicit UTC offset. The absolute deadline
+MUST be preserved across Worker handoff, observation, continuation, and process
+restart; continuation MUST NOT silently reset or extend it.
+
+When a deadline expires, the Orchestrator MUST stop scheduling new work and
+request cancellation of active work. Once execution has stopped, the persisted
+terminal status MUST be `failed` with an explicit `deadline_exceeded` cause,
+unless a later version of the contract defines a dedicated terminal status with
+an equivalent unambiguous mapping. Deadline expiry MUST NOT be conflated with a
+user-requested cancellation. If the deadline is already expired before initial
+execution or continuation begins, no new Worker invocation may start; the
+Orchestrator MUST persist the deadline failure when durable state is configured.
+If a Worker cannot stop promptly, the execution remains nonterminal with an
+observable deadline/cancellation-pending cause until termination is confirmed.
+
+The operations and representations are language-neutral; the contract does not
+mandate method names, HTTP routes, or a particular RPC mechanism.
 
 A production configuration that promises continuation MUST provide durable state
-sufficient to reconstruct the required execution context. A non-durable
-transport-smoke profile MAY exist, but MUST NOT claim restart-safe continuation.
+sufficient to reconstruct the required execution context, including the deadline
+and any pending cancellation request. A non-durable transport-smoke profile MAY
+exist, but MUST NOT claim restart-safe continuation.
 
 ## Lifecycle and observable state
 
@@ -136,9 +177,10 @@ identity, prior results, and provenance. Cancellation MUST NOT be rewritten as
 ordinary failure or success. A deadline MUST NOT be silently ignored or converted
 to success.
 
-The exact API operation for requesting cancellation and the complete deadline
-representation require explicit implementation/API contract work; this ADR
-requires their observable lifecycle semantics, not a specific route.
+Cancellation and deadline are separate execution controls. Cancellation
+records an explicit client request; deadline expiry records a system-enforced
+termination cause. Both must preserve the execution identity and evidence, but
+they MUST remain distinguishable in the final execution record.
 
 ## Conformance
 
