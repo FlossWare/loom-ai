@@ -94,6 +94,57 @@ Arbiter
 
 Nested Arbiters are valid because an Arbiter satisfies the Worker contract.
 
+## Sequential arbitration pipelines
+
+A **sequential arbitration pipeline** is a configured sequence of one or more arbitration stages. Each stage runs a set of independent Workers against the same current task and relevant execution context, then asks its Arbiter to adjudicate the collected results.
+
+Conceptually:
+
+```text
+Intent + execution context
+          |
+          v
+  Stage 1: Workers
+          |
+          v
+  Stage 1: Arbiter
+          |
+          +---- selected result + preserved context ----+
+                                                        |
+                                                        v
+                                               Stage 2: Workers
+                                                        |
+                                                        v
+                                               Stage 2: Arbiter
+                                                        |
+                                                        v
+                                                   Final result
+```
+
+The following semantics are normative:
+
+1. **Shared stage input.** Workers within a stage MUST receive the same logical task and stage-input context. A binding MAY provide immutable snapshots or equivalent representations, but one Worker’s private in-memory mutations MUST NOT silently change another Worker’s input.
+2. **Independent results.** The stage MUST collect each dispatched Worker’s result and relevant evidence. A Worker failure is represented as a result with its status and failure information; it MUST NOT be silently rewritten as a successful result.
+3. **Adjudication.** The Arbiter MUST evaluate the available results and evidence and select or produce a justified stage result. It is not merely a prose summarizer. The contract does not prescribe majority voting, a particular scoring algorithm, or a particular internal reasoning method.
+4. **Preserved handoff.** If another stage is configured, its input MUST include the selected prior result and enough underlying context for independent re-evaluation. Depending on the task, that includes the original Intent, the artifact being reviewed or changed, relevant workspace/repository state, files or diffs, evidence, Worker findings, material disagreements or rejected alternatives, and stage/execution metadata.
+5. **No prose-only handoff.** A stage MUST NOT reduce the handoff to only the previous Arbiter’s textual synthesis when the underlying result, evidence, or execution state is relevant to evaluating it.
+6. **Configured termination.** The configured pipeline topology determines the number of stages. If another stage is configured and execution has not been cancelled or terminated by an explicit execution failure policy, the pipeline MUST proceed to that stage. Confidence scores or implicit confidence thresholds MUST NOT silently shorten the configured pipeline.
+7. **Final result.** The final configured Arbiter produces the pipeline result. The result MUST retain sufficient provenance to identify the stage outcome and the evidence used to support it.
+8. **Single-stage compatibility.** A one-stage pipeline is valid and uses the same semantics as any other stage; multiple stages do not define a separate orchestration architecture.
+
+### Task modes and pipeline depth
+
+Task mode describes the work being requested; pipeline depth describes how many sequential arbitration stages are configured. They are separate dimensions.
+
+- `review`: one arbitration stage performing review.
+- `multi-review`: multiple sequential arbitration stages performing review.
+- `solve`: one arbitration stage performing a solution task.
+- `multi-solve`: multiple sequential arbitration stages performing a solution task.
+
+An implementation MAY support additional depth notation or configuration forms, but MUST preserve this separation. A pipeline MUST NOT require a fixed discovery → verifier → synthesizer topology. Each stage’s worker set and adjudication policy are configuration, not universal protocol primitives.
+
+These semantics describe observable behavior only. They do not prescribe a programming-language API, agent vendor, provider, orchestration framework, or private reasoning format.
+
 ## Result and evidence
 
 Results communicate externally meaningful execution outcomes. Evidence communicates provenance or other facts needed to understand how the result was produced or verified.
