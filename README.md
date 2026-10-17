@@ -49,5 +49,5 @@ AI-domain implementations must conform to both the generic Loom contract and the
 AI-domain contracts defined here. A language implementation must be replaceable
 without changing the meaning of the AI-domain contract.
 
-See FlossWare engineering standard ADR-0024 for the contract-centric repository
+See FlossWare/standards ADR-0024 for the contract-centric repository
 naming and layering convention.
