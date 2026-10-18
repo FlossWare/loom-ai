@@ -74,6 +74,16 @@
           "input_schema_ref": {
             "type": "string",
             "minLength": 1
+          },
+          "name": {
+            "type": "string",
+            "minLength": 1,
+            "description": "Model-facing name mapped by the runtime to this configured capability."
+          },
+          "description": {
+            "type": "string",
+            "minLength": 1,
+            "description": "Human-readable description supplied to the model; it grants no authority."
           }
         },
         "additionalProperties": false
