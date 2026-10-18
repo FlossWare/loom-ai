@@ -67,9 +67,11 @@ A conforming implementation MUST demonstrate that:
 5. required unresolved capabilities cause an explicit activation failure;
 6. capability invocation requires both an explicitly configured tool and an authorized capability, plus a trusted runtime binding;
 7. when effective policy requires approval, invocation fails closed unless a trusted approval authorizer approves that specific invocation;
-8. attempts, duration, and output bounds are enforced or rejected explicitly;
-9. effective Worker configuration and gateway selection identifiers are attributable in non-secret provenance;
-10. credentials and secret values are never serialized into the configuration or Result.
+8. every declared `input_schema_ref` resolves through a trusted runtime registry; unresolved references and invalid arguments fail closed before approval or execution;
+9. duplicate `capability_ref` entries in a Worker’s `tools` array are rejected rather than silently merged;
+10. attempts, duration, and output bounds are enforced or rejected explicitly;
+11. effective Worker configuration and gateway selection identifiers are attributable in non-secret provenance;
+12. credentials and secret values are never serialized into the configuration or Result.
 
 Schema validation establishes structural validity only. It does not prove authorization, capability availability, or runtime enforcement; those require executable conformance tests in each implementation.
 
@@ -78,6 +80,6 @@ Schema validation establishes structural validity only. It does not prove author
 
 A runtime MUST NOT treat a model response, a capability reference, or a caller-supplied boolean as execution authority. Before invoking a capability, it MUST verify the capability is authorized by the effective policy, verify the capability is explicitly declared as a tool for that Worker, resolve the reference through a trusted runtime binding registry, and enforce any required approval through a trusted authorizer. Missing bindings, failed authorization, failed approval, and invalid arguments MUST fail closed. Tool arguments and results must be bounded and validated by the binding or its registered input/output contract.
 
-Capability arguments and results MUST be JSON-compatible values. Before invoking a binding, the runtime MUST validate the argument object against the registered input contract when one exists, and MUST detach it from caller-owned mutable data. The binding result MUST be serialized as UTF-8 JSON with non-finite numbers rejected; the serialized result MUST NOT exceed the Worker's `limits.max_output_bytes`. Unsupported values and over-limit results MUST fail explicitly and MUST NOT be returned as successful capability results. Bindings may impose stricter per-capability bounds.
+Capability arguments and results MUST be JSON-compatible values. Every configured `input_schema_ref` MUST resolve to a trusted runtime validator; an unresolved schema reference MUST fail closed. Before approval or execution, the runtime MUST validate the argument object against the registered input contract when one exists, and MUST detach it from caller-owned mutable data. Validators and approval authorizers MUST receive detached copies so their mutations cannot change the arguments later executed by the binding. The binding MUST receive a separate detached copy of the validated and approved arguments. The binding result MUST be serialized as UTF-8 JSON with non-finite numbers rejected; the serialized result MUST NOT exceed the Worker's `limits.max_output_bytes`. Unsupported values and over-limit results MUST fail explicitly and MUST NOT be returned as successful capability results. Bindings may impose stricter per-capability bounds.
 
 This contract does not prescribe a provider-specific tool-call format. Model-native tool-call parsing and the mapping from a model's requested call to this runtime boundary are separate adapter responsibilities; implementations must not infer a tool call by executing arbitrary text emitted by a model.
