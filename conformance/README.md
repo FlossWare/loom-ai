@@ -123,3 +123,20 @@ The [structured-tool-call-bounded-loop fixture](fixtures/structured-tool-call-bo
 defines the minimum observable behavior: only configured capabilities execute,
 validation and policy checks precede execution, calls are bounded, and the final
 Worker Result retains outcome evidence without exposing private model reasoning.
+
+
+### Tool definitions and structured results
+
+The provider-neutral model request MAY include an ordered collection of tool
+definitions. Each definition has a unique name, a description, and a
+JSON-compatible input schema. A definition is published only for a tool the
+Worker has explicitly configured; its name is a model-facing selector, not an
+authorization grant. The runtime remains responsible for mapping the selected
+name to a trusted capability and applying validation, policy, and approval.
+
+A subsequent model request MUST carry prior tool results as structured data
+correlated to the original call identifier and configured capability. A runtime
+MUST NOT splice tool output into ordinary prompt text and treat it as trusted
+instructions. Tool results must be JSON-compatible and bounded by the Worker's
+output policy. Provider adapters may translate these neutral definitions and
+results into provider-specific wire formats, but those formats are not normative.
