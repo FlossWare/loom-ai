@@ -75,6 +75,35 @@
       "trusted validation and policy checks precede invocation",
       "tool call count and duration limits are enforced",
       "final Result preserves externally observable outcome evidence"
-    ]
+    ],
+    "tool_definitions": [
+      {
+        "name": "search.read",
+        "description": "Read-only search capability",
+        "input_schema": {
+          "type": "object",
+          "properties": {
+            "query": {
+              "type": "string"
+            }
+          },
+          "required": [
+            "query"
+          ]
+        }
+      }
+    ],
+    "tool_results": [
+      {
+        "call_id": "call-1",
+        "capability_ref": "search.read",
+        "result": {
+          "matches": 1
+        },
+        "structured": true,
+        "returned_to_model": true
+      }
+    ],
+    "tool_results_are_prompt_text": false
   }
 }
