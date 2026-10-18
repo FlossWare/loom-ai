@@ -1,0 +1,80 @@
+{
+  "fixture": "structured-tool-call-bounded-loop",
+  "version": "0.1",
+  "semantic_area": "worker_structured_tool_calls",
+  "setup": {
+    "configured_capabilities": [
+      "search.read"
+    ],
+    "max_tool_calls": 2,
+    "max_duration_ms": 5000,
+    "max_output_bytes": 4096,
+    "trusted_binding_available": true,
+    "input_validator_available": true,
+    "authorization_required": true,
+    "approval_required": false
+  },
+  "model_responses": [
+    {
+      "kind": "tool_calls",
+      "calls": [
+        {
+          "call_id": "call-1",
+          "capability_ref": "search.read",
+          "arguments": {
+            "query": "Loom contract"
+          }
+        }
+      ]
+    },
+    {
+      "kind": "final",
+      "content": "The configured search returned one result."
+    }
+  ],
+  "required_semantics": {
+    "outcome": "worker_result",
+    "capability_invocations": [
+      {
+        "call_id": "call-1",
+        "capability_ref": "search.read",
+        "order": 1,
+        "validation_before_invocation": true,
+        "authorization_before_invocation": true,
+        "trusted_binding_only": true
+      }
+    ],
+    "rejected_cases": [
+      {
+        "reason": "unknown_capability",
+        "must_invoke": false
+      },
+      {
+        "reason": "invalid_arguments",
+        "must_invoke": false
+      },
+      {
+        "reason": "duplicate_call_id",
+        "must_invoke": false
+      },
+      {
+        "reason": "call_budget_exhausted",
+        "must_invoke": false
+      },
+      {
+        "reason": "deadline_exceeded",
+        "must_invoke": false
+      }
+    ],
+    "tool_results_are_bounded": true,
+    "ordinary_text_is_not_executable": true,
+    "private_model_reasoning_exposed": false,
+    "conformance": [
+      "model output cannot authorize a capability by itself",
+      "every invocation uses an explicitly configured capability",
+      "trusted validation and policy checks precede invocation",
+      "tool call count and duration limits are enforced",
+      "final Result preserves externally observable outcome evidence"
+    ]
+  }
+}
