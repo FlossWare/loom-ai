@@ -1,0 +1,52 @@
+{
+  "schema_version": "0.1",
+  "worker_id": "test-worker",
+  "purpose": "Run declared tests and return verifiable test evidence",
+  "model_gateway": {
+    "gateway_ref": "default-model-gateway",
+    "selection_ref": "coding-balanced"
+  },
+  "instructions": [
+    "Run only declared test commands.",
+    "Report exit status and bounded output.",
+    "Do not claim tests that were not run."
+  ],
+  "tools": [
+    {
+      "name": "run-tests",
+      "description": "Execute a declared test command",
+      "capability_ref": "verification.run",
+      "required": true
+    },
+    {
+      "name": "read-test-artifact",
+      "description": "Read a test result artifact",
+      "capability_ref": "artifact.read",
+      "required": true
+    }
+  ],
+  "capabilities": [
+    "verification.run",
+    "artifact.read"
+  ],
+  "policy": {
+    "policy_ref": "bounded-verification",
+    "approval_required": true,
+    "allowed_capabilities": [
+      "verification.run",
+      "artifact.read"
+    ],
+    "denied_capabilities": [
+      "credential.read",
+      "secret.export"
+    ]
+  },
+  "limits": {
+    "max_attempts": 2,
+    "max_duration_seconds": 900,
+    "max_output_bytes": 200000
+  },
+  "metadata": {
+    "team": "engineering"
+  }
+}
