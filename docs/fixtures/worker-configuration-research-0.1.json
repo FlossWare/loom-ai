@@ -1,0 +1,52 @@
+{
+  "schema_version": "0.1",
+  "worker_id": "research-worker",
+  "purpose": "Compare supplied sources and return evidence-backed findings",
+  "model_gateway": {
+    "gateway_ref": "default-model-gateway",
+    "selection_ref": "research-balanced"
+  },
+  "instructions": [
+    "Use only configured source access.",
+    "Separate observations from conclusions.",
+    "Cite sources for factual claims."
+  ],
+  "tools": [
+    {
+      "name": "search-sources",
+      "description": "Search configured source indexes",
+      "capability_ref": "search.query",
+      "required": true
+    },
+    {
+      "name": "read-document",
+      "description": "Read a source document",
+      "capability_ref": "repository.read",
+      "required": true
+    }
+  ],
+  "capabilities": [
+    "search.query",
+    "repository.read"
+  ],
+  "policy": {
+    "policy_ref": "bounded-research",
+    "approval_required": true,
+    "allowed_capabilities": [
+      "search.query",
+      "repository.read"
+    ],
+    "denied_capabilities": [
+      "credential.read",
+      "secret.export"
+    ]
+  },
+  "limits": {
+    "max_attempts": 2,
+    "max_duration_seconds": 900,
+    "max_output_bytes": 200000
+  },
+  "metadata": {
+    "team": "engineering"
+  }
+}

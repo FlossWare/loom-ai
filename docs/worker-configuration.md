@@ -83,3 +83,42 @@ A runtime MUST NOT treat a model response, a capability reference, or a caller-s
 Capability arguments and results MUST be JSON-compatible values. Every configured `input_schema_ref` MUST resolve to a trusted runtime validator; an unresolved schema reference MUST fail closed. Before approval or execution, the runtime MUST validate the argument object against the registered input contract when one exists, and MUST detach it from caller-owned mutable data. Validators and approval authorizers MUST receive detached copies so their mutations cannot change the arguments later executed by the binding. The binding MUST receive a separate detached copy of the validated and approved arguments. The binding result MUST be serialized as UTF-8 JSON with non-finite numbers rejected; the serialized result MUST NOT exceed the Worker's `limits.max_output_bytes`. Unsupported values and over-limit results MUST fail explicitly and MUST NOT be returned as successful capability results. Bindings may impose stricter per-capability bounds.
 
 This contract does not prescribe a provider-specific tool-call format. Model-native tool-call parsing and the mapping from a model's requested call to this runtime boundary are separate adapter responsibilities; implementations must not infer a tool call by executing arbitrary text emitted by a model.
+
+## Model-facing tool names
+
+A tool entry MAY include a `name` and `description`. `name` is the model-facing
+selector; the runtime maps it to the entry's trusted `capability_ref`. When
+`name` is omitted, implementations use `capability_ref` as the compatibility
+default. Names MUST be unique within one Worker configuration. A model response
+MUST request a configured tool name, not supply a capability reference for
+direct resolution. A name or description never grants permission: the runtime
+still checks effective policy, schema validation, trusted bindings, and required
+approval before invocation.
+
+## Worker role examples
+
+All examples use the same language-neutral envelope. Their differences are
+purpose, instructions, configured tools, and effective policy, not a separate
+Agent abstraction.
+
+- **Coding Worker:** inspect and modify a bounded repository scope, then return
+  changed-file and verification evidence. Typical tools are `read-file`,
+  `edit-file`, and `run-verification`.
+- **Research Worker:** gather and compare supplied sources, distinguish
+  observations from conclusions, and return cited evidence. Typical tools are
+  `search-sources` and `read-document`.
+- **Scraping Worker:** retrieve only explicitly permitted public resources,
+  obey configured host/rate/output limits, and preserve source provenance.
+  Typical tools are `fetch-resource` and `extract-structured-data`.
+- **Test Worker:** execute declared test commands and return exit status,
+  bounded output, and test evidence. Typical tools are `run-tests` and
+  `read-test-artifact`.
+- **Review Worker:** inspect a proposed change and report findings against
+  declared criteria without modifying the change. Typical tools are
+  `read-diff`, `read-file`, and `record-review`.
+
+These names are illustrative, not built-in capabilities. A deployment must
+provide each referenced tool through its trusted runtime registry and policy.
+A configuration that names an unavailable or unauthorized capability MUST fail
+activation or invocation according to the contract; it must not invent a
+binding from the example.

@@ -1,0 +1,52 @@
+{
+  "schema_version": "0.1",
+  "worker_id": "scraping-worker",
+  "purpose": "Retrieve explicitly permitted resources within configured limits",
+  "model_gateway": {
+    "gateway_ref": "default-model-gateway",
+    "selection_ref": "research-balanced"
+  },
+  "instructions": [
+    "Access only authorized hosts.",
+    "Respect rate and output limits.",
+    "Preserve source provenance."
+  ],
+  "tools": [
+    {
+      "name": "fetch-resource",
+      "description": "Fetch an authorized public resource",
+      "capability_ref": "web.fetch",
+      "required": true
+    },
+    {
+      "name": "extract-structured-data",
+      "description": "Extract structured fields from fetched content",
+      "capability_ref": "content.extract",
+      "required": true
+    }
+  ],
+  "capabilities": [
+    "web.fetch",
+    "content.extract"
+  ],
+  "policy": {
+    "policy_ref": "bounded-retrieval",
+    "approval_required": true,
+    "allowed_capabilities": [
+      "web.fetch",
+      "content.extract"
+    ],
+    "denied_capabilities": [
+      "credential.read",
+      "secret.export"
+    ]
+  },
+  "limits": {
+    "max_attempts": 2,
+    "max_duration_seconds": 900,
+    "max_output_bytes": 200000
+  },
+  "metadata": {
+    "team": "engineering"
+  }
+}

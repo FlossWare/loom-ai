@@ -1,0 +1,52 @@
+{
+  "schema_version": "0.1",
+  "worker_id": "review-worker",
+  "purpose": "Review a proposed change against declared criteria without editing it",
+  "model_gateway": {
+    "gateway_ref": "default-model-gateway",
+    "selection_ref": "review-balanced"
+  },
+  "instructions": [
+    "Inspect the complete change scope.",
+    "Report findings with evidence.",
+    "Do not modify the reviewed change."
+  ],
+  "tools": [
+    {
+      "name": "read-diff",
+      "description": "Read the proposed change",
+      "capability_ref": "repository.diff",
+      "required": true
+    },
+    {
+      "name": "read-file",
+      "description": "Read a repository file",
+      "capability_ref": "repository.read",
+      "required": true
+    }
+  ],
+  "capabilities": [
+    "repository.diff",
+    "repository.read"
+  ],
+  "policy": {
+    "policy_ref": "read-only-review",
+    "approval_required": true,
+    "allowed_capabilities": [
+      "repository.diff",
+      "repository.read"
+    ],
+    "denied_capabilities": [
+      "credential.read",
+      "secret.export"
+    ]
+  },
+  "limits": {
+    "max_attempts": 2,
+    "max_duration_seconds": 900,
+    "max_output_bytes": 200000
+  },
+  "metadata": {
+    "team": "engineering"
+  }
+}
