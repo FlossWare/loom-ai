@@ -12,7 +12,13 @@
     "trusted_binding_available": true,
     "input_validator_available": true,
     "authorization_required": true,
-    "approval_required": false
+    "approval_required": false,
+    "configured_tools": [
+      {
+        "name": "search.read",
+        "capability_ref": "search.read"
+      }
+    ]
   },
   "model_responses": [
     {
@@ -20,10 +26,10 @@
       "calls": [
         {
           "call_id": "call-1",
-          "capability_ref": "search.read",
           "arguments": {
             "query": "Loom contract"
-          }
+          },
+          "tool_name": "search.read"
         }
       ]
     },
@@ -41,7 +47,8 @@
         "order": 1,
         "validation_before_invocation": true,
         "authorization_before_invocation": true,
-        "trusted_binding_only": true
+        "trusted_binding_only": true,
+        "tool_name": "search.read"
       }
     ],
     "rejected_cases": [
@@ -96,12 +103,12 @@
     "tool_results": [
       {
         "call_id": "call-1",
-        "capability_ref": "search.read",
         "result": {
           "matches": 1
         },
         "structured": true,
-        "returned_to_model": true
+        "returned_to_model": true,
+        "tool_name": "search.read"
       }
     ],
     "tool_results_are_prompt_text": false
