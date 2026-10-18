@@ -93,3 +93,33 @@ An implementation should provide an explicit representation/version for its dura
 
 The semantic boundary is intentionally small: stable execution identity, durable resumable state, preserved evidence/provenance, explicit interruption/terminal semantics, and independent persistence. Concrete APIs, storage schemas, and transport operations belong to language or implementation-specific layers.
 
+
+
+## Provider-neutral structured tool calls
+
+A model-backed Worker may receive a structured request to invoke a tool, but a
+provider's response is a request, not execution authority. A conforming runtime
+must map each requested call to an explicitly configured capability and invoke
+it only through the trusted binding, input validation, authorization, and
+approval boundaries already defined for that Worker.
+
+The provider-neutral semantic shape is:
+
+- a stable call identifier scoped to one model response;
+- an exact configured capability reference;
+- a JSON-compatible argument object;
+- an explicit distinction between a final model response and a response that
+  requests tool execution.
+
+A runtime must reject unknown or unauthorized capability references, malformed
+or non-JSON arguments, duplicate call identifiers within one response, and
+calls that exceed the Worker's configured attempt, duration, or output limits.
+It must not infer executable calls from ordinary response text. Tool results
+must be returned to the model as bounded structured observations, and the
+Worker must stop when the call budget or overall deadline is exhausted. Provider
+wire formats are adapter details and are not part of this contract.
+
+The [structured-tool-call-bounded-loop fixture](fixtures/structured-tool-call-bounded-loop.json)
+defines the minimum observable behavior: only configured capabilities execute,
+validation and policy checks precede execution, calls are bounded, and the final
+Worker Result retains outcome evidence without exposing private model reasoning.
